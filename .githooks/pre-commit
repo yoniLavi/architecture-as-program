@@ -1,41 +1,11 @@
 #!/bin/sh
-# Pre-commit hook: validate and export typst documents
+# Pre-commit hook: build outputs and check for unused citations
 
-ROOT="$(git rev-parse --show-toplevel)"
-DIST="$ROOT/dist"
-mkdir -p "$DIST"
+set -e
 
-# PDF export (via typst) — also validates citations, types, syntax
-if command -v typst >/dev/null 2>&1; then
-    echo "Building PDF..."
-    if ! typst compile "$ROOT/proposal.typ" "$DIST/proposal.pdf" 2>&1; then
-        echo "Pre-commit: typst compilation failed."
-        exit 1
-    fi
-    echo "Exported dist/proposal.pdf"
-else
-    echo "ERROR: typst not installed."
-    exit 1
-fi
-
-# Markdown export with rendered bibliography (via pandoc + citeproc)
-if command -v pandoc >/dev/null 2>&1; then
-    echo "Building markdown..."
-    if ! pandoc "$ROOT/proposal.typ" -f typst -t markdown --wrap=none \
-        --lua-filter="$ROOT/scripts/resolve-crossrefs.lua" \
-        --citeproc --bibliography="$ROOT/citations.bib" --csl="$ROOT/scripts/ieee.csl" \
-        -o "$DIST/proposal.md" 2>&1; then
-        echo "Pre-commit: pandoc export failed."
-        exit 1
-    fi
-    python3 "$ROOT/scripts/clean-markdown.py" "$DIST/proposal.md"
-    echo "Exported dist/proposal.md"
-else
-    echo "ERROR: pandoc not installed."
-    exit 1
-fi
+make build
 
 # Check for unused bib entries (warnings only, non-blocking)
-python3 "$ROOT/scripts/check-citations.py"
+python3 "$(git rev-parse --show-toplevel)/scripts/check-citations.py"
 
 echo "Pre-commit checks passed."
