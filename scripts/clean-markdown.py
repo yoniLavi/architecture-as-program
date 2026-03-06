@@ -45,6 +45,9 @@ def clean(text: str) -> str:
         text,
     )
 
+    # Fix image paths: dist/diagrams/foo.svg → diagrams/foo.svg (markdown lives in dist/)
+    text = re.sub(r'src="dist/', 'src="', text)
+
     # Collapse runs of 3+ blank lines into 2
     text = re.sub(r"\n{4,}", "\n\n\n", text)
 

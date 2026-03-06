@@ -215,42 +215,65 @@ An important open design question must be acknowledged here. The trust annotatio
 
 === A concrete graph <sec:concrete-graph>
 
-The following pseudocode sketches a small order-processing pipeline as a signal graph. No concrete syntax has been designed; this is illustrative of the kind of artifact a developer would author and review.
+The following pseudocode sketches an AI customer support agent as a signal graph. This scenario was chosen because it is a domain where the security properties of the signal graph model are most immediately visible: untrusted user input, LLM invocations with and without tool access, and fine-grained capability distinctions are all present. No concrete syntax has been designed; this is illustrative of the kind of artifact a developer would author and review.
 
 ```
-graph OrderProcessing {
-  node ParseRequest :
-    (RawHTTPRequest) → Untrusted<OrderRequest>
+graph CustomerSupport {
+  node ReceiveMessage :
+    (RawWebSocket) → Untrusted<UserMessage>
 
-  node ValidateOrder :
-    (Untrusted<OrderRequest>, DBHandle<'products', read>)
-    → OrderRequest
+  node SanitiseInput :
+    (Untrusted<UserMessage>) → UserMessage
 
-  node ProcessPayment :
-    (OrderRequest, PaymentGateway<'stripe'>)
-    → Result<PaymentResult, PaymentError>
+  node ModerateContent :
+    (UserMessage, LLMClient<no-tools>)
+    → Result<UserMessage, PolicyViolation, EscalationRequest>
 
-  node ConfirmOrder :
-    (OrderRequest, PaymentResult,
-     DBHandle<'orders', write>, EventEmitter<'order-events'>)
-    → OrderConfirmation
+  node FetchContext :
+    (UserMessage, DBHandle<'kb', read>)
+    → ConversationContext
 
-  node HandlePaymentFailure :
-    (OrderRequest, PaymentError, EventEmitter<'order-events'>)
-    → FailureNotification
+  node GenerateResponse :
+    (ConversationContext, LLMClient<[lookup]>,
+     DBHandle<'kb', read>)
+    → AgentResponse
 
-  edge ParseRequest.out       → ValidateOrder.input
-  edge ValidateOrder.out      → ProcessPayment.order
-  edge ValidateOrder.out      → ConfirmOrder.order
-  edge ValidateOrder.out      → HandlePaymentFailure.order
-  edge ProcessPayment.ok      → ConfirmOrder.payment
-  edge ProcessPayment.err     → HandlePaymentFailure.error
+  node SendReply :
+    (AgentResponse, WebSocket<user-session>)
+    → DeliveryConfirmation
+
+  node NotifyUser :
+    (PolicyViolation, WebSocket<user-session>)
+    → DeliveryConfirmation
+
+  node EscalateToHuman :
+    (EscalationRequest, EventEmitter<'support-queue'>)
+    → EscalationTicket
+
+  edge ReceiveMessage.out      → SanitiseInput.input
+  edge SanitiseInput.out       → ModerateContent.input
+  edge ModerateContent.safe    → FetchContext.input
+  edge ModerateContent.violation → NotifyUser.input
+  edge ModerateContent.escalate → EscalateToHuman.input
+  edge FetchContext.out        → GenerateResponse.context
+  edge GenerateResponse.out    → SendReply.input
 }
 ```
 
-This is simultaneously the architecture diagram, the security policy, and the program. The capability distribution is visible at a glance: only `ValidateOrder` can read the product catalogue; only `ProcessPayment` touches the payment gateway; only `ConfirmOrder` can write orders and emit events; `HandlePaymentFailure` can emit events but not write orders. `ParseRequest` has no capabilities at all — it is pure parsing. A reviewer examining this graph sees the entire attack surface in the wiring. An AI agent implementing `ParseRequest` would receive its signature and contracts but would have no mechanism to access a database or payment gateway, regardless of what code it generates.
+#figure(
+  image("dist/diagrams/customer-support.svg", width: 85%),
+  caption: [The CustomerSupport signal graph. The red zone marks untrusted data flow; the green zone marks the sanitised region. LLM capabilities (blue) show graduated access: the moderation LLM has no tools; the response LLM has only a lookup tool. Grey annotations show other injected capabilities.],
+) <fig:customer-support>
 
-The graph includes conditional routing: `ProcessPayment` returns a `Result`, and the `.ok` and `.err` edges direct the success and failure cases to different downstream nodes. The precise syntax for conditional routing, fan-out, and error propagation is an open design question for the Phase 1 language design; see Technical Note A.
+This diagram is simultaneously the architecture diagram, the security policy, and the program. Several properties are visible at a glance, without reading any implementation code.
+
+_Prompt injection is structurally prevented._ The first LLM in the pipeline (`ModerateContent`) has `LLMClient<no-tools>`: even if a user's message contains adversarial instructions that influence the moderation LLM's behaviour, the LLM has no tool access and therefore no mechanism to act on them. The second LLM (`GenerateResponse`) has tool access (`LLMClient<[lookup]>`), but receives only messages that have passed both sanitisation _and_ content moderation. A direct path from untrusted input to a tool-capable LLM does not exist in the graph; it would be ill-typed.
+
+_Capability distribution is minimal and visible._ `ReceiveMessage` and `SanitiseInput` are pure — no capabilities at all. `FetchContext` has read-only knowledge base access. `GenerateResponse` has a scoped LLM client and read-only database access. `SendReply` and `NotifyUser` each have only a session-scoped WebSocket. `EscalateToHuman` can emit to the support queue but cannot read or write any database. No node has more authority than its function requires, and the authority distribution is the graph's wiring, not a policy document.
+
+_Conditional routing is explicit._ `ModerateContent` produces a three-way result: safe messages continue to the response pipeline, policy violations are routed to user notification, and ambiguous cases are escalated to human agents. The routing is a structural property of the graph, visible in the diagram and the pseudocode.
+
+The precise syntax for conditional routing, fan-out, and error propagation is an open design question for the Phase 1 language design; see Technical Note A.
 
 == The development workflow <sec:workflow>
 

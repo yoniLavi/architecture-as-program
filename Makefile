@@ -1,15 +1,21 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 DIST := $(ROOT)/dist
 
+DIAGRAMS_SRC := $(wildcard diagrams/*.typ)
+DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC))
+
 .PHONY: build clean
 
 build: $(DIST)/proposal.pdf $(DIST)/proposal.md
 	@echo "Build complete."
 
-$(DIST)/proposal.pdf: proposal.typ citations.bib | $(DIST)
+$(DIST)/diagrams/%.svg: diagrams/%.typ | $(DIST)/diagrams
+	typst compile $< $@ --format svg
+
+$(DIST)/proposal.pdf: proposal.typ citations.bib $(DIAGRAMS_SVG) | $(DIST)
 	typst compile $< $@
 
-$(DIST)/proposal.md: proposal.typ citations.bib scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(DIST)
+$(DIST)/proposal.md: proposal.typ citations.bib $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(DIST)
 	pandoc $< -f typst -t markdown --wrap=none \
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
@@ -17,6 +23,9 @@ $(DIST)/proposal.md: proposal.typ citations.bib scripts/resolve-crossrefs.lua sc
 	python3 scripts/clean-markdown.py $@
 
 $(DIST):
+	mkdir -p $@
+
+$(DIST)/diagrams: | $(DIST)
 	mkdir -p $@
 
 clean:
