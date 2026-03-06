@@ -28,7 +28,7 @@
     snap: -1,
     name: <untrusted>),
 
-  node(enclose: ((-1.5, 2.0), (0, 2.2), (-1.2, 3.4), (0, 3.4), (1.2, 3.4), (0, 4.4), (0, 5.4)),
+  node(enclose: ((-1.5, 2.0), (0, 2.2), (-1.2, 3.4), (0, 3.4), (1.2, 3.4), (0, 4.4), (0, 5.4), (1.2, 5.4)),
     stroke: 1pt + ok-color,
     fill: trusted-bg,
     corner-radius: 5pt,
@@ -59,6 +59,7 @@
   // Success path continues
   node((0, 4.4), align(center)[*GenerateResponse*\ #llm-cap[LLMClient\<\[lookup\]\>] \ #cap[DBHandle\<'kb', read\>]]),
   node((0, 5.4), align(center)[*SendReply*\ #cap[WebSocket\<user-session\>]]),
+  node((1.2, 5.4), align(center)[*HandleLLMError*\ #cap[WebSocket\<user-session\>]]),
 
   // === Edges ===
   edge((0, 0), (0, 1), "->",
@@ -83,6 +84,9 @@
     label: text(size: 7pt)[ConversationContext],
     label-side: right),
   edge((0, 4.4), (0, 5.4), "->",
-    label: text(size: 7pt)[AgentResponse],
+    label: text(size: 7pt, fill: ok-color)[ok],
+    label-side: left),
+  edge((0, 4.4), (1.2, 5.4), "->",
+    label: text(size: 7pt, fill: err-color)[error],
     label-side: right),
 )
