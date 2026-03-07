@@ -1,4 +1,4 @@
-Please perform a critical review of the research proposal in this repository.
+Please perform a full critical review of the research proposal in this repository.
 
 ## Phase 1: Read everything
 
