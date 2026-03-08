@@ -27,7 +27,7 @@ The proposal follows a deliberate argument arc:
 5. **Proposed system** (§5) — Signal graph definition, concrete example, development workflow, runtime, performance, security properties
 6. **Research agenda** (§6) — Three phases: demonstrator → hardening → formal foundations
 7. **Why now** (§7) — Four converging developments
-8. **Technical Note A** — Open problems (compositionality, coercion, replay, compilation, distributed authority)
+8. **Technical Note A** — Open problems (compositionality, coercion, replay, compilation, error handling, node-local state, graph-scale comprehension, graph evolution, distributed authority)
 9. **Annex B** — Areas for collaboration
 
 ## When editing the proposal
@@ -35,7 +35,7 @@ The proposal follows a deliberate argument arc:
 - **Maintain hedging on unproven claims.** The type system does not exist yet. Claims about properties it would provide use conditional language ("would be inexpressible", "in a well-typed realisation", "in a sound realisation of the type system"). Do not strengthen these to present tense without an implementation to back them.
 - **Keep citations accurate.** Every factual claim about prior work should be traceable to a citation. If adding a new claim, add the citation. Run `make build` to catch broken references (typst will error) and `scripts/check-citations.py` to catch orphaned bib entries.
 - **Preserve the argument arc.** Each section builds on the previous. New content should slot into the existing structure, not break the flow.
-- **Concrete over abstract.** The proposal's weakest mode is unsupported generality. Prefer specific examples (like the `OrderProcessing` graph or the `Untrusted<UserMessage>` type error) over sweeping claims.
+- **Concrete over abstract.** The proposal's weakest mode is unsupported generality. Prefer specific examples (like the `CustomerSupport` graph or the `Untrusted<UserMessage>` type error) over sweeping claims.
 - **Acknowledge limitations honestly.** Technical Note A exists for a reason. If a new claim has an open problem, name it there.
 
 ## Build
