@@ -37,9 +37,16 @@ Focus exclusively on these dimensions:
 - Every recommendation must be self-contained: implementing it should not open new questions or require follow-up changes elsewhere.
 - Prefer cuts and rewrites over additions. The proposal should not get longer.
 
+**Classify each recommendation:**
+- **Safe fix:** corrects an error or inconsistency without changing any claim. Unlikely to draw reviewer attention.
+- **Judgement call:** improves the text but touches framing, scope, or emphasis. Could open new questions.
+
 Present findings as a flat prioritised list. For each recommendation:
 - **What:** the specific problem, with line numbers
+- **Classification:** safe fix or judgement call
 - **Why it matters:** impact on credibility or clarity
 - **Suggested fix:** concrete, minimal, and unlikely to prompt further review concerns
+
+**If the proposal is clean enough that remaining issues are all judgement calls, say so.** A "no safe fixes remain" result is a valid and useful outcome.
 
 Do NOT make any changes. Present the review for discussion first.

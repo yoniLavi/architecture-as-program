@@ -211,7 +211,7 @@ A parallel development at a different level of technical sophistication supports
 
 The primary artifact is a version-controlled, typed signal graph with the following structure.
 
-*Nodes* are pure functions with explicit signatures. A node's signature declares its typed input signals, its typed output signals, and its injected capability handles. A node with no capability handles in its signature would be guaranteed pure; there is no ambient mechanism through which it could acquire authority.
+*Nodes* are pure functions with explicit signatures. A node's signature declares its typed input signals, its typed output signals, and its injected capability handles. A node with no capability handles in its signature would be guaranteed pure; there would be no ambient mechanism through which it could acquire authority.
 
 *Edges* are typed signal connections between nodes. An edge from node A's output to node B's input is valid only if the types match. Capability handles are wired explicitly: the graph's toplevel wiring determines which nodes receive which capabilities. This wiring is the architecture's security policy, expressed as graph structure rather than prose.
 
@@ -302,9 +302,9 @@ Nodes are individually testable by injecting mock capability objects and asserti
 
 Each node executes in a lightweight, capability-restricted sandbox (a WASM module, a Monty-style interpreter, or a BEAM-like process), ideally on CHERI hardware. Critical properties:
 
-*No ambient authority.* A node cannot import libraries, access the filesystem, make network calls, or perform any side effect beyond calling methods on its injected capability objects. This is enforced by the absence of any mechanism, not by a policy guard.
+*No ambient authority.* A node would not be able to import libraries, access the filesystem, make network calls, or perform any side effect beyond calling methods on its injected capability objects. This would be enforced by the absence of any mechanism, not by a policy guard.
 
-*Defence in depth.* The type system would prevent the graph from expressing forbidden capability grants. The runtime sandbox prevents generated code from exceeding its injected capabilities. The operating system compartmentalises processes with OS-level enforcement. On CHERI hardware, the processor prevents capability forgery at the memory level. These layers are not fully independent — the runtime's capability injection is configured by the type system's analysis, so a type system bug could misconfigure the runtime. But they provide overlapping coverage with distinct failure modes: a sandbox escape does not help an attacker who lacks a hardware capability, and a type system error does not propagate past a correctly configured OS compartment. This is weaker than fully independent enforcement but substantially better than any single layer.
+*Defence in depth.* The type system would prevent the graph from expressing forbidden capability grants. The runtime sandbox would prevent generated code from exceeding its injected capabilities. The operating system compartmentalises processes with OS-level enforcement. On CHERI hardware, the processor prevents capability forgery at the memory level. These layers are not fully independent — the runtime's capability injection is configured by the type system's analysis, so a type system bug could misconfigure the runtime. But they provide overlapping coverage with distinct failure modes: a sandbox escape does not help an attacker who lacks a hardware capability, and a type system error does not propagate past a correctly configured OS compartment. This is weaker than fully independent enforcement but substantially better than any single layer.
 
 *Language agnosticism.* WASM is the natural compilation target, supporting Rust, C, C++, Go, and Python (via interpreters such as Monty). The signal graph defines component interfaces using a language-neutral type system; the implementation language is an optimisation choice made by the AI agent, or specified by performance constraints in the node's contract.
 
