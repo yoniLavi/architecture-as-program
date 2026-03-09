@@ -22,6 +22,8 @@ $(DIST)/proposal.md: proposal.typ citations.bib $(DIAGRAMS_SVG) scripts/resolve-
 		-o $@
 	python3 scripts/clean-markdown.py $@
 
+# Typst has experimental native HTML export (typst compile --format html --features html)
+# but as of 0.13/0.14 it lacks CSS output and asset handling. Using pandoc for now.
 $(DIST)/proposal.html: proposal.typ citations.bib $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css | $(DIST)
 	pandoc $< -f typst -t html --standalone --wrap=none \
 		--lua-filter=scripts/resolve-crossrefs.lua \
