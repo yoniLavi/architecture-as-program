@@ -4,9 +4,10 @@ A research proposal for capability-injected, model-driven software development i
 
 ## Reading the proposal
 
-Pre-built outputs are in `dist/`:
-- `dist/proposal.pdf` — formatted PDF
-- `dist/proposal.md` — plain markdown (for pasting into Google Docs, etc.)
+- [**PDF**](https://yonilavi.github.io/architecture-as-program/proposal.pdf) (formatted)
+- [**Markdown**](https://yonilavi.github.io/architecture-as-program/proposal.md) (plain text, for pasting into Google Docs, etc.)
+
+These are built automatically from source on every push to `main`.
 
 ## Building from source
 
