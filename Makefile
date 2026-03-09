@@ -6,7 +6,7 @@ DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC)
 
 .PHONY: build clean
 
-build: $(DIST)/proposal.pdf $(DIST)/proposal.md
+build: $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 	@echo "Build complete."
 
 $(DIST)/diagrams/%.svg: diagrams/%.typ | $(DIST)/diagrams
@@ -21,6 +21,14 @@ $(DIST)/proposal.md: proposal.typ citations.bib $(DIAGRAMS_SVG) scripts/resolve-
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		-o $@
 	python3 scripts/clean-markdown.py $@
+
+$(DIST)/proposal.html: proposal.typ citations.bib $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css | $(DIST)
+	pandoc $< -f typst -t html --standalone --wrap=none \
+		--lua-filter=scripts/resolve-crossrefs.lua \
+		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
+		--css=proposal.css \
+		-o $@
+	cp scripts/proposal.css $(DIST)/
 
 $(DIST):
 	mkdir -p $@

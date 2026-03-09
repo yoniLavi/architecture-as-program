@@ -5,6 +5,7 @@ A research proposal for capability-injected, model-driven software development i
 ## Reading the proposal
 
 - [**PDF**](https://yonilavi.github.io/architecture-as-program/proposal.pdf) (formatted)
+- [**HTML**](https://yonilavi.github.io/architecture-as-program/proposal.html) (web-readable)
 - [**Markdown**](https://yonilavi.github.io/architecture-as-program/proposal.md) (plain text, for pasting into Google Docs, etc.)
 
 These are built automatically from source on every push to `main`.
