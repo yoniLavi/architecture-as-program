@@ -28,6 +28,7 @@ $(DIST)/proposal.html: proposal.typ citations.bib $(DIAGRAMS_SVG) scripts/resolv
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		--css=proposal.css \
 		-o $@
+	python3 scripts/clean-html.py $@
 	cp scripts/proposal.css $(DIST)/
 
 $(DIST):
