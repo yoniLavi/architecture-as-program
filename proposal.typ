@@ -131,7 +131,7 @@ The Object Management Group's Model-Driven Architecture (MDA) programme @omg_mda
 
 The C4 model @brown_c4_2018 provides a hierarchical approach to software architecture visualisation across four levels of abstraction: Context, Containers, Components, and Code. It has become the most widely adopted lightweight architecture diagramming approach, supported by tools including Structurizr, LikeC4, IcePanel, and Mermaid.
 
-Two recent developments extend C4 toward the role we envision. LikeC4 @likec4_2025 provides an MCP server that exposes the architecture model to AI agents as a queryable knowledge base, transforming static diagrams into an interactive substrate that agents can interrogate. Some practitioners have begun using C4 models as "executable context" for agents, maintaining the architecture model in the repository as the source of truth that constrains agent behaviour.
+Two recent developments extend C4 toward the role we envision. LikeC4 @likec4_2025 provides an MCP server that exposes the architecture model to AI agents as a queryable knowledge base, transforming static diagrams into an interactive substrate that agents can interrogate. Some practitioners, including the author @lavi_c4_skill_2025, have begun using C4 models as "executable context" for agents, maintaining the architecture model in the repository as the source of truth that constrains agent behaviour.
 
 C4's limitation for our purposes is that it is a _communication_ model, not a _constraint_ model. It describes architecture but does not enforce it. Our proposal replaces the C4 model with a typed signal graph that both describes and enforces; the diagram and the program are the same artifact.
 
