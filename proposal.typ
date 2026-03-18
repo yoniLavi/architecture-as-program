@@ -92,7 +92,7 @@ More recently, the FRP research community has explored _differential_ computatio
 In the signal graph, the same scenario is expressed as two nodes. The first, `UserInputHandler`, has signature:
 
 ```
-UserInputHandler : (RawHTTPRequest, DBHandle<'sessions'>) → Untrusted<UserMessage>
+UserInputHandler : (HTTPRequest<'POST', 'user:message'>, DBHandle<'sessions'>) → Untrusted<UserMessage>
 ```
 
 The second, `LLMOrchestrator`, has signature:
@@ -101,7 +101,7 @@ The second, `LLMOrchestrator`, has signature:
 LLMOrchestrator : (SanitisedPrompt, LLMClient<tools>) → AgentResponse
 ```
 
-A direct wiring from `UserInputHandler`'s output to `LLMOrchestrator`'s input is a _type error_: `Untrusted<UserMessage>` does not match `SanitisedPrompt`. The graph cannot be assembled without an explicit sanitisation node whose signature is `(Untrusted<UserMessage>) → SanitisedPrompt`, a node whose existence is visible in the architecture, whose implementation is subject to contract verification, and whose presence is required by the type system rather than by a policy document. In a well-typed realisation of this model, the prompt injection vulnerability would be _ill-typed_: no well-typed graph could express it. The type system design that delivers this guarantee is the central obligation of Phase 1 (@sec:phase1); the example illustrates the target property, not a proven result.
+A direct wiring from `UserInputHandler`'s output to `LLMOrchestrator`'s input is a _type error_: `Untrusted<UserMessage>` does not match `SanitisedPrompt`. The graph cannot be assembled without an explicit node that transforms `Untrusted<UserMessage>` into `SanitisedPrompt` — a node whose existence is visible in the architecture, whose implementation is subject to contract verification, and whose presence is required by the type system rather than by a policy document. In a well-typed realisation of this model, the prompt injection vulnerability would be _ill-typed_: no well-typed graph could express it. The type system design that delivers this guarantee is the central obligation of Phase 1 (@sec:phase1); the example illustrates the target property, not a proven result.
 
 == From UI programming to whole-system architecture <sec:frp-architecture>
 
@@ -215,11 +215,11 @@ A parallel development at a different level of technical sophistication supports
 
 The primary artifact is a version-controlled, typed signal graph with the following structure.
 
-*Nodes* are pure functions with explicit signatures. A node's signature declares its typed input signals, its typed output signals, and its injected capability handles. A node with no capability handles in its signature would be guaranteed pure; there would be no ambient mechanism through which it could acquire authority.
+*Nodes* are pure functions with explicit signatures. A node's signature declares its typed inputs and typed outputs. Some inputs are data signals from upstream nodes; others are _capability handles_ — typed references to external resources such as database connections, LLM clients, or message channels. Capabilities are ordinary typed values, consistent with the object-capability model (@sec:capabilities): the type system distinguishes them (a `DBHandle` is not a `CustomerQuery`), but the graph notation does not treat them as a separate syntactic category. A node whose inputs are all pure data types is guaranteed pure; purity is a statically derivable property of the node's signature.
 
-*Edges* are typed signal connections between nodes. An edge from node A's output to node B's input is valid only if the types match. Capability handles are wired explicitly: the graph's toplevel wiring determines which nodes receive which capabilities. This wiring is the architecture's security policy, expressed as graph structure rather than prose.
+*Edges* are typed connections between nodes. An edge from node A's output to node B's input is valid only if the types match. Data signals and capability handles are both wired as edges; the concrete example below distinguishes them visually, but both are typed connections subject to the same matching rules. The capability edges collectively constitute the architecture's security policy, expressed as reviewable graph structure rather than prose. Because capabilities are ordinary typed values, swapping a production capability for a mock (replacing a live `DBHandle` with a test fixture, for example) requires only a wiring change at the graph boundary — dependency injection is a structural property of the graph rather than a framework pattern.
 
-*Trust annotations* (the type-level markers introduced as trust tainting in @sec:frp-architecture) propagate through the graph. Data entering from untrusted sources carries a type marker, `Untrusted<T>`, that is preserved through transformations unless explicitly discharged by a sanitisation node. In a well-typed realisation, the type system would prevent `Untrusted<T>` from reaching a node that accepts only `T` without sanitisation.
+*Trust annotations* (the type-level markers introduced as trust tainting in @sec:frp-architecture) propagate through the graph. Data entering from untrusted sources carries a type marker, `Untrusted<T>`, that is preserved through transformations until explicitly discharged. In a well-typed realisation, the type system would prevent `Untrusted<T>` from reaching a node that accepts only `T`. Discharge is most effective when it is not merely a label removal but a _type transformation_: converting unstructured input into a constrained representation whose structure limits what downstream nodes can receive. The combination of trust propagation and structural typing is what delivers the security properties claimed in @sec:security.
 
 An important open design question must be acknowledged here. The trust annotation scheme as described enforces the _local_ typing of individual nodes, but the full security guarantee requires that the _wiring_ also be checked; specifically, that a source classified as untrusted at the graph's edge cannot be connected to a node whose signature expects a clean `T`, bypassing the `Untrusted<T>` marker through a widening coercion. This is the standard coercion problem in information-flow type systems #cite(<sabelfeld_language-based_2003>, supplement: [§3]): local type correctness of nodes is necessary but not sufficient for noninterference; the type system must also enforce that the subtyping relation between `Untrusted<T>` and `T` is absent, or equivalently, that wiring compatibility checks are flow-sensitive with respect to trust levels.
 
@@ -229,68 +229,26 @@ Several solutions exist in the literature (most directly, treating trust levels 
 
 === A concrete graph <sec:concrete-graph>
 
-The following pseudocode sketches an AI customer support agent as a signal graph. This scenario was chosen because it is a domain where the security properties of the signal graph model are most immediately visible: untrusted user input, LLM invocations with and without tool access, and fine-grained capability distinctions are all present. Unlike the simplified two-node illustration in @sec:frp-brief, this example shows a realistic pipeline with separate sanitisation and moderation stages. No concrete syntax has been designed; this is illustrative of the kind of artifact a developer would author and review.
+The following pseudocode sketches an AI customer support agent as a signal graph. This scenario was chosen because it is a domain where the security properties of the signal graph model are most immediately visible: untrusted user input, LLM invocations with and without tool access, and fine-grained capability distinctions are all present. Unlike the simplified two-node illustration in @sec:frp-brief, this example shows a realistic pipeline with structured input parsing and content moderation. No concrete syntax has been designed; this is illustrative of the kind of artifact a developer would author and review.
 
-```
-graph CustomerSupport {
-  node ReceiveMessage :
-    (RawWebSocket) → Untrusted<UserMessage>
+#raw(read("dist/graphs/customer-support.graph"), block: true)
 
-  node SanitiseInput :
-    (Untrusted<UserMessage>) → UserMessage
+The graph's parameter list declares its complete external dependencies: an HTTP route, a database handle, two LLM clients with different permission levels, a response channel, and an event emitter. This list is the system's authority manifest. In production, these parameters are bound to real infrastructure; in testing, they are replaced with mocks or deterministic fixtures — no node signature changes, only the bindings at the graph boundary. Because the graph has a typed signature (its parameter list and output types), it can itself be used as a node in a larger graph: a `SupportPlatform` graph might compose `CustomerSupport` alongside an `AgentDashboard` and a `BillingService`, each declaring its own capability requirements, with the platform's parameter list being the union of its sub-graphs' requirements. Hierarchical composition falls out naturally from the model.
 
-  node ModerateContent :
-    (UserMessage, LLMClient<no-tools>)
-    → Result<UserMessage, PolicyViolation, EscalationRequest>  // ok | violation | escalation
-
-  node FetchContext :
-    (UserMessage, DBHandle<'kb', read>)
-    → ConversationContext
-
-  node GenerateResponse :
-    (ConversationContext, LLMClient<[lookup]>,
-     DBHandle<'kb', read>)
-    → Result<AgentResponse, LLMError>
-
-  node HandleLLMError :
-    (LLMError, WebSocket<user-session>)
-    → DeliveryConfirmation
-
-  node SendReply :
-    (AgentResponse, WebSocket<user-session>)
-    → DeliveryConfirmation
-
-  node NotifyUser :
-    (PolicyViolation, WebSocket<user-session>)
-    → DeliveryConfirmation
-
-  node EscalateToHuman :
-    (EscalationRequest, EventEmitter<'support-queue'>)
-    → EscalationTicket
-
-  edge ReceiveMessage.out      → SanitiseInput.input
-  edge SanitiseInput.out       → ModerateContent.input
-  edge ModerateContent.safe    → FetchContext.input
-  edge ModerateContent.violation → NotifyUser.input
-  edge ModerateContent.escalate → EscalateToHuman.input
-  edge FetchContext.out        → GenerateResponse.context
-  edge GenerateResponse.ok      → SendReply.input
-  edge GenerateResponse.error   → HandleLLMError.input
-}
-```
+The `CustomerQuery` type is central to the security argument. `ParseMessage` does not merely strip the `Untrusted` wrapper from free text. It transforms unstructured input into a constrained representation — a classified intent (from a finite set of categories), extracted entity references, and bounded text fields — whose type limits what downstream nodes can receive. The raw message is consumed; downstream nodes never see it. This is a stronger guarantee than trust annotation alone: a well-typed `CustomerQuery` structurally cannot carry arbitrary executable instructions because its type does not permit unbounded free text in positions that flow to privileged nodes. A limitation must be acknowledged: if `CustomerQuery` contains any free-text field, that field could still carry adversarial content. The defence is layered rather than absolute, but each layer is visible in the graph topology and enforceable by the type system.
 
 #figure(
-  image("dist/diagrams/customer-support.svg", width: 85%),
-  caption: [The CustomerSupport signal graph. Red shading marks the untrusted zone; green shading marks the sanitised region. LLM capabilities (blue) show graduated access: the moderation LLM has no tools; the response LLM has only a lookup tool. Dashed edges show typed failure routing. Grey annotations show other injected capabilities.],
+  image("dist/graphs/customer-support.svg", width: 85%),
+  caption: [The CustomerSupport signal graph. Red shading marks the untrusted zone; green shading marks the structured-query region. Thin edges show data flow; thick edges show capability wiring. LLM access (blue) is graduated: no tools for parsing and moderation, a single lookup tool for response generation.],
 ) <fig:customer-support>
 
 This diagram is simultaneously the architecture model, the security policy, and the program. Several properties are visible at a glance, without reading any implementation code.
 
-_Prompt injection would be structurally prevented._ The first LLM in the pipeline (`ModerateContent`) has `LLMClient<no-tools>`: even if a user's message contains adversarial instructions that influence the moderation LLM's behaviour, the LLM has no tool access and therefore no mechanism to act on them. The second LLM (`GenerateResponse`) has tool access (`LLMClient<[lookup]>`), but receives only messages that have passed both sanitisation _and_ content moderation. A direct path from untrusted input to a tool-capable LLM does not exist in the graph; it would be ill-typed.
+_Prompt injection is addressed through structural typing and topological constraint._ `ParseMessage` transforms raw input into a `CustomerQuery`, a constrained representation that discards the original free text. Both LLMs that process user input (`ParseMessage` and `ModerateContent`) have `LLMClient<no-tools>`: even if adversarial instructions influence their behaviour, they have no mechanism to act on them. The tool-capable LLM (`GenerateResponse`) receives only `ConversationContext` assembled from a moderated `CustomerQuery` and knowledge-base lookups — never raw user text. A direct path from untrusted input to a tool-capable LLM does not exist in the graph; it would be ill-typed.
 
-_Capability distribution is minimal and visible._ `SanitiseInput` is pure: no capabilities at all. `ReceiveMessage` receives its input from the runtime boundary. `FetchContext` has read-only knowledge base access. `GenerateResponse` has a scoped LLM client and read-only database access. `SendReply`, `NotifyUser`, and `HandleLLMError` each have only a session-scoped WebSocket. `EscalateToHuman` can emit to the support queue but cannot read or write any database. No node has more authority than its function requires, and the authority distribution is the graph's wiring, not a policy document.
+_Capability distribution is minimal and visible._ The capability wiring section is a complete manifest of the system's authority. `ReceiveMessage` is pure: it transforms a typed HTTP request into a domain message with no capabilities. `ParseMessage` and `ModerateContent` have tool-less LLM access: enough to classify and evaluate text, not enough to act on instructions. `FetchContext` has read-only knowledge-base access. `GenerateResponse` has a scoped LLM client with a single lookup tool and read-only database access. Terminal nodes (`SendReply`, `NotifyUser`, `HandleLLMError`) each have only a session-scoped response channel. `EscalateToHuman` can emit to the support queue but cannot read or write any database. No node has more authority than its function requires.
 
-_Conditional routing and error handling are explicit._ `ModerateContent` produces a three-way result: safe messages continue to the response pipeline, policy violations are routed to user notification, and ambiguous cases are escalated to human agents. `GenerateResponse` returns `Result<AgentResponse, LLMError>`, with the error case routed to `HandleLLMError`. In both cases, the routing is a structural property of the graph, visible in the diagram and the pseudocode.
+_Conditional routing and error handling are explicit._ `ModerateContent` produces a three-way union: approved queries continue to the response pipeline, policy violations are routed to user notification, and ambiguous cases are escalated to human agents. `GenerateResponse` returns `AgentResponse | LLMError`, with the error case routed to `HandleLLMError`. In both cases, the routing is a structural property of the graph, visible in the diagram and the pseudocode.
 
 The precise syntax for conditional routing, fan-out, and error propagation is an open design question for the Phase 1 language design; see Technical Note A.
 
