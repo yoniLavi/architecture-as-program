@@ -226,13 +226,13 @@ def generate_fletcher(g):
             emit(
                 f'  edge(({fp[0]}, {fp[1]}), ({tp[0]}, {tp[1]}), "->",\n'
                 f'    label: text(size: 7pt, fill: rgb("{color_hex}"))[{label_escaped}],\n'
-                f"    label-side: {label_side}),"
+                f"    label-side: {label_side}, label-sep: 5pt),"
             )
         else:
             emit(
                 f'  edge(({fp[0]}, {fp[1]}), ({tp[0]}, {tp[1]}), "->",\n'
                 f"    label: text(size: 7pt)[{label_escaped}],\n"
-                f"    label-side: {label_side}),"
+                f"    label-side: {label_side}, label-sep: 5pt),"
             )
 
     emit(")")
