@@ -212,7 +212,13 @@ def generate_fletcher(g):
             label_text = src["output"] if src else ""
 
         label_escaped = esc(label_text)
-        label_side = e.get("label_side", "right")
+        # Default label side: flip for left-going diagonal edges so labels
+        # don't sit on the line
+        if tp[0] < fp[0] and tp[1] != fp[1]:
+            default_side = "left"
+        else:
+            default_side = "right"
+        label_side = e.get("label_side", default_side)
 
         # Colour: from edge_colors for ports, untrusted colour for
         # edges carrying Untrusted<...> data, default otherwise
