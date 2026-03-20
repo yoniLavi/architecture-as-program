@@ -1,0 +1,96 @@
+{
+  "name": "SupportPlatform",
+
+  "parameters": [
+    "HTTPRoute<'platform:*'>",
+    "DBHandle<'knowledge-base', read>",
+    "DBHandle<'billing', read-write>",
+    "DBHandle<'audit', append>",
+    "LLMClient<inference>",
+    "LLMClient<[lookup]>",
+    "ResponseChannel<user-session>",
+    "ResponseChannel<agent-session>",
+    "EventEmitter<'support-queue'>"
+  ],
+
+  "capabilities": [
+    "DBHandle<'knowledge-base', read>",
+    "DBHandle<'billing', read-write>",
+    "DBHandle<'audit', append>",
+    "LLMClient<inference>",
+    "LLMClient<[lookup]>",
+    "ResponseChannel<user-session>",
+    "ResponseChannel<agent-session>",
+    "EventEmitter<'support-queue'>"
+  ],
+
+  "nodes": [
+    {
+      "name": "RouteRequest",
+      "inputs": ["HTTPRoute<'platform:*'>"],
+      "output": "CustomerRequest | AgentRequest | BillingRequest"
+    },
+    {
+      "name": "CustomerSupport",
+      "inputs": [
+        "CustomerRequest",
+        "DBHandle<'knowledge-base', read>",
+        "LLMClient<inference>",
+        "LLMClient<[lookup]>",
+        "ResponseChannel<user-session>",
+        "EventEmitter<'support-queue'>"
+      ],
+      "output": "ServiceOutcome"
+    },
+    {
+      "name": "AgentDashboard",
+      "inputs": [
+        "AgentRequest",
+        "DBHandle<'knowledge-base', read>",
+        "ResponseChannel<agent-session>"
+      ],
+      "output": "ServiceOutcome"
+    },
+    {
+      "name": "BillingService",
+      "inputs": [
+        "BillingRequest",
+        "DBHandle<'billing', read-write>",
+        "ResponseChannel<user-session>"
+      ],
+      "output": "ServiceOutcome"
+    },
+    {
+      "name": "RecordAudit",
+      "inputs": [
+        "ServiceOutcome",
+        "DBHandle<'audit', append>"
+      ],
+      "output": "AuditConfirmation"
+    }
+  ],
+
+  "data_edges": [
+    { "from": "RouteRequest.customer",  "to": "CustomerSupport" },
+    { "from": "RouteRequest.agent",     "to": "AgentDashboard",  "label_side": "left" },
+    { "from": "RouteRequest.billing",   "to": "BillingService" },
+    { "from": "CustomerSupport",        "to": "RecordAudit",     "label_side": "left" },
+    { "from": "AgentDashboard",         "to": "RecordAudit" },
+    { "from": "BillingService",         "to": "RecordAudit" }
+  ],
+
+  "layout": {
+    "positions": {
+      "RouteRequest":    [0, 0],
+      "CustomerSupport": [-1.2, 1.4],
+      "AgentDashboard":  [0, 1.4],
+      "BillingService":  [1.2, 1.4],
+      "RecordAudit":     [0, 2.8]
+    },
+    "edge_colors": {
+      "customer": "#46c",
+      "agent": "#272",
+      "billing": "#c80"
+    }
+  }
+}

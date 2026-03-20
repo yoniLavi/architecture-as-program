@@ -14,7 +14,8 @@ Focus exclusively on these dimensions:
 ### Internal consistency
 - Are there claims in the body that contradict or are hedged differently from Technical Note A?
 - Are citations used correctly (right claim attributed to right source)?
-- Does the concrete graph example match its prose description and diagram caption?
+- Do the concrete graph examples match their prose descriptions and diagram captions?
+- Is hedging consistent? The proposal uses conditional language ("would be", "in a well-typed realisation", "in a sound realisation of the type system") — check that equivalent claims use equivalent hedging, and that no claim is hedged in one place but stated as fact in another.
 
 ### Overstatement
 - Are there places where the proposal asserts properties of the unbuilt system without conditional language?
@@ -24,6 +25,7 @@ Focus exclusively on these dimensions:
 - Are there sentences or paragraphs that repeat a point already made elsewhere?
 - Are there passages that could be shortened without losing meaning?
 - Is anything present that a reviewer could reasonably ask to be cut?
+- Are prior art descriptions proportionate to their relevance? Each should earn its length through the positioning work it does (the "gap statement" at the end).
 
 ### Surface quality
 - Typos, grammar, awkward phrasing, inconsistent terminology.
@@ -46,6 +48,12 @@ Present findings as a flat prioritised list. For each recommendation:
 - **Classification:** safe fix or judgement call
 - **Why it matters:** impact on credibility or clarity
 - **Suggested fix:** concrete, minimal, and unlikely to prompt further review concerns
+
+## Important guidance
+
+- **Verify before flagging.** Re-read the surrounding context before calling something a hedging gap or inconsistency. The proposal's hedging is deliberate and may appear in the preceding or following sentence rather than inline. False positives waste the author's time and erode trust in the review.
+- **Check Technical Note A.** Before flagging an unacknowledged limitation, verify it isn't already covered there.
+- **Build the project.** Run `make build` to check for broken references or citation issues.
 
 **If the proposal is clean enough that remaining issues are all judgement calls, say so.** A "no safe fixes remain" result is a valid and useful outcome.
 

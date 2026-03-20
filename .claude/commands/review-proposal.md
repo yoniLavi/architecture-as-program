@@ -8,6 +8,7 @@ Read all source files in parallel:
 - `AGENTS.md` (repo context)
 - `Makefile` and `.githooks/pre-commit` (build pipeline)
 - All scripts in `scripts/`
+- All graph definitions in `graphs/`
 
 ## Phase 2: Evaluate the proposal
 
@@ -27,11 +28,13 @@ Assess the proposal on each of these dimensions. For each, give a clear judgemen
 - Are claims appropriately hedged relative to what has actually been built?
 - Are there places where the proposal asserts properties that depend on an unbuilt type system without acknowledging this?
 - Is the concrete graph example sufficient, or does it need more detail?
+- Does the composition example (SupportPlatform) convincingly demonstrate hierarchical composition?
 
 ### Completeness
 - Is the cost model / performance discussion adequate?
 - Is the migration story convincing for practitioners?
 - Are open problems honestly acknowledged?
+- Does Technical Note A cover the right set of problems, or are there gaps?
 
 ### Presentation
 - Is the abstract effective?
@@ -40,7 +43,7 @@ Assess the proposal on each of these dimensions. For each, give a clear judgemen
 - Is the length appropriate, or are there sections that should be cut or expanded?
 
 ### Tooling
-- Does the build pipeline work correctly?
+- Does the build pipeline work correctly? Run `make build` and `scripts/check-citations.py`.
 - Are there missing scripts, broken dependencies, or documentation gaps?
 
 ## Phase 3: Recommendations
@@ -54,5 +57,12 @@ Separate into:
 1. **Must fix before sharing** — issues that would cause informed readers to dismiss the proposal
 2. **Should fix** — issues that weaken the argument but don't break it
 3. **Nice to have** — polish items
+
+## Important guidance
+
+- **Verify before flagging.** If you think hedging is missing, re-read the surrounding paragraph carefully — the proposal uses a consistent pattern of conditional language that may appear several sentences before or after the claim. Don't flag a hedging gap without confirming it's actually absent.
+- **Check cross-references.** When a claim seems unsupported, check whether Technical Note A addresses it before listing it as a gap.
+- **Build the project.** Actually run `make build` to verify — don't just read the Makefile.
+- **Be concrete.** Every recommendation should include specific line numbers and a suggested fix that could be implemented without further discussion.
 
 Do NOT make any changes. Present the review for discussion first.

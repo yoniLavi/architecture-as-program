@@ -13,7 +13,7 @@ This is a **writing project**, not a software project. The primary output is a f
 | `proposal.typ` | The proposal source (Typst markup). This is the artifact that matters. |
 | `citations.bib` | BibTeX bibliography. Every entry must be cited in the proposal; every citation must have an entry. |
 | `graphs/*.json` | Canonical signal graph definitions. Single source of truth for both pseudocode and diagrams. |
-| `Makefile` | Builds `dist/proposal.pdf` and `dist/proposal.md` from source. |
+| `Makefile` | Builds `dist/proposal.pdf`, `dist/proposal.md`, and `dist/proposal.html` from source. |
 | `.githooks/pre-commit` | Runs `make build` + citation check. Enable with `git config core.hooksPath .githooks`. |
 | `scripts/` | Build support: graph generator, pandoc cross-ref filter, markdown cleanup, unused citation checker. |
 
