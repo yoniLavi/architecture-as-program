@@ -54,6 +54,7 @@ Present findings as a flat prioritised list. For each recommendation:
 - **Verify before flagging.** Re-read the surrounding context before calling something a hedging gap or inconsistency. The proposal's hedging is deliberate and may appear in the preceding or following sentence rather than inline. False positives waste the author's time and erode trust in the review.
 - **Check Technical Note A.** Before flagging an unacknowledged limitation, verify it isn't already covered there.
 - **Build the project.** Run `make build` to check for broken references or citation issues.
+- **Verify factual claims.** If you suspect a factual error (author name, publication date, claim about prior work), check the PDFs in `refs/` or do a quick web search before flagging it. Only report confirmed errors.
 
 **If the proposal is clean enough that remaining issues are all judgement calls, say so.** A "no safe fixes remain" result is a valid and useful outcome.
 

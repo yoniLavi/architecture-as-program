@@ -64,5 +64,6 @@ Separate into:
 - **Check cross-references.** When a claim seems unsupported, check whether Technical Note A addresses it before listing it as a gap.
 - **Build the project.** Actually run `make build` to verify — don't just read the Makefile.
 - **Be concrete.** Every recommendation should include specific line numbers and a suggested fix that could be implemented without further discussion.
+- **Verify factual claims.** If you have concerns about factual accuracy (author names, publication dates, tool descriptions, claims about prior work), do a quick web search or check the PDFs in `refs/` before reporting them. Don't list unverified suspicions as recommendations.
 
 Do NOT make any changes. Present the review for discussion first.
