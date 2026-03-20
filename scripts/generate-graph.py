@@ -45,46 +45,36 @@ def generate_pseudocode(g):
         lines.append(f"  {p}{sep}")
     lines.append(") {")
 
-    # Node signatures
+    # Node signatures: data inputs in (...), capabilities in `with`
+    caps_set = set(g.get("capabilities", []))
+
     for node in nodes:
         n = node["name"]
         inputs = node["inputs"]
         output = node["output"]
 
+        data_inputs = [i for i in inputs if i not in caps_set]
+        node_caps = [i for i in inputs if i in caps_set]
+
         lines.append(f"  node {n} :")
-        if len(inputs) <= 2:
-            lines.append(f"    ({', '.join(inputs)})")
+        if len(data_inputs) <= 2:
+            lines.append(f"    ({', '.join(data_inputs)})")
         else:
-            lines.append(f"    ({inputs[0]},")
-            for j in range(1, len(inputs)):
-                end = ")" if j == len(inputs) - 1 else ","
-                lines.append(f"     {inputs[j]}{end}")
+            lines.append(f"    ({data_inputs[0]},")
+            for j in range(1, len(data_inputs)):
+                end = ")" if j == len(data_inputs) - 1 else ","
+                lines.append(f"     {data_inputs[j]}{end}")
         lines.append(f"    \u2192 {output}")
+        if node_caps:
+            lines.append(f"    with {', '.join(node_caps)}")
         lines.append("")
 
-    # Data-flow edges
+    # Data-flow edges only (capability wiring is expressed by `with` clauses)
     lines.append("  // Data flow")
     froms = [e["from"] for e in data_edges]
     pad = max(len(f) for f in froms)
     for e in data_edges:
         lines.append(f"  edge {e['from']:<{pad}} \u2192 {e['to']}")
-
-    # Capability edges (derived: node inputs that match declared capabilities)
-    caps = g.get("capabilities", params)
-    cap_map = {}
-    for node in nodes:
-        for inp in node["inputs"]:
-            if is_capability(inp, caps):
-                cap_map.setdefault(inp, []).append(node["name"])
-
-    if cap_map:
-        lines.append("")
-        lines.append("  // Capability wiring")
-        cpad = max(len(c) for c in cap_map)
-        for cap, targets in cap_map.items():
-            lines.append(
-                f"  edge {cap:<{cpad}} \u2192 {', '.join(targets)}"
-            )
 
     lines.append("}")
     return "\n".join(lines)
