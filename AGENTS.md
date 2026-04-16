@@ -1,4 +1,4 @@
-# Architecture as Program — Agent Guide
+# Architecture as Program — Notes for all Agents (This AGENTS.md is also symlinked for Claude Code to access as CLAUDE.md)
 
 ## What this repo is
 
