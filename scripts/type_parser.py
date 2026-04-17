@@ -30,7 +30,6 @@ import re
 from dataclasses import dataclass
 from typing import Union
 
-
 # ── AST ────────────────────────────────────────────────────────────
 
 
@@ -46,19 +45,19 @@ class TString:
 
 @dataclass(frozen=True)
 class TList:
-    items: tuple["Type", ...]
+    items: tuple[Type, ...]
 
 
 @dataclass(frozen=True)
 class TApp:
     head: str
-    args: tuple["Type", ...]
+    args: tuple[Type, ...]
 
 
 @dataclass(frozen=True)
 class TVariant:
     role: str | None
-    inner: "Type"
+    inner: Type
 
 
 @dataclass(frozen=True)
@@ -103,13 +102,9 @@ def _tokenize(src: str) -> list[tuple[str, str, int]]:
             continue
         value = m.group(kind)
         if kind == "UNCLOSED":
-            raise ParseError(
-                f"Unterminated string literal at position {m.start()} in {src!r}"
-            )
+            raise ParseError(f"Unterminated string literal at position {m.start()} in {src!r}")
         if kind == "ERROR":
-            raise ParseError(
-                f"Unexpected character {value!r} at position {m.start()} in {src!r}"
-            )
+            raise ParseError(f"Unexpected character {value!r} at position {m.start()} in {src!r}")
         tokens.append((kind, value, m.start()))
     tokens.append(("EOF", "", len(src)))
     return tokens
@@ -151,10 +146,7 @@ class _Parser:
         return TSum(tuple(variants))
 
     def _parse_variant(self) -> TVariant:
-        if (
-            self._peek()[0] == "IDENT"
-            and self._peek(1)[0] == "COLON"
-        ):
+        if self._peek()[0] == "IDENT" and self._peek(1)[0] == "COLON":
             role = self._consume("IDENT")[1]
             self._consume("COLON")
             inner = self._parse_application()
@@ -195,9 +187,7 @@ class _Parser:
         if tok[0] == "IDENT":
             self._consume("IDENT")
             return TName(tok[1])
-        raise ParseError(
-            f"Unexpected token {tok[0]} ({tok[1]!r}) at {tok[2]} in {self.src!r}"
-        )
+        raise ParseError(f"Unexpected token {tok[0]} ({tok[1]!r}) at {tok[2]} in {self.src!r}")
 
 
 def parse_type(src: str) -> Type:
@@ -210,9 +200,7 @@ def parse_type(src: str) -> Type:
     result = parser.parse_type()
     if parser._peek()[0] != "EOF":
         trailing = parser._peek()
-        raise ParseError(
-            f"Unexpected trailing token {trailing[1]!r} at {trailing[2]} in {src!r}"
-        )
+        raise ParseError(f"Unexpected trailing token {trailing[1]!r} at {trailing[2]} in {src!r}")
     return result
 
 

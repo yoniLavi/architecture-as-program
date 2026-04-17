@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from graph_validator import validate_files  # noqa: E402
+from graph_validator import validate_files
 
 
 def _good_single_graph() -> dict:
@@ -69,9 +69,7 @@ class TestAcceptsGoodGraphs(unittest.TestCase):
     def test_canonical_graphs_pass(self):
         """The two canonical graphs in the proposal must validate."""
         root = Path(__file__).resolve().parent.parent
-        files = sorted(
-            p for p in (root / "graphs").glob("*.json") if p.name != "schema.json"
-        )
+        files = sorted(p for p in (root / "graphs").glob("*.json") if p.name != "schema.json")
         self.assertEqual(validate_files(files), [])
 
     def test_synthetic_good_graph_passes(self):
@@ -115,9 +113,7 @@ class TestEdgeTypeCompatibility(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             bad = _good_single_graph()
             # Break the Sanitise → Store edge by renaming the variant type
-            bad["nodes"][1]["output"] = (
-                "ok: WrongType | error: ValidationError"
-            )
+            bad["nodes"][1]["output"] = "ok: WrongType | error: ValidationError"
             paths = _write({"broken.json": bad}, Path(td))
             errors = validate_files(paths)
             self.assertTrue(
@@ -159,8 +155,7 @@ class TestTrustPropagation(unittest.TestCase):
             errors = validate_files(paths)
             self.assertTrue(
                 any(
-                    "consumes an `Untrusted<_>` input but emits a non-`Untrusted` output"
-                    in e
+                    "consumes an `Untrusted<_>` input but emits a non-`Untrusted` output" in e
                     for e in errors
                 ),
                 msg=f"Expected trust-discharge error; got: {errors}",
@@ -192,9 +187,7 @@ class TestTrustPropagation(unittest.TestCase):
             )
             # Wire it: the new node won't actually be reached in this
             # fixture but it must still typecheck.
-            good["data_edges"].append(
-                {"from": "Ingest", "to": "PassThrough"}
-            )
+            good["data_edges"].append({"from": "Ingest", "to": "PassThrough"})
             # Give PassThrough's output a consumer to keep the graph
             # internally consistent.
             good["nodes"].append(
@@ -205,9 +198,7 @@ class TestTrustPropagation(unittest.TestCase):
                     "discharges_trust": True,
                 }
             )
-            good["data_edges"].append(
-                {"from": "PassThrough", "to": "SanitiseTwice"}
-            )
+            good["data_edges"].append({"from": "PassThrough", "to": "SanitiseTwice"})
             paths = _write({"ok.json": good}, Path(td))
             errors = validate_files(paths)
             # Filter out errors unrelated to trust (e.g. the new
@@ -221,20 +212,14 @@ class TestVariantCompleteness(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             bad = _good_single_graph()
             # Drop the edge that consumes the `error` variant
-            bad["data_edges"] = [
-                e for e in bad["data_edges"]
-                if e["from"] != "Sanitise.error"
-            ]
+            bad["data_edges"] = [e for e in bad["data_edges"] if e["from"] != "Sanitise.error"]
             # Also drop Report, the now-orphan consumer, so we don't
             # also trigger an unrelated "unused data input" error.
             bad["nodes"] = [n for n in bad["nodes"] if n["name"] != "Report"]
             paths = _write({"broken.json": bad}, Path(td))
             errors = validate_files(paths)
             self.assertTrue(
-                any(
-                    "variant 'error' but no edge consumes it" in e
-                    for e in errors
-                ),
+                any("variant 'error' but no edge consumes it" in e for e in errors),
                 msg=f"Expected dead-variant error; got: {errors}",
             )
 
@@ -352,9 +337,7 @@ class TestCrossGraphCapabilityNarrowing(unittest.TestCase):
             child = self._child_graph("DBHandle<'kb', read>")
             parent = self._parent_graph("DBHandle<'kb', read>")
             parent["nodes"][0]["inputs"][0] = "WrongType"
-            paths = _write(
-                {"child.json": child, "parent.json": parent}, Path(td)
-            )
+            paths = _write({"child.json": child, "parent.json": parent}, Path(td))
             errors = validate_files(paths)
             self.assertTrue(
                 any("data type 'WrongType'" in e for e in errors),
@@ -401,9 +384,7 @@ class TestCrossGraphCheck(unittest.TestCase):
                     {"from": "Boundary", "to": "Child"},
                 ],
             }
-            paths = _write(
-                {"child.json": child, "parent.json": parent}, Path(td)
-            )
+            paths = _write({"child.json": child, "parent.json": parent}, Path(td))
             errors = validate_files(paths)
             self.assertTrue(
                 any("used as a sub-graph" in e for e in errors),
@@ -438,9 +419,7 @@ class TestCrossGraphCheck(unittest.TestCase):
                 ],
                 "data_edges": [],
             }
-            paths = _write(
-                {"child.json": child, "parent.json": parent}, Path(td)
-            )
+            paths = _write({"child.json": child, "parent.json": parent}, Path(td))
             self.assertEqual(validate_files(paths), [])
 
 

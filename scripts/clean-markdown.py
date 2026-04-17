@@ -28,11 +28,11 @@ def clean(text: str) -> str:
     text = re.sub(r"^:{3,}.*$", "", text, flags=re.MULTILINE)
 
     # Normalize Unicode spaces (em space, hair space, etc.) to regular spaces
-    text = re.sub(r"[\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u200b\u205f]+", " ", text)
+    unicode_spaces = r"[\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u200b\u205f]+"
+    text = re.sub(unicode_spaces, " ", text)
 
     # Collapse multiple spaces to single (but preserve line-leading spaces)
     text = re.sub(r"(?<! ) {2,}", " ", text)
-
 
     # Clean escaped brackets from IEEE citations: \[1\] → [1]
     text = re.sub(r"\\\[(\d+(?:,\s*\d+)*)\\\]", r"[\1]", text)

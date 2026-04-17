@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from type_parser import (  # noqa: E402
+from type_parser import (
     ParseError,
     TApp,
     TList,
@@ -160,98 +160,44 @@ class TestCapabilitySubtyping(unittest.TestCase):
 
     def test_equal_types_are_assignable(self):
         self.assertTrue(self._assignable("CustomerQuery", "CustomerQuery"))
-        self.assertTrue(
-            self._assignable(
-                "LLMClient<[lookup]>", "LLMClient<[lookup]>"
-            )
-        )
+        self.assertTrue(self._assignable("LLMClient<[lookup]>", "LLMClient<[lookup]>"))
 
     def test_data_types_reject_inequality(self):
         self.assertFalse(self._assignable("TypeA", "TypeB"))
 
     def test_llm_wider_tool_set_is_assignable_to_narrower(self):
-        self.assertTrue(
-            self._assignable(
-                "LLMClient<[lookup, respond]>", "LLMClient<[lookup]>"
-            )
-        )
+        self.assertTrue(self._assignable("LLMClient<[lookup, respond]>", "LLMClient<[lookup]>"))
 
     def test_llm_narrower_tool_set_is_not_assignable_to_wider(self):
-        self.assertFalse(
-            self._assignable(
-                "LLMClient<[lookup]>", "LLMClient<[lookup, respond]>"
-            )
-        )
+        self.assertFalse(self._assignable("LLMClient<[lookup]>", "LLMClient<[lookup, respond]>"))
 
     def test_llm_inference_is_empty_tool_set(self):
         # Any LLMClient is at least inference; inference is assignable
         # only to another inference (or an equal empty-tool form).
-        self.assertTrue(
-            self._assignable(
-                "LLMClient<[lookup]>", "LLMClient<inference>"
-            )
-        )
-        self.assertFalse(
-            self._assignable(
-                "LLMClient<inference>", "LLMClient<[lookup]>"
-            )
-        )
-        self.assertTrue(
-            self._assignable(
-                "LLMClient<inference>", "LLMClient<inference>"
-            )
-        )
+        self.assertTrue(self._assignable("LLMClient<[lookup]>", "LLMClient<inference>"))
+        self.assertFalse(self._assignable("LLMClient<inference>", "LLMClient<[lookup]>"))
+        self.assertTrue(self._assignable("LLMClient<inference>", "LLMClient<inference>"))
 
     def test_db_read_write_is_assignable_to_read(self):
-        self.assertTrue(
-            self._assignable(
-                "DBHandle<'kb', read-write>", "DBHandle<'kb', read>"
-            )
-        )
+        self.assertTrue(self._assignable("DBHandle<'kb', read-write>", "DBHandle<'kb', read>"))
 
     def test_db_read_write_is_assignable_to_append(self):
-        self.assertTrue(
-            self._assignable(
-                "DBHandle<'kb', read-write>", "DBHandle<'kb', append>"
-            )
-        )
+        self.assertTrue(self._assignable("DBHandle<'kb', read-write>", "DBHandle<'kb', append>"))
 
     def test_db_read_is_not_assignable_to_read_write(self):
-        self.assertFalse(
-            self._assignable(
-                "DBHandle<'kb', read>", "DBHandle<'kb', read-write>"
-            )
-        )
+        self.assertFalse(self._assignable("DBHandle<'kb', read>", "DBHandle<'kb', read-write>"))
 
     def test_db_read_and_append_are_incomparable(self):
-        self.assertFalse(
-            self._assignable(
-                "DBHandle<'kb', read>", "DBHandle<'kb', append>"
-            )
-        )
-        self.assertFalse(
-            self._assignable(
-                "DBHandle<'kb', append>", "DBHandle<'kb', read>"
-            )
-        )
+        self.assertFalse(self._assignable("DBHandle<'kb', read>", "DBHandle<'kb', append>"))
+        self.assertFalse(self._assignable("DBHandle<'kb', append>", "DBHandle<'kb', read>"))
 
     def test_db_scope_must_match_exactly(self):
-        self.assertFalse(
-            self._assignable(
-                "DBHandle<'kb', read>", "DBHandle<'other', read>"
-            )
-        )
+        self.assertFalse(self._assignable("DBHandle<'kb', read>", "DBHandle<'other', read>"))
 
     def test_other_generic_types_use_strict_equality(self):
+        self.assertFalse(self._assignable("Foo<A>", "Foo<B>"))
         self.assertFalse(
-            self._assignable(
-                "Foo<A>", "Foo<B>"
-            )
-        )
-        self.assertFalse(
-            self._assignable(
-                "ResponseChannel<session-a>", "ResponseChannel<session-b>"
-            )
+            self._assignable("ResponseChannel<session-a>", "ResponseChannel<session-b>")
         )
 
 

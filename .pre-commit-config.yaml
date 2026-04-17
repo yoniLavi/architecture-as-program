@@ -1,0 +1,98 @@
+# Pre-commit hooks for the Architecture-as-Program proposal repo.
+#
+# Ordering: file-modifying hooks first so fixable issues don't block
+# on downstream failures, then fast validation, then slower checks
+# (pytest, validator, full build). `fail_fast` short-circuits on the
+# first failure for tighter feedback.
+#
+# Install once per clone with:  uv run pre-commit install
+# Update pinned hook versions:  uv run pre-commit autoupdate
+
+repos:
+  # ── Phase 1: file-modifying hooks ─────────────────────────────────
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.11
+    hooks:
+      - id: ruff
+        name: ruff lint
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+        name: ruff format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        # Typst/BibTeX sources are whitespace-sensitive in subtle
+        # ways; leave them alone and only trim .py / .yaml / .json / .md.
+        types_or: [python, yaml, json, markdown]
+      - id: end-of-file-fixer
+        types_or: [python, yaml, json, markdown, toml]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # ── Phase 2: fast syntactic validation ───────────────────────────
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-json
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+
+  # ── Phase 3: project-specific checks ─────────────────────────────
+
+  - repo: local
+    hooks:
+      - id: validate-graphs
+        name: validate signal-graph JSONs
+        description: Structural, type-aware, and cross-graph validation of graphs/*.json
+        entry: uv run python3 scripts/validate-graphs.py
+        language: system
+        pass_filenames: false
+        files: ^(graphs/|scripts/(graph_validator|type_parser|validate-graphs)\.py)
+        stages: [pre-commit]
+
+      - id: pytest
+        name: pytest (parser + validator)
+        description: Type-parser and graph-validator unit tests
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        types_or: [python, json]
+        stages: [pre-commit]
+
+      - id: make-build
+        name: make build
+        description: Compile proposal (PDF / Markdown / HTML) and grammar card
+        entry: make build
+        language: system
+        pass_filenames: false
+        # Trigger on anything that can affect the built outputs.
+        files: (\.typ$|\.bib$|\.json$|\.py$|\.lua$|\.csl$|\.css$|^Makefile$)
+        stages: [pre-commit]
+
+      - id: check-citations
+        name: check-citations
+        description: Warn on bib entries not cited in any .typ file
+        entry: uv run python3 scripts/check-citations.py
+        language: system
+        pass_filenames: false
+        files: (citations\.bib|proposal\.typ)$
+        stages: [pre-commit]
+
+default_stages: [pre-commit]
+fail_fast: true
+
+exclude: |
+  (?x)^(
+    dist/.*|
+    refs/.*|
+    \.venv/.*|
+    \.ruff_cache/.*|
+    \.pytest_cache/.*
+  )$

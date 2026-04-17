@@ -68,7 +68,7 @@ def generate_pseudocode(g):
         if node_caps:
             lines.append(f"    with {', '.join(node_caps)}")
         if node.get("discharges_trust"):
-            lines.append(f"    # discharges trust")
+            lines.append("    # discharges trust")
         lines.append("")
 
     # Data-flow edges only (capability wiring is expressed by `with` clauses)
@@ -87,12 +87,7 @@ def generate_pseudocode(g):
 
 def esc(s):
     """Escape characters that are special in Typst markup."""
-    return (
-        s.replace("<", "\\<")
-        .replace(">", "\\>")
-        .replace("[", "\\[")
-        .replace("]", "\\]")
-    )
+    return s.replace("<", "\\<").replace(">", "\\>").replace("[", "\\[").replace("]", "\\]")
 
 
 def generate_fletcher(g):
@@ -119,9 +114,7 @@ def generate_fletcher(g):
     emit('#set text(font: "New Computer Modern", size: 9pt)')
     emit("")
     emit("#let cap(body) = text(size: 7pt, fill: luma(100), body)")
-    emit(
-        '#let llm-cap(body) = text(size: 7pt, weight: "bold", fill: rgb("#46c"))[#body]'
-    )
+    emit('#let llm-cap(body) = text(size: 7pt, weight: "bold", fill: rgb("#46c"))[#body]')
 
     # Zone colour definitions
     for zname, z in zones.items():
@@ -156,16 +149,14 @@ def generate_fletcher(g):
         emit(f"  node(enclose: ({', '.join(coords)}),")
         emit(f"    stroke: 1pt + {zname}-color,")
         emit(f"    fill: {zname}-bg,")
-        emit(f"    corner-radius: 5pt,")
-        emit(f"    inset: 10pt,")
-        emit(f"    snap: -1,")
+        emit("    corner-radius: 5pt,")
+        emit("    inset: 10pt,")
+        emit("    snap: -1,")
         emit(f"    name: <{zname}>),")
         emit("")
         emit(f"  node(({min_x}, {min_y}),")
-        emit(
-            f'    text(size: 7pt, weight: "bold", fill: {zname}-color)[{z["label"]}],'
-        )
-        emit(f"    stroke: none, inset: 0pt),")
+        emit(f'    text(size: 7pt, weight: "bold", fill: {zname}-color)[{z["label"]}],')
+        emit("    stroke: none, inset: 0pt),")
         emit("")
 
     # ── Nodes ──
@@ -183,11 +174,9 @@ def generate_fletcher(g):
                 else:
                     parts.append(f"#cap[{e}]")
             ann = " \\ ".join(parts)
-            emit(
-                f"  node(({coord(pos[0])}, {coord(pos[1])}), align(center)[*{n}*\\ {ann}]),"
-            )
+            emit(f"  node(({coord(pos[0])}, {coord(pos[1])}), align(center)[*{n}*\\ {ann}]),")
         else:
-            emit(f'  node(({coord(pos[0])}, {coord(pos[1])}), [*{n}*\\ #cap[(pure)]]),')
+            emit(f"  node(({coord(pos[0])}, {coord(pos[1])}), [*{n}*\\ #cap[(pure)]]),")
 
     emit("")
 
@@ -216,10 +205,7 @@ def generate_fletcher(g):
         label_escaped = esc(label_text)
         # Default label side: flip for left-going diagonal edges so labels
         # don't sit on the line
-        if tp[0] < fp[0] and tp[1] != fp[1]:
-            default_side = "left"
-        else:
-            default_side = "right"
+        default_side = "left" if tp[0] < fp[0] and tp[1] != fp[1] else "right"
         label_side = e.get("label_side", default_side)
 
         # Colour: from edge_colors for ports, untrusted colour for

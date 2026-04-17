@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from type_parser import (
     ParseError,
@@ -34,11 +34,10 @@ from type_parser import (
     contains_untrusted,
     is_assignable,
     parse_type,
-    sum_variant_type,
     sum_roles,
+    sum_variant_type,
     unparse,
 )
-
 
 _NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 
@@ -58,9 +57,7 @@ def _validate_structure(graph: dict, path: Path, errors: list[str]) -> bool:
         return False
 
     if not isinstance(graph["name"], str) or not _NAME_RE.match(graph["name"]):
-        errors.append(
-            f"{path.name}: `name` must be PascalCase, got: {graph['name']!r}"
-        )
+        errors.append(f"{path.name}: `name` must be PascalCase, got: {graph['name']!r}")
         ok = False
     for f in ("parameters", "capabilities"):
         v = graph[f]
@@ -125,14 +122,10 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
             )
             continue
         if not isinstance(n["output"], str) or not n["output"]:
-            errors.append(
-                f"{path.name}: node {nname!r} `output` must be a non-empty string"
-            )
+            errors.append(f"{path.name}: node {nname!r} `output` must be a non-empty string")
             continue
         if "discharges_trust" in n and not isinstance(n["discharges_trust"], bool):
-            errors.append(
-                f"{path.name}: node {nname!r} `discharges_trust` must be boolean"
-            )
+            errors.append(f"{path.name}: node {nname!r} `discharges_trust` must be boolean")
             continue
         node_map[nname] = n
 
@@ -144,9 +137,7 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
                 used_caps.add(inp)
     for c in caps:
         if c not in used_caps:
-            errors.append(
-                f"{path.name}: capability {c!r} declared but never used in any node"
-            )
+            errors.append(f"{path.name}: capability {c!r} declared but never used in any node")
 
     # Every non-capability parameter must be consumed by at least one node.
     data_params = [p for p in params if p not in caps]
@@ -157,9 +148,7 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
                 consumed.add(inp)
     for p in data_params:
         if p not in consumed:
-            errors.append(
-                f"{path.name}: boundary data input {p!r} declared but never consumed"
-            )
+            errors.append(f"{path.name}: boundary data input {p!r} declared but never consumed")
 
     _validate_edges(path, node_map, caps, edges, errors)
     _validate_trust_propagation(path, node_map, caps, errors)
@@ -183,9 +172,7 @@ def _validate_edges(
 
     for e in edges:
         if not isinstance(e, dict) or "from" not in e or "to" not in e:
-            errors.append(
-                f"{path.name}: edge must be an object with `from` and `to`: {e!r}"
-            )
+            errors.append(f"{path.name}: edge must be an object with `from` and `to`: {e!r}")
             continue
         fr = e["from"]
         to = e["to"]
@@ -237,10 +224,7 @@ def _validate_edges(
         # Target data-input resolution.
         tgt_data = _data_inputs(tgt_node, caps)
         if len(tgt_data) == 0:
-            errors.append(
-                f"{path.name}: edge {fr!r}→{to!r}: target node {to!r} has no "
-                f"data inputs"
-            )
+            errors.append(f"{path.name}: edge {fr!r}→{to!r}: target node {to!r} has no data inputs")
             continue
         if len(tgt_data) > 1:
             errors.append(
@@ -250,9 +234,7 @@ def _validate_edges(
             )
             continue
 
-        tgt_ast = _try_parse(
-            tgt_data[0], f"input of node {to!r}", path, errors
-        )
+        tgt_ast = _try_parse(tgt_data[0], f"input of node {to!r}", path, errors)
         if tgt_ast is None:
             continue
 
@@ -268,9 +250,7 @@ def _validate_edges(
     # the whole output is consumed unported (which covers all
     # variants at once).
     for name, n in node_map.items():
-        output_ast = _try_parse(
-            n["output"], f"output of node {name!r}", path, errors
-        )
+        output_ast = _try_parse(n["output"], f"output of node {name!r}", path, errors)
         if output_ast is None:
             continue
         variants = sum_roles(output_ast)
@@ -294,15 +274,11 @@ def _validate_trust_propagation(
     for n in node_map.values():
         input_asts: list[Type] = []
         for inp in _data_inputs(n, caps):
-            ast = _try_parse(
-                inp, f"input of node {n['name']!r}", path, errors
-            )
+            ast = _try_parse(inp, f"input of node {n['name']!r}", path, errors)
             if ast is not None:
                 input_asts.append(ast)
 
-        output_ast = _try_parse(
-            n["output"], f"output of node {n['name']!r}", path, errors
-        )
+        output_ast = _try_parse(n["output"], f"output of node {n['name']!r}", path, errors)
         if output_ast is None:
             continue
 
@@ -314,7 +290,7 @@ def _validate_trust_propagation(
             errors.append(
                 f"{path.name}: node {n['name']!r} consumes an `Untrusted<_>` "
                 f"input but emits a non-`Untrusted` output without "
-                f"`\"discharges_trust\": true`. Trust discharge must be "
+                f'`"discharges_trust": true`. Trust discharge must be '
                 f"marked explicitly."
             )
         if discharges and not has_untrusted_in:
@@ -335,17 +311,13 @@ def _validate_layout(
         return
     for pn in layout.get("positions", {}):
         if pn not in node_map:
-            errors.append(
-                f"{path.name}: layout.positions references unknown node: {pn!r}"
-            )
+            errors.append(f"{path.name}: layout.positions references unknown node: {pn!r}")
     for zname, z in layout.get("zones", {}).items():
         if not isinstance(z, dict):
             continue
         for zn in z.get("nodes", []):
             if zn not in node_map:
-                errors.append(
-                    f"{path.name}: layout.zones.{zname} references unknown node: {zn!r}"
-                )
+                errors.append(f"{path.name}: layout.zones.{zname} references unknown node: {zn!r}")
 
 
 # ── Cross-graph check ──────────────────────────────────────────────
@@ -382,7 +354,7 @@ def _validate_cross_graph(
                 continue
 
             mismatches: list[str] = []
-            for i, (p, e) in enumerate(zip(provided, expected)):
+            for i, (p, e) in enumerate(zip(provided, expected, strict=True)):
                 if p == e:
                     continue
                 # Different strings: capability positions may still
@@ -390,17 +362,14 @@ def _validate_cross_graph(
                 is_capability_position = e in target_caps
                 if not is_capability_position:
                     mismatches.append(
-                        f"position {i}: data type {p!r} does not match "
-                        f"expected {e!r}"
+                        f"position {i}: data type {p!r} does not match expected {e!r}"
                     )
                     continue
                 try:
                     pa = parse_type(p)
                     ea = parse_type(e)
                 except ParseError as pe:
-                    mismatches.append(
-                        f"position {i}: cannot parse types ({pe})"
-                    )
+                    mismatches.append(f"position {i}: cannot parse types ({pe})")
                     continue
                 if not is_assignable(pa, ea):
                     mismatches.append(

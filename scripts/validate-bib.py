@@ -9,8 +9,9 @@ import json
 import re
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 
@@ -19,14 +20,10 @@ def parse_bib(bib_path: Path) -> list[dict]:
     content = bib_path.read_text()
     entries = []
     # Match each @type{key, ... } block
-    for match in re.finditer(
-        r"@(\w+)\{([\w-]+),\s*(.*?)\n\}", content, re.DOTALL
-    ):
+    for match in re.finditer(r"@(\w+)\{([\w-]+),\s*(.*?)\n\}", content, re.DOTALL):
         entry_type, key, body = match.groups()
         entry = {"type": entry_type, "key": key}
-        for field_match in re.finditer(
-            r"(\w+)\s*=\s*\{(.*?)\}(?:,|\s*$)", body, re.DOTALL
-        ):
+        for field_match in re.finditer(r"(\w+)\s*=\s*\{(.*?)\}(?:,|\s*$)", body, re.DOTALL):
             field_name, field_value = field_match.groups()
             # Clean up whitespace
             entry[field_name] = " ".join(field_value.split())
@@ -50,7 +47,7 @@ def query_s2(doi: str) -> dict | None:
         if e.code == 404:
             return None
         if e.code == 429:
-            print(f"  Rate limited, waiting 5s...", file=sys.stderr)
+            print("  Rate limited, waiting 5s...", file=sys.stderr)
             time.sleep(5)
             return query_s2(doi)
         raise
@@ -62,7 +59,7 @@ def query_s2_by_title(title: str) -> dict | None:
     """Query Semantic Scholar by title search as fallback."""
     # Clean bib title formatting
     clean = re.sub(r"\{([^}]*)\}", r"\1", title)
-    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={urllib.request.quote(clean)}&limit=1&fields=title,authors,year,venue,externalIds,publicationVenue"
+    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={urllib.parse.quote(clean)}&limit=1&fields=title,authors,year,venue,externalIds,publicationVenue"
     req = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -131,13 +128,16 @@ def main() -> int:
         # Compare title
         bib_title = normalize(clean_bib_title(title))
         s2_title = normalize(s2.get("title", ""))
-        if bib_title and s2_title and bib_title != s2_title:
-            # Check if one contains the other (subtitle differences)
-            if not (bib_title in s2_title or s2_title in bib_title):
-                entry_issues.append(
-                    f"  TITLE  bib: {clean_bib_title(title)}\n"
-                    f"         s2:  {s2.get('title', '')}"
-                )
+        if (
+            bib_title
+            and s2_title
+            and bib_title != s2_title
+            and not (bib_title in s2_title or s2_title in bib_title)
+        ):
+            # Titles differ and neither contains the other — real mismatch.
+            entry_issues.append(
+                f"  TITLE  bib: {clean_bib_title(title)}\n         s2:  {s2.get('title', '')}"
+            )
 
         # Compare year
         s2_year = str(s2.get("year", ""))
@@ -152,8 +152,7 @@ def main() -> int:
             bib_names = authors.replace(" and ", ", ")
             s2_names = ", ".join(a["name"] for a in s2_authors)
             entry_issues.append(
-                f"  AUTHORS bib({bib_count}): {bib_names}\n"
-                f"          s2({s2_count}):  {s2_names}"
+                f"  AUTHORS bib({bib_count}): {bib_names}\n          s2({s2_count}):  {s2_names}"
             )
 
         if entry_issues:

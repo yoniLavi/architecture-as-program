@@ -30,7 +30,6 @@ from type_parser import (  # noqa: E402
     unparse,
 )
 
-
 GRAMMAR = """\
 type        := variant ( '|' variant )*
 variant     := ( IDENT ':' )? application
@@ -150,9 +149,7 @@ def render_card(canonical_types: list[str]) -> str:
     for t in canonical_types:
         ast = parse_type(t)
         roundtrip = unparse(ast)
-        assert roundtrip == t, (
-            f"Parser does not roundtrip: {t!r} -> {roundtrip!r}"
-        )
+        assert roundtrip == t, f"Parser does not roundtrip: {t!r} -> {roundtrip!r}"
         lines.append(f"### `{t}`")
         lines.append("")
         lines.append("```")
@@ -217,7 +214,7 @@ def render_card(canonical_types: list[str]) -> str:
     lines.append(
         "A node whose data inputs contain an `Untrusted<_>` "
         "application and whose output is not wrapped in `Untrusted<_>` "
-        "must declare `\"discharges_trust\": true` in its JSON "
+        'must declare `"discharges_trust": true` in its JSON '
         "definition. The converse is also checked: a "
         "`discharges_trust: true` annotation without an `Untrusted<_>` "
         "input is rejected as stale. Trust discharge is therefore "

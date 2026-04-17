@@ -11,7 +11,6 @@ Exits non-zero if any graph has errors.
 import sys
 from pathlib import Path
 
-
 _HERE = Path(__file__).resolve().parent
 # Put scripts/ on sys.path so graph_validator can import type_parser
 # when this wrapper is invoked directly.
@@ -28,9 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         root = _HERE.parent
         graph_dir = root / "graphs"
-        files = sorted(
-            p for p in graph_dir.glob("*.json") if p.name != "schema.json"
-        )
+        files = sorted(p for p in graph_dir.glob("*.json") if p.name != "schema.json")
 
     if not files:
         print("No graph JSON files found.")
