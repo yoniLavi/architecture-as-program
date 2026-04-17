@@ -1,5 +1,6 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 DIST := $(ROOT)/dist
+PY   := uv run python3
 
 GRAPHS_SRC := $(filter-out graphs/schema.json,$(wildcard graphs/*.json))
 GRAPHS_TXT := $(patsubst graphs/%.json,$(DIST)/graphs/%.graph,$(GRAPHS_SRC))
@@ -16,15 +17,15 @@ build: validate-graphs $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal
 # Validate all graph JSON files: structural, type-aware, cross-graph.
 # Depends on `test` so validator-logic changes are tested before use.
 validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_validator.py scripts/type_parser.py graphs/schema.json
-	@python3 scripts/validate-graphs.py
+	@$(PY) scripts/validate-graphs.py
 
-# Run the unittest suite (type parser + graph validator).
+# Run the test suite (type parser + graph validator) via pytest.
 test:
-	@python3 -m unittest discover -s tests -t . 2>&1 | tail -3
+	@uv run pytest
 
 # Generate pseudocode and diagram from canonical graph JSON
 $(DIST)/graphs/%.graph $(DIST)/graphs/%.typ: graphs/%.json scripts/generate-graph.py | $(DIST)/graphs
-	python3 scripts/generate-graph.py $<
+	$(PY) scripts/generate-graph.py $<
 
 # Compile diagram Typst to SVG
 $(DIST)/graphs/%.svg: $(DIST)/graphs/%.typ
@@ -42,7 +43,7 @@ $(DIST)/proposal.md: proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DI
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		-o $@
-	python3 scripts/clean-markdown.py $@
+	$(PY) scripts/clean-markdown.py $@
 
 # Typst has experimental native HTML export (typst compile --format html --features html)
 # but as of 0.13/0.14 it lacks CSS output and asset handling. Using pandoc for now.
@@ -52,7 +53,7 @@ $(DIST)/proposal.html: proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		--css=proposal.css \
 		-o $@
-	python3 scripts/clean-html.py $@
+	$(PY) scripts/clean-html.py $@
 	cp scripts/proposal.css $(DIST)/
 
 $(DIST):
