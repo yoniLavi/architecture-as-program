@@ -8,14 +8,19 @@ GRAPHS_SVG := $(patsubst graphs/%.json,$(DIST)/graphs/%.svg,$(GRAPHS_SRC))
 DIAGRAMS_SRC := $(wildcard diagrams/*.typ)
 DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC))
 
-.PHONY: build clean validate-graphs
+.PHONY: build clean validate-graphs test
 
 build: validate-graphs $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 	@echo "Build complete."
 
-# Validate all graph JSON files against schema + cross-file consistency
-validate-graphs: $(GRAPHS_SRC) scripts/validate-graphs.py graphs/schema.json
+# Validate all graph JSON files: structural, type-aware, cross-graph.
+# Depends on `test` so validator-logic changes are tested before use.
+validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_validator.py scripts/type_parser.py graphs/schema.json
 	@python3 scripts/validate-graphs.py
+
+# Run the unittest suite (type parser + graph validator).
+test:
+	@python3 -m unittest discover -s tests -t . 2>&1 | tail -3
 
 # Generate pseudocode and diagram from canonical graph JSON
 $(DIST)/graphs/%.graph $(DIST)/graphs/%.typ: graphs/%.json scripts/generate-graph.py | $(DIST)/graphs

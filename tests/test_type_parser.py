@@ -1,0 +1,177 @@
+"""Tests for scripts/type_parser.py."""
+
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+
+from type_parser import (  # noqa: E402
+    ParseError,
+    TApp,
+    TList,
+    TName,
+    TString,
+    TSum,
+    TVariant,
+    contains_untrusted,
+    is_untrusted,
+    parse_type,
+    sum_roles,
+    sum_variant_type,
+    unparse,
+)
+
+
+class TestAtoms(unittest.TestCase):
+    def test_bare_identifier(self):
+        self.assertEqual(parse_type("CustomerQuery"), TName("CustomerQuery"))
+
+    def test_hyphenated_identifier(self):
+        self.assertEqual(parse_type("read-write"), TName("read-write"))
+
+    def test_string_literal_atom(self):
+        # Strings only appear inside generic args in practice, but the
+        # atom grammar allows them anywhere.
+        self.assertEqual(parse_type("'some-string'"), TString("some-string"))
+
+    def test_rejects_empty(self):
+        with self.assertRaises(ParseError):
+            parse_type("")
+        with self.assertRaises(ParseError):
+            parse_type("   ")
+
+    def test_rejects_unclosed_string(self):
+        with self.assertRaises(ParseError):
+            parse_type("DBHandle<'unterminated")
+
+    def test_rejects_trailing_garbage(self):
+        with self.assertRaises(ParseError):
+            parse_type("CustomerQuery garbage")
+
+
+class TestApplication(unittest.TestCase):
+    def test_single_type_arg(self):
+        self.assertEqual(
+            parse_type("Untrusted<RawMessage>"),
+            TApp("Untrusted", (TName("RawMessage"),)),
+        )
+
+    def test_mixed_args_string_and_ident(self):
+        self.assertEqual(
+            parse_type("DBHandle<'knowledge-base', read-write>"),
+            TApp(
+                "DBHandle",
+                (TString("knowledge-base"), TName("read-write")),
+            ),
+        )
+
+    def test_list_arg(self):
+        self.assertEqual(
+            parse_type("LLMClient<[respond, lookup]>"),
+            TApp(
+                "LLMClient",
+                (TList((TName("respond"), TName("lookup"))),),
+            ),
+        )
+
+    def test_empty_list_arg(self):
+        self.assertEqual(
+            parse_type("LLMClient<[]>"),
+            TApp("LLMClient", (TList(()),)),
+        )
+
+    def test_nested_generics(self):
+        self.assertEqual(
+            parse_type("Outer<Inner<T>>"),
+            TApp("Outer", (TApp("Inner", (TName("T"),)),)),
+        )
+
+    def test_string_with_internal_colon(self):
+        # HTTPRoute<'platform:*'> — the colon must not be mistaken
+        # for a variant separator because it is inside a string.
+        self.assertEqual(
+            parse_type("HTTPRoute<'platform:*'>"),
+            TApp("HTTPRoute", (TString("platform:*"),)),
+        )
+
+    def test_rejects_generic_on_non_name(self):
+        with self.assertRaises(ParseError):
+            parse_type("'str'<X>")
+
+
+class TestSumTypes(unittest.TestCase):
+    def test_two_variants(self):
+        t = parse_type("ok: AgentResponse | error: LLMError")
+        self.assertEqual(
+            t,
+            TSum(
+                (
+                    TVariant("ok", TName("AgentResponse")),
+                    TVariant("error", TName("LLMError")),
+                )
+            ),
+        )
+
+    def test_three_variants_real(self):
+        t = parse_type(
+            "ok: ModeratedQuery | violation: PolicyViolation | escalation: EscalationRequest"
+        )
+        self.assertIsInstance(t, TSum)
+        self.assertEqual(sum_roles(t), ["ok", "violation", "escalation"])
+
+    def test_sum_roles_on_non_sum(self):
+        self.assertEqual(sum_roles(parse_type("CustomerQuery")), [])
+
+    def test_sum_variant_type_lookup(self):
+        t = parse_type("ok: AgentResponse | error: LLMError")
+        self.assertEqual(sum_variant_type(t, "ok"), TName("AgentResponse"))
+        self.assertEqual(sum_variant_type(t, "error"), TName("LLMError"))
+        self.assertIsNone(sum_variant_type(t, "missing"))
+
+
+class TestTrustPredicates(unittest.TestCase):
+    def test_is_untrusted_positive(self):
+        self.assertTrue(is_untrusted(parse_type("Untrusted<RawMessage>")))
+
+    def test_is_untrusted_negative(self):
+        self.assertFalse(is_untrusted(parse_type("RawMessage")))
+        self.assertFalse(is_untrusted(parse_type("CustomerQuery")))
+
+    def test_contains_untrusted_in_sum(self):
+        t = parse_type("ok: Untrusted<X> | err: LLMError")
+        self.assertTrue(contains_untrusted(t))
+
+    def test_contains_untrusted_clean_sum(self):
+        t = parse_type("ok: A | err: B")
+        self.assertFalse(contains_untrusted(t))
+
+    def test_contains_untrusted_bare(self):
+        # is_untrusted only inspects the top level; nested Untrusted
+        # inside generic args doesn't count as top-level untrusted.
+        t = parse_type("Wrapper<Untrusted<X>>")
+        self.assertFalse(contains_untrusted(t))
+
+
+class TestUnparseRoundtrip(unittest.TestCase):
+    def test_roundtrip(self):
+        cases = [
+            "CustomerQuery",
+            "Untrusted<RawMessage>",
+            "DBHandle<'knowledge-base', read-write>",
+            "LLMClient<[respond, lookup]>",
+            "LLMClient<inference>",
+            "HTTPRoute<'platform:*'>",
+            "HTTPRequest<'POST', 'customer:message'>",
+            "ok: AgentResponse | error: LLMError",
+            "ok: ModeratedQuery | violation: PolicyViolation | escalation: EscalationRequest",
+            "Outer<Inner<T>>",
+            "LLMClient<[]>",
+        ]
+        for s in cases:
+            with self.subTest(src=s):
+                self.assertEqual(unparse(parse_type(s)), s)
+
+
+if __name__ == "__main__":
+    unittest.main()

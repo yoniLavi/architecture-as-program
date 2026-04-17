@@ -67,6 +67,8 @@ def generate_pseudocode(g):
         lines.append(f"    \u2192 {output}")
         if node_caps:
             lines.append(f"    with {', '.join(node_caps)}")
+        if node.get("discharges_trust"):
+            lines.append(f"    # discharges trust")
         lines.append("")
 
     # Data-flow edges only (capability wiring is expressed by `with` clauses)
