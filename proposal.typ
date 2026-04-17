@@ -104,6 +104,11 @@ LLMOrchestrator : (SanitisedPrompt) → AgentResponse
 
 A direct wiring from `UserInputHandler`'s output to `LLMOrchestrator`'s input is a _type error_: `Untrusted<UserMessage>` does not match `SanitisedPrompt`. The graph cannot be assembled without an explicit node that transforms `Untrusted<UserMessage>` into `SanitisedPrompt` — a node whose existence is visible in the architecture, whose implementation is subject to contract verification, and whose presence is required by the type system rather than by a policy document. In a well-typed realisation of this model, the prompt injection vulnerability would be _ill-typed_: no well-typed graph could express it. The type system design that delivers this guarantee is the central obligation of Phase 1 (@sec:phase1); the example illustrates the target property, not a proven result.
 
+#figure(
+  image("dist/diagrams/typed-wiring.svg", width: 80%),
+  caption: [The direct wiring of the two nodes above is structurally rejected: the output type `Untrusted<UserMessage>` does not inhabit the input type `SanitisedPrompt`. An explicit sanitisation node — not shown — is required by the type system to close the gap. Security, here, is a property of graph shape.],
+) <fig:typed-wiring>
+
 == Extending FRP: capability annotation and trust tainting <sec:frp-architecture>
 
 The step from FRP as a UI technique to FRP as a whole-system architectural model requires two extensions that the existing literature does not fully address.
