@@ -216,6 +216,152 @@ class TestTrustPropagation(unittest.TestCase):
             self.assertEqual(trust_errors, [], msg=f"All errors: {errors}")
 
 
+class TestVariantCompleteness(unittest.TestCase):
+    def test_missing_variant_consumer_flagged(self):
+        with tempfile.TemporaryDirectory() as td:
+            bad = _good_single_graph()
+            # Drop the edge that consumes the `error` variant
+            bad["data_edges"] = [
+                e for e in bad["data_edges"]
+                if e["from"] != "Sanitise.error"
+            ]
+            # Also drop Report, the now-orphan consumer, so we don't
+            # also trigger an unrelated "unused data input" error.
+            bad["nodes"] = [n for n in bad["nodes"] if n["name"] != "Report"]
+            paths = _write({"broken.json": bad}, Path(td))
+            errors = validate_files(paths)
+            self.assertTrue(
+                any(
+                    "variant 'error' but no edge consumes it" in e
+                    for e in errors
+                ),
+                msg=f"Expected dead-variant error; got: {errors}",
+            )
+
+    def test_whole_output_consumed_unported_covers_all_variants(self):
+        """If a downstream node consumes the full sum output (no port
+        suffix), the validator should not flag individual variants as
+        dead — they are all carried by the unported edge."""
+        with tempfile.TemporaryDirectory() as td:
+            graph = {
+                "name": "Pipeline",
+                "parameters": ["RawInput"],
+                "capabilities": [],
+                "nodes": [
+                    {
+                        "name": "Split",
+                        "inputs": ["RawInput"],
+                        "output": "a: AlphaPayload | b: BetaPayload",
+                    },
+                    {
+                        "name": "Consumer",
+                        "inputs": ["a: AlphaPayload | b: BetaPayload"],
+                        "output": "Receipt",
+                    },
+                ],
+                "data_edges": [{"from": "Split", "to": "Consumer"}],
+            }
+            paths = _write({"whole.json": graph}, Path(td))
+            errors = validate_files(paths)
+            variant_errors = [e for e in errors if "no edge consumes" in e]
+            self.assertEqual(variant_errors, [], msg=f"All errors: {errors}")
+
+
+class TestCrossGraphCapabilityNarrowing(unittest.TestCase):
+    def _child_graph(self, param: str) -> dict:
+        return {
+            "name": "Child",
+            "parameters": ["InTypeA", param],
+            "capabilities": [param],
+            "nodes": [
+                {
+                    "name": "Inner",
+                    "inputs": ["InTypeA", param],
+                    "output": "OutTypeA",
+                }
+            ],
+            "data_edges": [],
+        }
+
+    def _parent_graph(self, passed: str) -> dict:
+        return {
+            "name": "Parent",
+            "parameters": ["InTypeA", passed],
+            "capabilities": [passed],
+            "nodes": [
+                {
+                    "name": "Child",
+                    "inputs": ["InTypeA", passed],
+                    "output": "OutTypeA",
+                }
+            ],
+            "data_edges": [],
+        }
+
+    def _run(self, child_param: str, parent_passed: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as td:
+            paths = _write(
+                {
+                    "child.json": self._child_graph(child_param),
+                    "parent.json": self._parent_graph(parent_passed),
+                },
+                Path(td),
+            )
+            return validate_files(paths)
+
+    def test_wider_llm_tool_set_passes(self):
+        errors = self._run(
+            child_param="LLMClient<[lookup]>",
+            parent_passed="LLMClient<[lookup, respond]>",
+        )
+        cross_errors = [e for e in errors if "sub-graph" in e]
+        self.assertEqual(cross_errors, [], msg=f"All errors: {errors}")
+
+    def test_narrower_llm_tool_set_fails(self):
+        errors = self._run(
+            child_param="LLMClient<[lookup, respond]>",
+            parent_passed="LLMClient<[lookup]>",
+        )
+        self.assertTrue(
+            any("is not assignable to expected" in e for e in errors),
+            msg=f"Expected subtype failure; got: {errors}",
+        )
+
+    def test_db_read_write_passes_where_read_expected(self):
+        errors = self._run(
+            child_param="DBHandle<'kb', read>",
+            parent_passed="DBHandle<'kb', read-write>",
+        )
+        cross_errors = [e for e in errors if "sub-graph" in e]
+        self.assertEqual(cross_errors, [], msg=f"All errors: {errors}")
+
+    def test_db_read_fails_where_read_write_expected(self):
+        errors = self._run(
+            child_param="DBHandle<'kb', read-write>",
+            parent_passed="DBHandle<'kb', read>",
+        )
+        self.assertTrue(
+            any("is not assignable to expected" in e for e in errors),
+            msg=f"Expected subtype failure; got: {errors}",
+        )
+
+    def test_data_position_must_match_exactly(self):
+        """Subtyping only applies to capability positions; data inputs
+        still require strict equality."""
+        with tempfile.TemporaryDirectory() as td:
+            child = self._child_graph("DBHandle<'kb', read>")
+            parent = self._parent_graph("DBHandle<'kb', read>")
+            parent["nodes"][0]["inputs"][0] = "WrongType"
+            paths = _write(
+                {"child.json": child, "parent.json": parent}, Path(td)
+            )
+            errors = validate_files(paths)
+            self.assertTrue(
+                any("data type 'WrongType'" in e for e in errors),
+                msg=f"Expected data mismatch; got: {errors}",
+            )
+
+
 class TestCrossGraphCheck(unittest.TestCase):
     def test_sub_graph_signature_mismatch_flagged(self):
         """If node X in graph A matches graph B's name, X's inputs

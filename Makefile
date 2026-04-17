@@ -11,8 +11,14 @@ DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC)
 
 .PHONY: build clean validate-graphs test
 
-build: validate-graphs $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
+build: validate-graphs $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html $(DIST)/grammar.md
 	@echo "Build complete."
+
+# Grammar card — built from scripts/type_parser.py and the canonical
+# graph JSONs so that the documented grammar and subtype rules cannot
+# drift from the implementation without failing the build.
+$(DIST)/grammar.md: scripts/emit-grammar.py scripts/type_parser.py $(GRAPHS_SRC) | $(DIST)
+	$(PY) scripts/emit-grammar.py
 
 # Validate all graph JSON files: structural, type-aware, cross-graph.
 # Depends on `test` so validator-logic changes are tested before use.

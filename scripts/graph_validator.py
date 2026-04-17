@@ -32,6 +32,7 @@ from type_parser import (
     ParseError,
     Type,
     contains_untrusted,
+    is_assignable,
     parse_type,
     sum_variant_type,
     sum_roles,
@@ -174,6 +175,12 @@ def _validate_edges(
     edges: list[dict],
     errors: list[str],
 ) -> None:
+    # Track, per source node, which output-variant roles (and the
+    # whole unported output) have at least one consumer. Used for
+    # the variant-completeness check below.
+    consumed_ports: dict[str, set[str]] = {n: set() for n in node_map}
+    consumed_whole: set[str] = set()
+
     for e in edges:
         if not isinstance(e, dict) or "from" not in e or "to" not in e:
             errors.append(
@@ -222,8 +229,10 @@ def _validate_edges(
             src_ast = sum_variant_type(src_output_ast, port)
             if src_ast is None:
                 continue  # shouldn't happen given the check above
+            consumed_ports[from_node].add(port)
         else:
             src_ast = src_output_ast
+            consumed_whole.add(from_node)
 
         # Target data-input resolution.
         tgt_data = _data_inputs(tgt_node, caps)
@@ -252,6 +261,27 @@ def _validate_edges(
                 f"{path.name}: edge {fr!r}→{to!r}: type mismatch.\n"
                 f"      source emits: {unparse(src_ast)}\n"
                 f"      target wants: {unparse(tgt_ast)}"
+            )
+
+    # Variant-completeness sweep: for every sum-typed output, every
+    # declared variant must have at least one consuming edge, unless
+    # the whole output is consumed unported (which covers all
+    # variants at once).
+    for name, n in node_map.items():
+        output_ast = _try_parse(
+            n["output"], f"output of node {name!r}", path, errors
+        )
+        if output_ast is None:
+            continue
+        variants = sum_roles(output_ast)
+        if not variants or name in consumed_whole:
+            continue
+        unconsumed = [v for v in variants if v not in consumed_ports[name]]
+        for role in unconsumed:
+            errors.append(
+                f"{path.name}: node {name!r} declares output variant "
+                f"{role!r} but no edge consumes it; the variant is dead "
+                f"code at the graph level."
             )
 
 
@@ -327,20 +357,65 @@ def _validate_cross_graph(
     errors: list[str],
 ) -> None:
     """A node whose name matches another graph's `name` is a sub-graph
-    reference. Its input list must equal that graph's parameter list."""
+    reference. Its input list must satisfy that graph's parameter list
+    position-by-position: data inputs must match by equality; capability
+    inputs may be provided with at least the authority the sub-graph
+    declares (capability narrowing — see `type_parser.is_assignable`)."""
     for gname, g in graphs.items():
         path = graphs_path[gname]
         for n in g["nodes"]:
             ref = n["name"]
-            if ref in graphs and ref != gname:
-                target = graphs[ref]
-                if list(n["inputs"]) != list(target["parameters"]):
-                    errors.append(
-                        f"{path.name}: node {ref!r} is used as a sub-graph but "
-                        f"its inputs do not match that graph's parameters.\n"
-                        f"      node inputs:    {n['inputs']}\n"
-                        f"      target params:  {target['parameters']}"
+            if ref not in graphs or ref == gname:
+                continue
+            target = graphs[ref]
+            provided = n["inputs"]
+            expected = target["parameters"]
+            target_caps = set(target["capabilities"])
+
+            if len(provided) != len(expected):
+                errors.append(
+                    f"{path.name}: node {ref!r} is used as a sub-graph but "
+                    f"has arity {len(provided)} vs target's {len(expected)}.\n"
+                    f"      node inputs:    {provided}\n"
+                    f"      target params:  {expected}"
+                )
+                continue
+
+            mismatches: list[str] = []
+            for i, (p, e) in enumerate(zip(provided, expected)):
+                if p == e:
+                    continue
+                # Different strings: capability positions may still
+                # satisfy via narrowing; data positions must match.
+                is_capability_position = e in target_caps
+                if not is_capability_position:
+                    mismatches.append(
+                        f"position {i}: data type {p!r} does not match "
+                        f"expected {e!r}"
                     )
+                    continue
+                try:
+                    pa = parse_type(p)
+                    ea = parse_type(e)
+                except ParseError as pe:
+                    mismatches.append(
+                        f"position {i}: cannot parse types ({pe})"
+                    )
+                    continue
+                if not is_assignable(pa, ea):
+                    mismatches.append(
+                        f"position {i}: provided capability {p!r} is not "
+                        f"assignable to expected {e!r} under the subtyping "
+                        f"rules"
+                    )
+
+            if mismatches:
+                bullet = "\n      - ".join(mismatches)
+                errors.append(
+                    f"{path.name}: node {ref!r} is used as a sub-graph but "
+                    f"its inputs do not satisfy that graph's parameters:\n"
+                    f"      - {bullet}"
+                )
 
 
 # ── Public entry point ─────────────────────────────────────────────

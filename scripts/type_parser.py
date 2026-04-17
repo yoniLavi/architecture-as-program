@@ -270,3 +270,82 @@ def unparse(t: Type) -> str:
     # Exhaustive over the Type union; this branch is unreachable at
     # runtime and exists only as a defensive default.
     return repr(t)
+
+
+# ── Capability subtyping ───────────────────────────────────────────
+#
+# A narrow slice of structural subtyping, intentionally applied only
+# at cross-graph composition boundaries (the PoC validator uses
+# strict equality everywhere else). The rules capture the
+# principle-of-least-authority intuition that a parent may provide
+# a handle with at least the authority the sub-graph declares.
+
+
+def _llm_tool_set(app: TApp) -> frozenset[str] | None:
+    """Normalise an `LLMClient<...>` argument to the set of tools
+    it grants. `LLMClient<inference>` is treated as the empty set.
+    Returns None if the shape is not a recognised LLMClient form."""
+    if len(app.args) != 1:
+        return None
+    arg = app.args[0]
+    if isinstance(arg, TName) and arg.name == "inference":
+        return frozenset()
+    if isinstance(arg, TList):
+        names: set[str] = set()
+        for item in arg.items:
+            if not isinstance(item, TName):
+                return None
+            names.add(item.name)
+        return frozenset(names)
+    return None
+
+
+# DBHandle mode lattice (read-write is top; read and append are
+# incomparable middle elements).
+_DB_MODE_COVERS: dict[str, frozenset[str]] = {
+    "read-write": frozenset({"read-write", "read", "append"}),
+    "read": frozenset({"read"}),
+    "append": frozenset({"append"}),
+}
+
+
+def is_assignable(actual: Type, target: Type) -> bool:
+    """True if a value of type `actual` can stand in where `target`
+    is expected, under the PoC's capability-narrowing rules.
+
+    Equality implies assignability (reflexivity). Beyond that:
+    * `LLMClient<[tools]>`: actual must carry a *superset* of the
+      tools the target requires. `LLMClient<inference>` is the
+      empty-tool-set form.
+    * `DBHandle<scope, mode>`: scopes must match exactly; the
+      actual mode must cover the target mode under the lattice
+      `read-write ⊇ {read, append}`.
+    * Trust markers are not handled here — `Untrusted<T>` is never
+      assignable to `T` (trust discharge is enforced separately).
+    * All other types: strict equality only."""
+    if actual == target:
+        return True
+    if not isinstance(actual, TApp) or not isinstance(target, TApp):
+        return False
+    if actual.head != target.head:
+        return False
+    if actual.head == "LLMClient":
+        atools = _llm_tool_set(actual)
+        ttools = _llm_tool_set(target)
+        if atools is None or ttools is None:
+            return False
+        return ttools.issubset(atools)
+    if actual.head == "DBHandle":
+        if len(actual.args) != 2 or len(target.args) != 2:
+            return False
+        if actual.args[0] != target.args[0]:
+            return False
+        amode = actual.args[1]
+        tmode = target.args[1]
+        if not isinstance(amode, TName) or not isinstance(tmode, TName):
+            return False
+        covered = _DB_MODE_COVERS.get(amode.name)
+        if covered is None:
+            return amode.name == tmode.name
+        return tmode.name in covered
+    return False
