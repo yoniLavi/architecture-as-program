@@ -3,6 +3,7 @@
 
 Note: Missing/broken citations are already caught by `typst compile`.
 This script catches the reverse: bib entries that exist but are never used.
+Exits non-zero if any orphaned entry is found, so the pre-commit hook fails.
 """
 
 import re
@@ -49,9 +50,10 @@ def main() -> int:
 
     unused = all_bib_keys - all_citations
     if unused:
-        print("WARNING: Bib entries not cited in any .typ file:")
+        print("ERROR: Bib entries not cited in any .typ file:")
         for key in sorted(unused):
             print(f"  @{key}")
+        return 1
 
     return 0
 

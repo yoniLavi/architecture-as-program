@@ -14,7 +14,7 @@ This is a **writing project**, not a software project. The primary output is a f
 | `citations.bib` | BibTeX bibliography. Every entry must be cited in the proposal; every citation must have an entry. |
 | `graphs/*.json` | Canonical signal graph definitions. Single source of truth for both pseudocode and diagrams. |
 | `Makefile` | Builds `dist/proposal.pdf`, `dist/proposal.md`, and `dist/proposal.html` from source. |
-| `.githooks/pre-commit` | Runs `make build` + citation check. Enable with `git config core.hooksPath .githooks`. |
+| `.pre-commit-config.yaml` | Pre-commit hooks (ruff, graph validation, pytest, `make build`, citation check). Install once per clone with `uv run pre-commit install`. |
 | `scripts/` | Build support: graph generator, pandoc cross-ref filter, markdown cleanup, unused citation checker. |
 
 ## Proposal structure
@@ -24,11 +24,11 @@ The proposal follows a deliberate argument arc:
 1. **The window** (§1) — Why graph-based code representations are newly viable (AI agents removed the human objection)
 2. **Central thesis** (§2) — Four interlocking properties: signal graph as source of truth, capabilities as injected parameters, code as compiled artifact, security by construction
 3. **FRP as core** (§3) — Technical foundation in functional reactive programming, with capability annotation and trust tainting as extensions
-4. **Prior art** (§4) — Positioning against C4, Haskell/Idris, Unison, Hazel, BEAM, ocap security, CHERI, WASM, SDD frameworks, Cedar, Roc, Darklang
+4. **Prior art** (§4) — Positioning against C4, Haskell/Idris, Effekt/capture checking, Unison, Hazel, BEAM, ocap security, CHERI, WASM, SDD frameworks, Cedar, Roc, Darklang
 5. **Proposed system** (§5) — Signal graph definition, concrete example, development workflow, runtime, performance, security properties
 6. **Research agenda** (§6) — Three phases: demonstrator → hardening → formal foundations
 7. **Why now** (§7) — Four converging developments
-8. **Technical Note A** — Open problems (compositionality, coercion, replay, compilation, error handling, node-local state, graph-scale comprehension, graph evolution, distributed authority)
+8. **Technical Note A** — Open problems (compositionality, coercion, replay, compilation, error handling, contract incompleteness, node-local state, graph-scale comprehension, capability routing/aggregation, user-level authorisation, revocation, covert channels, graph evolution, soundness, distributed authority)
 9. **Annex B** — Areas for collaboration
 
 ## When editing the proposal
@@ -42,8 +42,9 @@ The proposal follows a deliberate argument arc:
 ## Build
 
 ```sh
-make build        # Build PDF + markdown
+make build        # Validate graphs, run tests, build PDF + markdown + HTML + grammar card
+make test         # Run the type-parser and graph-validator unit tests
 make clean        # Remove dist/
 ```
 
-Requires: [Typst](https://typst.app/), [Pandoc](https://pandoc.org/) (with citeproc), Python 3.
+Requires: [Typst](https://typst.app/), [Pandoc](https://pandoc.org/) (with citeproc), Python 3 via [uv](https://docs.astral.sh/uv/).

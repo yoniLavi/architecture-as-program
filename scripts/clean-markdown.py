@@ -37,6 +37,11 @@ def clean(text: str) -> str:
     # Clean escaped brackets from IEEE citations: \[1\] → [1]
     text = re.sub(r"\\\[(\d+(?:,\s*\d+)*)\\\]", r"[\1]", text)
 
+    # Unwrap paragraphs pandoc renders as a bold span around a paragraph
+    # that itself opens with bold (e.g. the title-page process note),
+    # which produces stray ****...** markers in plain markdown.
+    text = re.sub(r"^\*\*(\*\*.+)\*\*$", r"\1", text, flags=re.MULTILINE)
+
     # Clean CSL bibliography markup:
     # [[1] ]{.csl-left-margin}[Text]{.csl-right-inline} → [1] Text
     text = re.sub(
