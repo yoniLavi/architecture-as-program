@@ -144,9 +144,16 @@ def test_bypass_is_rejected_for_a_type_mismatch(graph):
 
 
 def test_laundering_trust_is_rejected_by_trust_propagation(graph):
-    """The subtle variant type-checks on the edge, and is still rejected:
-    trust cannot be laundered by widening the consumer's input type."""
+    """The subtle variant type-checks on every edge, and is still rejected —
+    now as a *trust-lattice* violation rather than by a separate side-condition.
+    Widening the tool-capable node's input to `Untrusted<_>` makes the wire
+    well-typed, but the node then raises trust (untrusted in, clean out) without
+    being a declared discharger, which the lattice forbids as upward coercion."""
     unsafe = UNSAFE_VARIANTS["launder_trust"](graph)
     errors = " ".join(validate_graph_dict(unsafe))
+    # Caught for a lattice reason: upward coercion / laundering, keyed on the
+    # discharger marker — not by edge data-type incompatibility.
+    assert "upward coercion" in errors
+    assert "laundering" in errors
     assert "discharges_trust" in errors
     assert "type mismatch" not in errors

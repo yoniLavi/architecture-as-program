@@ -30,12 +30,16 @@ from pathlib import Path
 
 from type_parser import (
     ParseError,
+    Trust,
     Type,
-    contains_untrusted,
     is_assignable,
     parse_type,
+    strip_trust,
     sum_roles,
     sum_variant_type,
+    trust_flows_to,
+    trust_level,
+    trust_meet,
     unparse,
 )
 
@@ -151,7 +155,7 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
             errors.append(f"{path.name}: boundary data input {p!r} declared but never consumed")
 
     _validate_edges(path, node_map, caps, edges, errors)
-    _validate_trust_propagation(path, node_map, caps, errors)
+    _validate_node_trust_flow(path, node_map, caps, errors)
     _validate_layout(path, node_map, graph.get("layout", {}), errors)
 
     return node_map
@@ -238,11 +242,28 @@ def _validate_edges(
         if tgt_ast is None:
             continue
 
-        if src_ast != tgt_ast:
+        # Two independent obligations, kept apart on purpose. (1) Data
+        # compatibility: the carried shapes, with any trust wrapper
+        # stripped, must match. (2) Trust flow: the source's trust label
+        # must flow to the target's under the lattice — no upward
+        # coercion. Folding trust into the edge check this way is what
+        # makes trust laundering a wiring error rather than a separate
+        # side-condition (see _validate_node_trust_flow for the node-body
+        # half of the same discipline).
+        if strip_trust(src_ast) != strip_trust(tgt_ast):
             errors.append(
                 f"{path.name}: edge {fr!r}→{to!r}: type mismatch.\n"
                 f"      source emits: {unparse(src_ast)}\n"
                 f"      target wants: {unparse(tgt_ast)}"
+            )
+        elif not trust_flows_to(trust_level(src_ast), trust_level(tgt_ast)):
+            errors.append(
+                f"{path.name}: edge {fr!r}→{to!r}: trust-lattice violation "
+                f"(upward coercion).\n"
+                f"      source emits: {unparse(src_ast)} (untrusted)\n"
+                f"      target wants: {unparse(tgt_ast)} (trusted)\n"
+                f"      `Untrusted<_>` does not flow to a clean requirement; "
+                f"route it through a declared discharger first."
             )
 
     # Variant-completeness sweep: for every sum-typed output, every
@@ -265,12 +286,23 @@ def _validate_edges(
             )
 
 
-def _validate_trust_propagation(
+def _validate_node_trust_flow(
     path: Path,
     node_map: dict[str, dict],
     caps: list[str],
     errors: list[str],
 ) -> None:
+    """The node-body half of the trust-lattice discipline (the edge
+    half lives in `_validate_edges`). A node's body is itself a flow,
+    from the meet of its input trust levels to its output level, and it
+    is checked with the *same* `trust_flows_to` predicate: a node may
+    not raise trust — emit an output more trusted than its least-trusted
+    input — because that is upward coercion (trust laundering). The one
+    exception is a node explicitly declared as a discharger, which is
+    precisely the licence to make that upward move. Casting the check
+    this way is what subsumes the old two-rule scheme (edge equality +
+    a standalone `discharges_trust` presence test) into one lattice
+    order applied uniformly to edges and node bodies."""
     for n in node_map.values():
         input_asts: list[Type] = []
         for inp in _data_inputs(n, caps):
@@ -282,18 +314,25 @@ def _validate_trust_propagation(
         if output_ast is None:
             continue
 
-        has_untrusted_in = any(contains_untrusted(t) for t in input_asts)
-        has_untrusted_out = contains_untrusted(output_ast)
+        in_trust = trust_meet(trust_level(t) for t in input_asts)
+        out_trust = trust_level(output_ast)
         discharges = bool(n.get("discharges_trust", False))
 
-        if has_untrusted_in and not has_untrusted_out and not discharges:
+        # `raises_trust` is exactly the negation of the lattice flow
+        # condition on the node body: the output demands more trust than
+        # the inputs supply. Only a declared discharger may do this.
+        raises_trust = not trust_flows_to(in_trust, out_trust)
+
+        if raises_trust and not discharges:
             errors.append(
-                f"{path.name}: node {n['name']!r} consumes an `Untrusted<_>` "
-                f"input but emits a non-`Untrusted` output without "
-                f'`"discharges_trust": true`. Trust discharge must be '
-                f"marked explicitly."
+                f"{path.name}: node {n['name']!r} raises trust without "
+                f"discharging: it consumes an `Untrusted<_>` input but emits "
+                f"a non-`Untrusted` output, yet is not a declared discharger "
+                f'(`"discharges_trust": true`). Under the trust lattice this '
+                f"is upward coercion — trust laundering — which the wiring "
+                f"forbids."
             )
-        if discharges and not has_untrusted_in:
+        if discharges and in_trust is not Trust.UNTRUSTED:
             errors.append(
                 f"{path.name}: node {n['name']!r} declares "
                 f"`discharges_trust: true` but has no `Untrusted<_>` input; "

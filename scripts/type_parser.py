@@ -27,7 +27,9 @@ validator without external dependencies.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Union
 
 # ── AST ────────────────────────────────────────────────────────────
@@ -220,6 +222,88 @@ def contains_untrusted(t: Type) -> bool:
     if isinstance(t, TSum):
         return any(contains_untrusted(v.inner) for v in t.variants)
     return False
+
+
+# ── Trust lattice ──────────────────────────────────────────────────
+#
+# A two-point security-label lattice in the Jif lineage
+# @myers_decentralized_1997:
+#
+#       UNTRUSTED  ⊑  TRUSTED
+#
+# ordered so that TRUSTED is the top. Trust may be *forgotten* freely
+# (a trusted value can stand where an untrusted one is wanted) but
+# never *manufactured*: `Untrusted<T>` does not inhabit `T`. The one
+# sanctioned upward move — raising UNTRUSTED to TRUSTED — is an
+# explicit discharge, permitted only at a node declared as a
+# discharger (see graph_validator).
+#
+# The order is deliberately abstract behind `trust_level`,
+# `trust_meet`, and `trust_flows_to` so that a later graded lattice
+# (e.g. `Untrusted ⊑ Sanitised ⊑ Trusted`) or a full Jif-style
+# decentralised-label model can replace the two-point set without
+# touching the wiring check. Only these three functions know the
+# lattice shape.
+
+
+class Trust(IntEnum):
+    """A trust level. The integer value is the lattice height, so the
+    natural `<`/`<=`/`max`/`min` operations coincide with the lattice
+    order and meet/join. Do not rely on the specific integers outside
+    this module; go through the helpers below."""
+
+    UNTRUSTED = 0
+    TRUSTED = 1
+
+
+def trust_level(t: Type) -> Trust:
+    """The trust level of a type. A type wrapped in `Untrusted<_>` at
+    the top level — or a sum with any `Untrusted<_>` variant — sits at
+    UNTRUSTED; everything else is TRUSTED. This reuses
+    `contains_untrusted`, so a partially-untrusted sum is conservatively
+    treated as untrusted (the least-trusted variant taints the whole)."""
+    return Trust.UNTRUSTED if contains_untrusted(t) else Trust.TRUSTED
+
+
+def trust_meet(levels: Iterable[Trust]) -> Trust:
+    """The lattice meet (greatest lower bound) of some levels — the
+    *least* trusted among them, TRUSTED for the empty set (the meet
+    over nothing is the lattice top). This is the effective trust a
+    node's body may claim to have received: if any input is untrusted,
+    the combined input is untrusted."""
+    result = Trust.TRUSTED
+    for lvl in levels:
+        if lvl < result:
+            result = lvl
+    return result
+
+
+def trust_flows_to(provided: Trust, required: Trust) -> bool:
+    """True if a value at trust level `provided` may satisfy a position
+    that requires level `required`, with **no upward coercion**: trust
+    can be forgotten but never manufactured. Equivalent to
+    `required ⊑ provided` — the requirement must not exceed what is
+    supplied. This single predicate governs both edges (source output →
+    target input) and node bodies (input meet → output); trust
+    laundering is exactly its violation without a declared discharge."""
+    return required <= provided
+
+
+def strip_trust(t: Type) -> Type:
+    """Remove a top-level `Untrusted<_>` wrapper, exposing the carried
+    data shape; other types are returned unchanged. Used to separate a
+    type's *data compatibility* (which must match by shape) from its
+    *trust level* (which is compared under the lattice), so that the
+    two obligations are checked independently rather than smeared into
+    one equality test."""
+    if is_untrusted(t):
+        assert isinstance(t, TApp)  # narrowed by is_untrusted
+        # `Untrusted<T>` carries exactly one argument; be defensive if
+        # a malformed `Untrusted<A, B>` slips through and just return
+        # the whole node so the shape comparison stays conservative.
+        if len(t.args) == 1:
+            return t.args[0]
+    return t
 
 
 def sum_variant_type(t: Type, role: str) -> Type | None:

@@ -423,5 +423,155 @@ class TestCrossGraphCheck(unittest.TestCase):
             self.assertEqual(validate_files(paths), [])
 
 
+class TestTrustLattice(unittest.TestCase):
+    """The two-point trust lattice (`Untrusted ⊑ Trusted`) exercised
+    directly: an edge is rejected exactly when it demands more trust
+    than the source supplies (upward coercion), and a node body may
+    raise trust only when it is a declared discharger. Both halves use
+    the same lattice order, so these tables pin the whole discipline."""
+
+    UNTRUSTED = "Untrusted<Payload>"
+    TRUSTED = "Payload"
+
+    def _two_node_edge(self, src_out: str, tgt_in: str) -> list[str]:
+        """A Src → Tgt graph with the given source-output and
+        target-input types. Tgt always emits `Untrusted<Result>` so its
+        own body never raises trust — isolating the *edge* check."""
+        graph = {
+            "name": "Pipeline",
+            "parameters": ["RawInput"],
+            "capabilities": [],
+            "nodes": [
+                {"name": "Src", "inputs": ["RawInput"], "output": src_out},
+                {"name": "Tgt", "inputs": [tgt_in], "output": "Untrusted<Result>"},
+            ],
+            "data_edges": [{"from": "Src", "to": "Tgt"}],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            paths = _write({"pipeline.json": graph}, Path(td))
+            return validate_files(paths)
+
+    def _lattice_errors(self, errors: list[str]) -> list[str]:
+        return [e for e in errors if "upward coercion" in e or "laundering" in e]
+
+    def test_edge_trust_matrix(self):
+        """Data shapes match in every cell (both carry `Payload`); only
+        the trust levels vary. Upward coercion — untrusted source into a
+        clean requirement — is the single rejected cell."""
+        cases = [
+            # (src_out, tgt_in, should_reject)
+            (self.TRUSTED, self.TRUSTED, False),  # clean → clean
+            (self.TRUSTED, self.UNTRUSTED, False),  # clean → untrusted (forget trust)
+            (self.UNTRUSTED, self.UNTRUSTED, False),  # untrusted → untrusted (carry)
+            (self.UNTRUSTED, self.TRUSTED, True),  # untrusted → clean: UPWARD COERCION
+        ]
+        for src_out, tgt_in, should_reject in cases:
+            with self.subTest(src=src_out, tgt=tgt_in):
+                errors = self._two_node_edge(src_out, tgt_in)
+                lattice = self._lattice_errors(errors)
+                # No case should ever be a plain data-type mismatch: the
+                # carried shapes are equal, so trust is the only variable.
+                self.assertFalse(
+                    any("type mismatch" in e for e in errors),
+                    msg=f"unexpected data mismatch; errors: {errors}",
+                )
+                if should_reject:
+                    self.assertTrue(lattice, msg=f"expected upward-coercion error; got: {errors}")
+                else:
+                    self.assertEqual(lattice, [], msg=f"unexpected trust error; got: {errors}")
+
+    def _single_node(self, in_t: str, out_t: str, discharges: bool) -> list[str]:
+        node = {"name": "Only", "inputs": [in_t], "output": out_t}
+        if discharges:
+            node["discharges_trust"] = True
+        graph = {
+            "name": "G",
+            "parameters": [in_t],
+            "capabilities": [],
+            "nodes": [node],
+            "data_edges": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            paths = _write({"g.json": graph}, Path(td))
+            return validate_files(paths)
+
+    def test_node_body_trust_matrix(self):
+        """A node raises trust only legitimately at a declared discharger;
+        every other upward move is a lattice violation, and a discharger
+        with nothing to discharge is flagged as an unused annotation."""
+        U, T = self.UNTRUSTED, self.TRUSTED
+        # (in, out, discharges) -> substring expected in errors, or None
+        cases = [
+            (U, T, False, "upward coercion"),  # launder: untrusted → clean, no discharge
+            (U, T, True, None),  # legitimate discharge
+            (U, U, False, None),  # pass-through untrusted
+            (T, T, False, None),  # clean → clean
+            (T, U, False, None),  # clean → untrusted (adding restriction is free)
+            (T, T, True, "annotation is unused"),  # discharger with no untrusted input
+        ]
+        for in_t, out_t, discharges, expected in cases:
+            with self.subTest(in_t=in_t, out_t=out_t, discharges=discharges):
+                errors = self._single_node(in_t, out_t, discharges)
+                trust = [
+                    e
+                    for e in errors
+                    if "upward coercion" in e or "laundering" in e or "annotation is unused" in e
+                ]
+                if expected is None:
+                    self.assertEqual(trust, [], msg=f"unexpected trust error; got: {errors}")
+                else:
+                    self.assertTrue(
+                        any(expected in e for e in trust),
+                        msg=f"expected {expected!r}; got: {errors}",
+                    )
+
+    def test_discharger_mediated_flow_is_accepted(self):
+        """An untrusted source reaching a clean consumer *through* a
+        declared discharger is fully well-typed — the discharge is the
+        sanctioned upward move the lattice provides."""
+        graph = {
+            "name": "Mediated",
+            "parameters": ["RawInput"],
+            "capabilities": [],
+            "nodes": [
+                {"name": "Src", "inputs": ["RawInput"], "output": "Untrusted<Payload>"},
+                {
+                    "name": "Discharge",
+                    "inputs": ["Untrusted<Payload>"],
+                    "output": "CleanPayload",
+                    "discharges_trust": True,
+                },
+                {"name": "Sink", "inputs": ["CleanPayload"], "output": "Receipt"},
+            ],
+            "data_edges": [
+                {"from": "Src", "to": "Discharge"},
+                {"from": "Discharge", "to": "Sink"},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            paths = _write({"mediated.json": graph}, Path(td))
+            self.assertEqual(validate_files(paths), [])
+
+    def test_random_labellings_reject_exactly_upward_coercion(self):
+        """Property check: over many random two-node trust labellings with
+        matching data shapes, an edge is rejected on trust grounds iff it
+        is an upward-coercion edge (untrusted source, clean requirement)."""
+        import random
+
+        rng = random.Random(20260715)
+        levels = [self.TRUSTED, self.UNTRUSTED]
+        for _ in range(60):
+            src_out = rng.choice(levels)
+            tgt_in = rng.choice(levels)
+            is_upward = src_out == self.UNTRUSTED and tgt_in == self.TRUSTED
+            errors = self._two_node_edge(src_out, tgt_in)
+            lattice = self._lattice_errors(errors)
+            self.assertEqual(
+                bool(lattice),
+                is_upward,
+                msg=f"src={src_out} tgt={tgt_in} upward={is_upward}; errors={errors}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

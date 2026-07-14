@@ -11,6 +11,7 @@ from type_parser import (
     TApp,
     TList,
     TName,
+    Trust,
     TString,
     TSum,
     TVariant,
@@ -18,8 +19,12 @@ from type_parser import (
     is_assignable,
     is_untrusted,
     parse_type,
+    strip_trust,
     sum_roles,
     sum_variant_type,
+    trust_flows_to,
+    trust_level,
+    trust_meet,
     unparse,
 )
 
@@ -219,6 +224,42 @@ class TestUnparseRoundtrip(unittest.TestCase):
         for s in cases:
             with self.subTest(src=s):
                 self.assertEqual(unparse(parse_type(s)), s)
+
+
+class TestTrustLattice(unittest.TestCase):
+    def test_level_of_clean_and_untrusted(self):
+        self.assertEqual(trust_level(parse_type("RawMessage")), Trust.TRUSTED)
+        self.assertEqual(trust_level(parse_type("Untrusted<RawMessage>")), Trust.UNTRUSTED)
+
+    def test_level_of_sum_taints_conservatively(self):
+        # A sum with any untrusted variant is untrusted as a whole.
+        mixed = parse_type("ok: CleanPayload | raw: Untrusted<RawMessage>")
+        self.assertEqual(trust_level(mixed), Trust.UNTRUSTED)
+        clean = parse_type("ok: CleanPayload | err: ValidationError")
+        self.assertEqual(trust_level(clean), Trust.TRUSTED)
+
+    def test_meet_is_least_trusted(self):
+        self.assertEqual(trust_meet([Trust.TRUSTED, Trust.TRUSTED]), Trust.TRUSTED)
+        self.assertEqual(trust_meet([Trust.TRUSTED, Trust.UNTRUSTED]), Trust.UNTRUSTED)
+        # The meet over nothing is the lattice top.
+        self.assertEqual(trust_meet([]), Trust.TRUSTED)
+
+    def test_flows_to_forbids_upward_coercion(self):
+        # Trust may be forgotten, never manufactured.
+        self.assertTrue(trust_flows_to(Trust.TRUSTED, Trust.TRUSTED))
+        self.assertTrue(trust_flows_to(Trust.TRUSTED, Trust.UNTRUSTED))
+        self.assertTrue(trust_flows_to(Trust.UNTRUSTED, Trust.UNTRUSTED))
+        self.assertFalse(trust_flows_to(Trust.UNTRUSTED, Trust.TRUSTED))
+
+    def test_strip_trust_exposes_shape(self):
+        self.assertEqual(strip_trust(parse_type("Untrusted<RawMessage>")), parse_type("RawMessage"))
+        # Non-untrusted types pass through unchanged.
+        self.assertEqual(strip_trust(parse_type("CleanPayload")), parse_type("CleanPayload"))
+        # Stripping separates shape from trust: same shape, different level.
+        u = parse_type("Untrusted<RawMessage>")
+        t = parse_type("RawMessage")
+        self.assertEqual(strip_trust(u), strip_trust(t))
+        self.assertNotEqual(trust_level(u), trust_level(t))
 
 
 if __name__ == "__main__":
