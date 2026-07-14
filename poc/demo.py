@@ -16,8 +16,15 @@ from .graph import AssemblyError, assemble, load_graph_dict
 from .handles import CapabilityError, InferenceLLM, ToolLLM
 from .llm import AnthropicBackend, LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
+from .sandbox import SandboxError
+from .sandbox import available as sandbox_available
+from .sandbox.host import FS, Sandbox
 from .values import ConversationContext, CustomerQuery, CustomerRequest, Untrusted
 from .variants import UNSAFE_VARIANTS
+
+# Nodes ported to the confined WASM tier. Used when the sandbox toolchain is
+# present; otherwise the demo runs them on the host tier and says so.
+SANDBOXED_NODES = {"ParseMessage", "GenerateResponse"}
 
 BENIGN = "Why was I charged twice on my latest invoice?"
 
@@ -79,13 +86,15 @@ def demo_capability_confinement() -> None:
         print(f"    ✓ out-of-scope tool call refused: {e}")
 
 
-def demo_pipeline(graph: dict, backend, label: str, message: str) -> None:
+def demo_pipeline(graph: dict, backend, label: str, message: str, sandbox=()) -> None:
     rule(f"3. {label}")
-    g = assemble(graph, backend=backend, stores=STORES)
+    g = assemble(graph, backend=backend, stores=STORES, sandbox=sandbox)
     result = execute(g, CustomerRequest(session_id="user-session", body=message))
 
     print(f"  input:  {message[:64]}{'…' if len(message) > 64 else ''}")
     print(f"  path:   {' → '.join(result.order)}")
+    tiered = "  ".join(f"{n}[{result.tiers[n]}]" for n in result.order)
+    print(f"  tiers:  {tiered}")
 
     parsed = result.received.get("ModerateContent")
     if isinstance(parsed, CustomerQuery):
@@ -105,9 +114,9 @@ def demo_pipeline(graph: dict, backend, label: str, message: str) -> None:
         print(f"\n  terminal: {node} → {out}")
 
 
-def demo_residual(graph: dict, backend) -> None:
+def demo_residual(graph: dict, backend, sandbox=()) -> None:
     rule("4. The residual — stated honestly")
-    g = assemble(graph, backend=backend, stores=STORES)
+    g = assemble(graph, backend=backend, stores=STORES, sandbox=sandbox)
     result = execute(g, CustomerRequest(session_id="user-session", body=ADVERSARIAL))
     ctx = result.received.get("GenerateResponse")
 
@@ -122,6 +131,57 @@ def demo_residual(graph: dict, backend) -> None:
     print("    • it cannot call anything outside {lookup} — the handle refuses;")
     print("    • the inference-only nodes cannot act on it at all.")
     print("  Blast radius drops from 'arbitrary tool execution' to 'a bad lookup query'.")
+    print("\n  The sandbox tier does NOT close this residual: it stops ambient-authority")
+    print("  escapes, not adversarial data in a permitted field. What bounds the damage")
+    print("  is still the capability scope, not the sandbox.")
+
+
+def demo_sandbox_hostile() -> None:
+    rule("2b. A hostile node cannot escape the sandbox tier")
+    if not sandbox_available():
+        print("  (skipped — wasmtime not installed; `uv sync --group poc` to enable)")
+        return
+
+    import os
+    import socket
+    from pathlib import Path
+
+    print("  The same escape attempts, host tier vs sandbox tier:\n")
+
+    # Filesystem: a node granted no fs capability.
+    host_fs = bool(Path(__file__).read_text())
+    fs_verdict, _, _ = Sandbox("hostile_ambient").call_export("escape_fs").partition(FS)
+    print(
+        f"  read a file       host: {'ESCAPES' if host_fs else '—':10}  sandbox: "
+        f"{'DENIED' if fs_verdict != 'yes' else 'ESCAPED!'}"
+    )
+
+    # Network: ambient socket construction.
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.close()
+    net_verdict, _, _ = Sandbox("hostile_ambient").call_export("escape_net").partition(FS)
+    print(
+        f"  open a socket     host: {'ESCAPES':10}  sandbox: "
+        f"{'DENIED' if net_verdict != 'yes' else 'ESCAPED!'}"
+    )
+
+    # Environment: ambient env read.
+    host_env = os.environ.get("PATH") is not None
+    env_verdict, _, _ = Sandbox("hostile_ambient").call_export("escape_env").partition(FS)
+    print(
+        f"  read an env var   host: {'ESCAPES' if host_env else '—':10}  sandbox: "
+        f"{'DENIED' if env_verdict != 'yes' else 'ESCAPED!'}"
+    )
+
+    # Ungranted capability: a module importing a handle it was not given.
+    try:
+        Sandbox("hostile_ungranted", {"cap_infer": lambda _a: "x"})
+        print("  ungranted tool    host: (n/a)  sandbox: INSTANTIATED — should not happen!")
+    except SandboxError:
+        print("  ungranted tool    host: could import one  sandbox: WON'T INSTANTIATE")
+
+    print("\n  On the sandbox tier the capability is absent, not merely unexposed: an")
+    print("  inference-only node has no tool *import*, not just no tool *method*.")
 
 
 def main() -> int:
@@ -131,30 +191,53 @@ def main() -> int:
         action="store_true",
         help="use the real Claude API for the LLM-backed nodes",
     )
+    parser.add_argument(
+        "--no-sandbox",
+        action="store_true",
+        help="run every node on the host tier even if the WASM sandbox is available",
+    )
     args = parser.parse_args()
 
     backend = AnthropicBackend() if args.live else StubLLM()
     mode = "LIVE (real Claude)" if args.live else "offline (deterministic stub model)"
 
+    use_sandbox = sandbox_available() and not args.no_sandbox
+    sandbox = SANDBOXED_NODES if use_sandbox else set()
+    tier_line = (
+        f"sandbox (WASM/WASI) for {sorted(SANDBOXED_NODES)}, host for the rest"
+        if use_sandbox
+        else "host-discipline for every node"
+        + ("" if sandbox_available() else " (wasmtime not installed)")
+    )
+
     print("\n\033[1mSignal-graph runtime — prompt-injection demonstration\033[0m")
     print(f"Model backend: {mode}")
+    print(f"Enforcement:   {tier_line}")
 
     graph = load_graph_dict("customer-support")
 
     demo_assembly_rejection(graph)
     demo_capability_confinement()
-    demo_pipeline(graph, backend, "Benign message runs end-to-end", BENIGN)
-    demo_pipeline(graph, backend, "Adversarial message — capabilities hold", ADVERSARIAL)
-    demo_residual(graph, backend)
+    demo_sandbox_hostile()
+    demo_pipeline(graph, backend, "Benign message runs end-to-end", BENIGN, sandbox)
+    demo_pipeline(graph, backend, "Adversarial message — capabilities hold", ADVERSARIAL, sandbox)
+    demo_residual(graph, backend, sandbox)
 
     rule("Enforcement fidelity (read this)")
-    print("  Capability confinement here is HOST-DISCIPLINE enforcement: a node gets")
-    print("  only the handles its signature declares, and each handle's surface is")
-    print("  scoped to its declared authority. That demonstrates the *shape* of the")
-    print("  guarantee — it does not make it unforgeable. Nothing here stops a")
-    print("  malicious node from `import os`. Memory-level unforgeability needs the")
-    print("  WASM/WASI sandbox tier, and ultimately CHERI. Both are named follow-ups,")
-    print("  not claims this PoC makes.\n")
+    if use_sandbox:
+        print("  The two ported nodes ran on the SANDBOX tier: a WASM module under an")
+        print("  empty WASI context, whose only imports are its declared capabilities.")
+        print("  For those nodes 'no ambient authority' is enforced, not merely modelled —")
+        print("  the hostile-node section above shows the escapes it denies. The remaining")
+        print("  nodes ran on the HOST tier, which demonstrates the *shape* of confinement")
+        print("  but cannot stop a malicious node from `import os`. The two tiers composing")
+        print("  in one graph is the proposal's incremental-migration path.")
+    else:
+        print("  Every node ran on the HOST tier: it gets only its declared handles, but")
+        print("  nothing stops a malicious node from `import os`. That is the *shape* of")
+        print("  confinement, not enforcement. Install the sandbox (`uv sync --group poc`)")
+        print("  to run the two ported nodes with unforgeable WASM/WASI confinement.")
+    print("  Memory-level unforgeability (CHERI) remains out of scope for this PoC.\n")
     return 0
 
 

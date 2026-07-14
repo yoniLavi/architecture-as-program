@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import json
 import tempfile
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from graph_validator import validate_files
@@ -33,12 +33,19 @@ class AssemblyError(RuntimeError):
         super().__init__("graph failed validation:\n  " + "\n  ".join(errors))
 
 
+# Enforcement tiers a node may run on. `host` is the default host-discipline
+# tier; `sandbox` runs the node body as a confined WASM module (see poc/sandbox).
+TIER_HOST = "host"
+TIER_SANDBOX = "sandbox"
+
+
 @dataclass
 class Node:
     name: str
     inputs: list[str]
     output: str
     discharges_trust: bool
+    tier: str = field(default=TIER_HOST)
 
 
 @dataclass
@@ -91,15 +98,21 @@ def assemble(
     *,
     backend: LLMBackend,
     stores: Mapping[str, Mapping[str, list[str]]] | None = None,
+    sandbox: Iterable[str] = (),
 ) -> AssembledGraph:
     """Validate and assemble a graph dict into a runnable `AssembledGraph`.
 
     Raises `AssemblyError` if validation fails — this is the assembly-time
-    rejection of unsafe wiring."""
+    rejection of unsafe wiring.
+
+    `sandbox` names the nodes to run on the confined WASM tier; every other node
+    runs on the host tier. The two tiers compose in one graph, which is the
+    proposal's incremental-migration path (opaque host node → confined node)."""
     errors = validate_graph_dict(graph)
     if errors:
         raise AssemblyError(errors)
 
+    sandbox_nodes = set(sandbox)
     stores = stores or {}
     nodes = {
         n["name"]: Node(
@@ -107,9 +120,13 @@ def assemble(
             inputs=list(n["inputs"]),
             output=n["output"],
             discharges_trust=bool(n.get("discharges_trust", False)),
+            tier=TIER_SANDBOX if n["name"] in sandbox_nodes else TIER_HOST,
         )
         for n in graph["nodes"]
     }
+    unknown = sandbox_nodes - set(nodes)
+    if unknown:
+        raise AssemblyError([f"unknown node(s) requested for sandbox tier: {sorted(unknown)}"])
 
     edges: list[Edge] = []
     for e in graph["data_edges"]:

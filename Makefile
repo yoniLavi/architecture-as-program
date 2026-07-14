@@ -9,7 +9,12 @@ GRAPHS_SVG := $(patsubst graphs/%.json,$(DIST)/graphs/%.svg,$(GRAPHS_SRC))
 DIAGRAMS_SRC := $(wildcard diagrams/*.typ)
 DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC))
 
-.PHONY: build clean validate-graphs test
+.PHONY: build clean validate-graphs test wasm
+
+RUST_DIR    := $(ROOT)/poc/sandbox/rust
+WASM_OUT    := $(ROOT)/poc/sandbox/wasm
+WASM_TARGET := wasm32-wasip1
+WASM_MODULES := node_parse_message node_generate_response hostile_ambient hostile_ungranted
 
 build: validate-graphs $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html $(DIST)/grammar.md
 	@echo "Build complete."
@@ -28,6 +33,20 @@ validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_val
 # Run the test suite (type parser + graph validator) via pytest.
 test:
 	@uv run pytest
+
+# Build the sandbox-tier WASM node artifacts from their Rust sources and copy
+# them into poc/sandbox/wasm/ (which is committed). Requires a Rust toolchain
+# with the wasm32-wasip1 target: `rustup target add wasm32-wasip1`. This is NOT
+# part of `make build` or the pre-commit hooks — the committed .wasm artifacts
+# let the sandbox tests run without a Rust toolchain; rebuild only when the Rust
+# node sources change.
+wasm:
+	cargo build --manifest-path $(RUST_DIR)/Cargo.toml --release --target $(WASM_TARGET)
+	@mkdir -p $(WASM_OUT)
+	@for m in $(WASM_MODULES); do \
+		cp $(RUST_DIR)/target/$(WASM_TARGET)/release/$$m.wasm $(WASM_OUT)/ ; \
+		echo "  wrote poc/sandbox/wasm/$$m.wasm" ; \
+	done
 
 # Generate pseudocode and diagram from canonical graph JSON
 $(DIST)/graphs/%.graph $(DIST)/graphs/%.typ: graphs/%.json scripts/generate-graph.py | $(DIST)/graphs

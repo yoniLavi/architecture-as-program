@@ -15,8 +15,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .graph import AssembledGraph, Node
+from .graph import TIER_SANDBOX, AssembledGraph, Node
 from .nodes import REGISTRY
+from .sandbox.nodes import SANDBOX_REGISTRY
 from .values import Variant
 
 
@@ -26,6 +27,8 @@ class ExecutionResult:
     # node name → the data value it received as input
     received: dict[str, object] = field(default_factory=dict)
     order: list[str] = field(default_factory=list)
+    # node name → the enforcement tier that ran it ("host" | "sandbox")
+    tiers: dict[str, str] = field(default_factory=dict)
 
 
 class ExecutionError(RuntimeError):
@@ -65,12 +68,16 @@ def execute(graph: AssembledGraph, boundary_value: object) -> ExecutionResult:
     while pending:
         node_name, value = pending.pop(0)
         node = graph.nodes[node_name]
-        impl = REGISTRY.get(node_name)
+        registry = SANDBOX_REGISTRY if node.tier == TIER_SANDBOX else REGISTRY
+        impl = registry.get(node_name)
         if impl is None:
-            raise ExecutionError(f"no implementation registered for node {node_name!r}")
+            raise ExecutionError(
+                f"no {node.tier}-tier implementation registered for node {node_name!r}"
+            )
 
         result.received[node_name] = value
         result.order.append(node_name)
+        result.tiers[node_name] = node.tier
 
         output = impl(value, *_capability_handles(graph, node))
 

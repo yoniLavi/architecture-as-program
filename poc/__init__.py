@@ -6,13 +6,14 @@ instantiates each node with injected capability handles, and propagates signals
 along the active path.
 
 Enforcement fidelity (stated honestly, per the proposal's hedging discipline):
-capability confinement here is *host-discipline* enforcement — a node receives
-only the handles its signature declares, and each handle's surface is scoped to
-its declared authority. This demonstrates the *shape* of capability confinement.
-It does NOT make confinement unforgeable: nothing stops a determined node from
-`import os`. Memory-level unforgeability requires the WASM/WASI sandbox tier
-(a named follow-up change) and, ultimately, CHERI hardware — both described in
-the proposal's runtime section.
+nodes run on one of two tiers. On the *host tier* (default) capability
+confinement is host-discipline — a node receives only its declared handles, each
+scoped by its type, but nothing stops a determined node from `import os`. On the
+*sandbox tier* (`poc.sandbox`) a node body runs as a WebAssembly module under an
+empty WASI context, so confinement is unforgeable at the WASM boundary: the
+module's only imports are the host functions for its declared capabilities.
+Memory-level unforgeability (CHERI) is still out of scope, and host-tier nodes
+remain host-discipline only — both as described in the proposal's runtime section.
 """
 
 # Put the repo's `scripts/` directory on sys.path so this package can reuse the
