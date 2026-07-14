@@ -79,3 +79,18 @@ to those previously published for the flat-ABI tier, and the only claim the data
 typing the boundary did not move the crossing out of its order of magnitude. The crossing measurement
 also now differences *one* component driven down a 1-crossing and a 3-crossing path, rather than two
 different node bodies, so guest-side work cancels.
+
+**Follow-on proposal edit prompted by review (beyond 5.2).** The finding that a `wasip2` build drags
+in ambient WASI imports raised a fair question: is WASI the right thing to build on, given it might be
+deprecated? Answered by distinguishing the two layers the word "WASI" conflates. The durable
+substrate is the **WASM Component Model / WIT** (the typed-interface layer); **WASI** is a standard
+*library* of interfaces built on it. The PoC already bets on the substrate — it defines its own WIT
+capability interfaces rather than importing WASI's — so it is untouched by WASI's interface churn.
+Grounded in the current roadmap: WASI 0.1 is legacy; 0.2 rebased WASI onto the Component Model; **0.3
+(ratified June 2026) removed the `wasi:io` package entirely**, folding it into the Component Model's
+canonical ABI; WASI 1.0 is expected late 2026/early 2027. That `wasi:io` removal is a concrete
+instance of the point — the interfaces move, the substrate they rebase onto is stable. @sec:sandboxing
+was rewritten to state the layering and reframe WASI's own interfaces as a *worked example* of
+capability-as-interface (structurally the same as our `DBHandle`/`LLMClient`, for host resources); the
+agenda's "WASM/WASI" shorthand was tightened to name the Component Model where the typed boundary is
+load-bearing. New citations: `wasi_030_2026`, `wasi_roadmap_2026`.
