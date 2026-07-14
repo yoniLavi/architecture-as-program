@@ -16,9 +16,9 @@ from .graph import AssemblyError, assemble, load_graph_dict
 from .handles import CapabilityError, InferenceLLM, ToolLLM
 from .llm import AnthropicBackend, LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
-from .sandbox import SandboxError
+from .sandbox import INFERENCE_LLM, SandboxError
 from .sandbox import available as sandbox_available
-from .sandbox.host import FS, Sandbox
+from .sandbox.host import Sandbox, capability_imports, wasi_imports
 from .values import ConversationContext, CustomerQuery, CustomerRequest, Untrusted
 from .variants import UNSAFE_VARIANTS
 
@@ -137,7 +137,7 @@ def demo_residual(graph: dict, backend, sandbox=()) -> None:
 
 
 def demo_sandbox_hostile() -> None:
-    rule("2b. A hostile node cannot escape the sandbox tier")
+    rule("2b. A hostile node cannot escape the component tier")
     if not sandbox_available():
         print("  (skipped — wasmtime not installed; `uv sync --group poc` to enable)")
         return
@@ -146,42 +146,49 @@ def demo_sandbox_hostile() -> None:
     import socket
     from pathlib import Path
 
-    print("  The same escape attempts, host tier vs sandbox tier:\n")
+    print("  The same escape attempts, host tier vs component tier:\n")
+
+    def escaped(export: str) -> bool:
+        # The hostile component's world imports nothing at all, so it is granted
+        # nothing at all. Each export returns a typed `escape-verdict`.
+        return Sandbox("hostile_ambient").call(export).escaped
 
     # Filesystem: a node granted no fs capability.
     host_fs = bool(Path(__file__).read_text())
-    fs_verdict, _, _ = Sandbox("hostile_ambient").call_export("escape_fs").partition(FS)
     print(
-        f"  read a file       host: {'ESCAPES' if host_fs else '—':10}  sandbox: "
-        f"{'DENIED' if fs_verdict != 'yes' else 'ESCAPED!'}"
+        f"  read a file       host: {'ESCAPES' if host_fs else '—':10}  component: "
+        f"{'ESCAPED!' if escaped('escape-fs') else 'DENIED'}"
     )
 
     # Network: ambient socket construction.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.close()
-    net_verdict, _, _ = Sandbox("hostile_ambient").call_export("escape_net").partition(FS)
     print(
-        f"  open a socket     host: {'ESCAPES':10}  sandbox: "
-        f"{'DENIED' if net_verdict != 'yes' else 'ESCAPED!'}"
+        f"  open a socket     host: {'ESCAPES':10}  component: "
+        f"{'ESCAPED!' if escaped('escape-net') else 'DENIED'}"
     )
 
     # Environment: ambient env read.
     host_env = os.environ.get("PATH") is not None
-    env_verdict, _, _ = Sandbox("hostile_ambient").call_export("escape_env").partition(FS)
     print(
-        f"  read an env var   host: {'ESCAPES' if host_env else '—':10}  sandbox: "
-        f"{'DENIED' if env_verdict != 'yes' else 'ESCAPED!'}"
+        f"  read an env var   host: {'ESCAPES' if host_env else '—':10}  component: "
+        f"{'ESCAPED!' if escaped('escape-env') else 'DENIED'}"
     )
 
-    # Ungranted capability: a module importing a handle it was not given.
+    # Ungranted capability: a component whose world imports an interface it was
+    # never granted. Provisioned inference-only, it cannot even instantiate.
     try:
-        Sandbox("hostile_ungranted", {"cap_infer": lambda _a: "x"})
-        print("  ungranted tool    host: (n/a)  sandbox: INSTANTIATED — should not happen!")
+        Sandbox("hostile_ungranted", {INFERENCE_LLM: {"infer": lambda _s, _p, _t: "x"}})
+        print("  ungranted tool    host: (n/a)  component: INSTANTIATED — should not happen!")
     except SandboxError:
-        print("  ungranted tool    host: could import one  sandbox: WON'T INSTANTIATE")
+        print("  ungranted tool    host: could import one  component: WON'T INSTANTIATE")
 
-    print("\n  On the sandbox tier the capability is absent, not merely unexposed: an")
-    print("  inference-only node has no tool *import*, not just no tool *method*.")
+    ambient = wasi_imports("node_parse_message")
+    print("\n  On the component tier the capability is absent, not merely unexposed: an")
+    print("  inference-only node has no tool *import*, not just no tool *method*. And")
+    print("  there is no ambient authority to reach for — the confined node's import")
+    print(f"  set holds only {capability_imports('node_parse_message')[0]}")
+    print(f"  with {len(ambient)} filesystem/socket/environment/clock imports in it.")
 
 
 def main() -> int:

@@ -1,25 +1,43 @@
-"""The hostile-node suite and the sandbox execution tier.
+"""The hostile-node suite and the component execution tier.
 
-This suite is the deliverable of the WASI-sandbox change, not the sandbox itself.
+This suite is the deliverable of the component-model change, not the tier itself.
 Its spine is a set of *attacks*: a node body that actively tries to escape its
 capability set. Each attack is asserted twice —
 
   * on the **host tier**, where it **succeeds** (host discipline cannot stop a
     node from `import os` / opening a socket / reading the environment), so the
     known gap is recorded as a test rather than as prose; and
-  * on the **sandbox tier**, where it **fails**, because the WASM module runs
-    under an empty WASI context with only its declared capability imports.
+  * on the **component tier**, where it **fails**, because the node runs as a WASM
+    component whose import set contains exactly its declared capability interfaces
+    and nothing else.
+
+The previous (core-wasm) tier established that confinement result, and the rule
+for this port was that it must not regress: every escape denied then must be
+denied now. It is — and the *mechanism* is stronger, which the structural tests
+below assert directly:
+
+  * `test_no_component_imports_any_wasi_function` — the old tier's modules imported
+    `fd_write`, `environ_get` and friends, rendered powerless by an empty
+    `WasiConfig`. These components do not import them at all. "No ambient
+    authority" became a property of the artifact rather than of the host's config.
+  * `test_component_imports_match_the_graph_signature` — a component's import set
+    is checked against the capability set derived from `graphs/customer-support.json`,
+    so a world that over-grants fails here rather than shipping quietly.
+  * `test_type_mismatched_value_is_rejected_at_the_boundary` — the typed boundary
+    refuses a malformed value instead of reinterpreting bytes.
 
 Covers the `signal-graph-runtime` spec requirements added/modified by
-`add-wasi-node-sandbox`:
+`add-wasm-component-model` and `add-wasi-node-sandbox`:
+  - Capability boundaries are typed WIT interfaces
+  - A component node imports no ambient WASI functions
   - Nodes execute with no ambient authority
   - A hostile node cannot exceed its injected capabilities
-  - Host and sandbox tiers compose within one graph
+  - Host and component tiers compose within one graph
   - Capability-crossing overhead is measured
   - Prompt-injection attenuation, disclosed per tier
 
-If the wasmtime toolchain or the built `.wasm` artifacts are absent, the whole
-module skips with a clear reason rather than failing.
+If wasmtime or the built artifacts are absent, the whole module skips with a clear
+reason rather than failing.
 """
 
 from __future__ import annotations
@@ -30,8 +48,23 @@ from pathlib import Path
 
 import pytest
 
-from poc.sandbox import SandboxError, available, wasm_path
-from poc.sandbox.host import FS, Sandbox, cap_imports, wasi_imports
+from poc.graph import load_graph_dict
+from poc.sandbox import (
+    INFERENCE_LLM,
+    KB_READ,
+    TOOL_LLM,
+    TYPES,
+    Sandbox,
+    SandboxError,
+    SandboxTypeError,
+    available,
+    capability_imports,
+    component_imports,
+    expected_imports,
+    record,
+    wasi_imports,
+    wasm_path,
+)
 
 _ARTIFACTS = [
     "node_parse_message",
@@ -44,7 +77,7 @@ _missing = [m for m in _ARTIFACTS if not wasm_path(m).exists()]
 pytestmark = pytest.mark.skipif(
     not available() or bool(_missing),
     reason=(
-        "sandbox tier unavailable: "
+        "component tier unavailable: "
         + ("wasmtime not installed (`uv sync --group poc`)" if not available() else "")
         + (f" missing artifacts {_missing} (`make wasm`)" if _missing else "")
     ),
@@ -53,10 +86,10 @@ pytestmark = pytest.mark.skipif(
 
 # ── The attacks, defined once ──────────────────────────────────────
 #
-# Each attack names a class of ambient authority. The host-tier lambda performs
+# Each attack names a class of ambient authority. The host-tier function performs
 # it in plain Python and returns True when it succeeds (it always does); the
-# sandbox-tier column names the WASM export that attempts the same class of
-# escape and reports a verdict.
+# component-tier column names the WASM export that attempts the same class of
+# escape and returns a typed verdict.
 
 
 def _host_reads_a_file() -> bool:
@@ -82,18 +115,21 @@ HOST_ATTACKS = {
     "environment": _host_reads_the_environment,
 }
 
-SANDBOX_ESCAPES = {
-    "filesystem": "escape_fs",
-    "network": "escape_net",
-    "environment": "escape_env",
+COMPONENT_ESCAPES = {
+    "filesystem": "escape-fs",
+    "network": "escape-net",
+    "environment": "escape-env",
 }
 
 
-def _sandbox_escaped(export: str) -> tuple[bool, str]:
-    """Run a hostile-ambient export and return `(escaped, detail)`."""
-    sb = Sandbox("hostile_ambient")  # no capability imports granted at all
-    verdict, _, detail = sb.call_export(export).partition(FS)
-    return verdict == "yes", detail
+def _component_escaped(export: str) -> tuple[bool, str]:
+    """Run a hostile-ambient export and return `(escaped, detail)`.
+
+    The hostile component is granted nothing — and, its world importing nothing,
+    there is nothing it could have been granted."""
+    sb = Sandbox("hostile_ambient")
+    verdict = sb.call(export)
+    return verdict.escaped, verdict.detail
 
 
 # ── The host tier's gap is asserted, not hidden ────────────────────
@@ -101,107 +137,184 @@ def _sandbox_escaped(export: str) -> tuple[bool, str]:
 
 @pytest.mark.parametrize("attack", sorted(HOST_ATTACKS))
 def test_host_tier_escape_succeeds(attack):
-    """Scenario: the host tier's gap is asserted, not hidden. Host discipline
-    does not confine a hostile node — every ambient-authority attack succeeds.
-    This is the limitation the sandbox tier exists to close."""
+    """Scenario: the host tier's gap is asserted, not hidden. Host discipline does
+    not confine a hostile node — every ambient-authority attack succeeds. This is
+    the limitation the confined tier exists to close."""
     assert HOST_ATTACKS[attack]() is True
 
 
-# ── The sandbox tier denies every escape ───────────────────────────
+# ── The component tier denies every escape ─────────────────────────
 
 
-def test_sandbox_denies_filesystem_access():
-    """Scenario: filesystem access is denied — no preopen was granted."""
-    escaped, detail = _sandbox_escaped("escape_fs")
+def test_component_denies_filesystem_access():
+    """Scenario: filesystem access is denied — there is no filesystem import."""
+    escaped, detail = _component_escaped("escape-fs")
     assert not escaped, f"filesystem escape should fail, got: {detail}"
 
 
-def test_sandbox_denies_network_egress():
-    """Scenario: network egress is denied — no socket capability was granted."""
-    escaped, detail = _sandbox_escaped("escape_net")
+def test_component_denies_network_egress():
+    """Scenario: network egress is denied — there is no socket import."""
+    escaped, detail = _component_escaped("escape-net")
     assert not escaped, f"network escape should fail, got: {detail}"
 
 
-def test_sandbox_denies_environment_access():
-    """Scenario: ambient environment access is denied — empty WASI env."""
-    escaped, detail = _sandbox_escaped("escape_env")
+def test_component_denies_environment_access():
+    """Scenario: ambient environment access is denied — there is no env import."""
+    escaped, detail = _component_escaped("escape-env")
     assert not escaped, f"environment escape should fail, got: {detail}"
 
 
-def test_every_ambient_attack_is_denied_in_the_sandbox():
-    """The whole ambient-authority class is denied: the sandbox tier is the
-    mirror image of the host tier's gap above."""
-    for export in SANDBOX_ESCAPES.values():
-        escaped, detail = _sandbox_escaped(export)
+def test_every_ambient_attack_is_denied_on_the_component_tier():
+    """The whole ambient-authority class is denied: the component tier is the mirror
+    image of the host tier's gap above. This is the confinement result the core-wasm
+    tier established, carried over intact by the port — the requirement that the
+    change must strengthen the mechanism without weakening the outcome."""
+    for export in COMPONENT_ESCAPES.values():
+        escaped, detail = _component_escaped(export)
         assert not escaped, f"{export} should be denied, got: {detail}"
+
+
+# ── No ambient WASI imports at all ─────────────────────────────────
+
+
+@pytest.mark.parametrize("component", _ARTIFACTS)
+def test_no_component_imports_any_wasi_function(component):
+    """Scenario: the component's import set contains no WASI functions.
+
+    The strengthened form of "no ambient authority", and the headline result of the
+    port. A `wasm32-wasip1` module — what the retired tier shipped — imports WASI
+    stubs (`environ_get`, `fd_write`, `path_open`, …) through the standard library.
+    They were powerless there, because the host handed them an empty `WasiConfig`;
+    but they were *present*, and confinement was therefore a fact about the host's
+    configuration rather than about the artifact.
+
+    These components are built for `wasm32-unknown-unknown` and converted with no
+    WASI adapter. No filesystem, socket, environment or clock function appears among
+    their imports at all."""
+    assert wasi_imports(component) == []
+
+
+def test_the_hostile_component_imports_nothing_whatsoever():
+    """The hostile-ambient node's world declares no capabilities, so its import set
+    holds nothing but the shared type vocabulary — which declares records and enums
+    and no functions, and so grants no authority. There is literally nothing for it
+    to call."""
+    assert capability_imports("hostile_ambient") == []
+    assert component_imports("hostile_ambient") == [TYPES]
+
+
+# ── A component's imports are exactly its declared capabilities ─────
+
+
+def test_parse_message_imports_only_the_inference_interface():
+    """Scenario: a confined node's imports are exactly its declared capabilities.
+    ParseMessage holds `LLMClient<inference>` — its component imports exactly the
+    typed inference interface and no other capability interface."""
+    assert capability_imports("node_parse_message") == [INFERENCE_LLM]
+
+
+def test_generate_response_imports_only_its_two_interfaces():
+    """GenerateResponse holds `LLMClient<[lookup]>` and a read-only DB handle — its
+    component imports exactly the two backing interfaces and nothing else (no
+    exfiltrate, no write interface, no second tool)."""
+    assert capability_imports("node_generate_response") == sorted([TOOL_LLM, KB_READ])
+
+
+def test_inference_only_node_has_no_tool_interface_at_all():
+    """Scenario: an inference-only node has no tool import at all. Stronger than the
+    host tier's missing *method*: the tool-calling capability is absent from the
+    component's world entirely, and `inference-llm` has no case in which it could
+    return a tool request even if a tool existed to run."""
+    imports = capability_imports("node_parse_message")
+    assert TOOL_LLM not in imports
+    assert KB_READ not in imports
+
+
+@pytest.mark.parametrize(
+    ("component", "node"),
+    [("node_parse_message", "ParseMessage"), ("node_generate_response", "GenerateResponse")],
+)
+def test_component_imports_match_the_graph_signature(component, node):
+    """Scenario: the boundary cannot drift from the node signature.
+
+    The expected import set is *derived from the graph JSON* — the node's `with`
+    clause, parsed with the project's own type parser and mapped onto WIT interfaces
+    (`poc/sandbox/interfaces.py`) — and compared against what the built component
+    actually imports. A world that grants an interface the graph never asked for
+    fails here, rather than shipping as a silent over-grant."""
+    graph = load_graph_dict("customer-support")
+    assert component_imports(component) == expected_imports(graph, node)
 
 
 # ── A node cannot call a capability it was not granted ─────────────
 
 
-def test_ungranted_capability_module_cannot_instantiate():
+def test_ungranted_capability_component_cannot_instantiate():
     """Scenario: a node cannot call a capability it was not granted. The hostile
-    module imports `cap_kb_lookup`; provisioned as an inference-only node (which
-    links only `cap_infer`), the import is unsatisfied and instantiation fails
-    before a single instruction runs."""
+    component's world imports `kb-read`; provisioned as an inference-only node
+    (which links only the inference interface), the import is unsatisfied and
+    instantiation fails before a single instruction runs."""
     with pytest.raises(SandboxError, match="not granted"):
-        Sandbox("hostile_ungranted", {"cap_infer": lambda a: "ok"})
+        Sandbox("hostile_ungranted", {INFERENCE_LLM: {"infer": lambda _s, _p, _t: "unknown"}})
+
+
+def test_the_denial_names_the_interface_it_refused():
+    """The typed boundary improves even the failure. The core-wasm host could only
+    report an unsatisfied *symbol* (`cap_kb_lookup`); here the refusal names the
+    capability interface the component asked for and did not get."""
+    with pytest.raises(SandboxError) as exc:
+        Sandbox("hostile_ungranted", {INFERENCE_LLM: {"infer": lambda _s, _p, _t: "unknown"}})
+    assert KB_READ in str(exc.value)
 
 
 def test_ungranted_capability_is_stronger_than_the_host_tier():
     """On the host tier an inference-only Python node could still `import` and
-    fabricate a DB handle. On the sandbox tier the capability is absent from the
-    import table — granting nothing lets the module instantiate at all."""
+    fabricate a DB handle. Here the capability is absent from the component's world
+    — and granting it nothing does not let it instantiate either."""
     with pytest.raises(SandboxError):
         Sandbox("hostile_ungranted", {})
 
 
-# ── A sandboxed node's imports are exactly its declared capabilities ─
+# ── The boundary is typed ──────────────────────────────────────────
 
 
-def test_parse_message_imports_only_inference():
-    """Scenario: a sandboxed node's imports are exactly its declared capabilities.
-    ParseMessage holds `LLMClient<inference>` — its module imports exactly
-    `cap_infer` and no other capability function."""
-    assert cap_imports("node_parse_message") == ["cap_infer"]
+def test_type_mismatched_value_is_rejected_at_the_boundary():
+    """Scenario: a value that does not match an interface's WIT type is a boundary
+    error, not a marshalling accident.
+
+    This is what the flat ABI could not offer. There, every value was bytes in
+    linear memory: a malformed one was reinterpreted as *something* and surfaced
+    later as a nonsense field, or not at all. Here `run` takes a `raw-message`, and a
+    value of the wrong shape never reaches the guest."""
+    sb = Sandbox("node_parse_message", {INFERENCE_LLM: {"infer": lambda _s, _p, _t: "unknown"}})
+    with pytest.raises(SandboxTypeError):
+        sb.call("run", record(wrong_field="not a raw-message"))
 
 
-def test_generate_response_imports_only_its_two_capabilities():
-    """GenerateResponse holds `LLMClient<[lookup]>` and a read-only DB handle —
-    its module imports exactly the two backing host functions and nothing else
-    (no exfiltrate, no write, no second tool)."""
-    assert cap_imports("node_generate_response") == ["cap_generate", "cap_kb_lookup"]
+def test_the_intent_enum_is_closed_at_the_boundary():
+    """The graph says ParseMessage's intent comes from a closed set, and on this tier
+    the *type* says so: `intent` is a WIT enum. However adversarial the text, and
+    whatever label the model returns, the value crossing back cannot be outside the
+    five cases — there is no such value to construct. The core-wasm node body needed
+    a membership check to promise this; here the promise is structural."""
+    from poc.values import Intent
+
+    wit_cases = {i.value.replace("_", "-") for i in Intent}
+    for label in ("billing_question", "TOTALLY_MADE_UP", "'; DROP TABLE --", ""):
+        infer = lambda _s, _p, _t, reply=label: reply  # noqa: E731 — bind per iteration
+        sb = Sandbox("node_parse_message", {INFERENCE_LLM: {"infer": infer}})
+        out = sb.call("run", record(text="hello"))
+        assert out.intent in wit_cases, f"model label {label!r} widened the intent set"
 
 
-def test_inference_only_node_has_no_tool_import_at_all():
-    """Scenario: an inference-only node has no tool import at all. Stronger than
-    the host tier's missing *method*: the tool-calling capability is absent from
-    the module's import table entirely."""
-    imports = cap_imports("node_parse_message")
-    assert "cap_kb_lookup" not in imports
-    assert not any("lookup" in name or "generate" in name for name in imports)
-
-
-def test_no_capability_import_grants_ambient_authority():
-    """No `cap` import is a filesystem, socket, environment, or clock handle. The
-    WASI functions the module links (environ_get, fd_write, …) exist but are
-    powerless under the empty context — proven by the escape tests above — and
-    there are no ambient sockets in wasip1 at all."""
-    for module in ("node_parse_message", "node_generate_response"):
-        caps = cap_imports(module)
-        assert all(c.startswith("cap_") for c in caps)
-    # wasip1 provides no socket family: ambient network is absent even as an import.
-    assert not any("sock" in w for w in wasi_imports("node_parse_message"))
-
-
-# ── Host and sandbox tiers compose within one graph ────────────────
+# ── Host and component tiers compose within one graph ──────────────
 
 _SANDBOXED = {"ParseMessage", "GenerateResponse"}
 
 
 def _run(message: str, sandbox=_SANDBOXED):
     from poc.demo import STORES
-    from poc.graph import assemble, load_graph_dict
+    from poc.graph import assemble
     from poc.llm import StubLLM
     from poc.runtime import execute
     from poc.values import CustomerRequest
@@ -213,9 +326,10 @@ def _run(message: str, sandbox=_SANDBOXED):
 
 
 def test_mixed_tier_graph_runs_end_to_end_and_reports_tiers():
-    """Scenario: a mixed-tier graph runs end-to-end. ParseMessage and
-    GenerateResponse run confined; the rest run on the host tier; the vertical
-    completes and the runtime reports which tier enforced each node."""
+    """Scenario: a mixed-tier graph runs end-to-end. ParseMessage and GenerateResponse
+    run as confined components; the rest run on the host tier; the vertical completes
+    and the runtime reports which tier enforced each node. The migration story — port
+    the security-critical nodes first, leave the rest — survives the port."""
     from poc.demo import BENIGN
     from poc.values import DeliveryConfirmation
 
@@ -231,10 +345,10 @@ def test_mixed_tier_graph_runs_end_to_end_and_reports_tiers():
     assert result.tiers["ReceiveMessage"] == "host"
 
 
-def test_sandbox_and_host_tiers_produce_the_same_outcome():
-    """Code as compiled artifact: the Rust/WASM node bodies and the Python ones
-    satisfy the same contracts, so the graph reaches the same terminal along the
-    same path regardless of which tier runs the two ported nodes."""
+def test_component_and_host_tiers_produce_the_same_outcome():
+    """Code as compiled artifact: the Rust/WASM node bodies and the Python ones satisfy
+    the same contracts, so the graph reaches the same terminal along the same path
+    regardless of which tier runs the two ported nodes."""
     from poc.demo import BENIGN
 
     host = _run(BENIGN, sandbox=())
@@ -243,10 +357,10 @@ def test_sandbox_and_host_tiers_produce_the_same_outcome():
     assert all(t == "host" for t in host.tiers.values())
 
 
-def test_sandboxed_parse_message_still_discharges_trust():
-    """The confined ParseMessage consumes `Untrusted[RawMessage]` and emits a
-    plain `CustomerQuery`; downstream nodes see non-`Untrusted` values, exactly
-    as on the host tier."""
+def test_confined_parse_message_still_discharges_trust():
+    """The confined ParseMessage consumes `Untrusted[RawMessage]` and emits a plain
+    `CustomerQuery`; downstream nodes see non-`Untrusted` values, exactly as on the
+    host tier."""
     from poc.demo import ADVERSARIAL
     from poc.values import CustomerQuery, Untrusted
 
@@ -257,12 +371,12 @@ def test_sandboxed_parse_message_still_discharges_trust():
     assert not isinstance(mod_in, Untrusted)
 
 
-# ── Prompt-injection attenuation holds on the sandbox tier ─────────
+# ── Prompt-injection attenuation holds on the component tier ────────
 
 
-def test_sandboxed_tool_node_never_receives_raw_user_text():
+def test_confined_tool_node_never_receives_raw_user_text():
     """Scenario: the tool-capable node never sees raw user text — holds on the
-    sandbox tier too. GenerateResponse receives a `ConversationContext`, not the
+    component tier too. GenerateResponse receives a `ConversationContext`, not the
     `Untrusted[RawMessage]`."""
     from poc.demo import ADVERSARIAL
     from poc.values import ConversationContext, RawMessage, Untrusted
@@ -272,10 +386,10 @@ def test_sandboxed_tool_node_never_receives_raw_user_text():
     assert not isinstance(ctx, (Untrusted, RawMessage))
 
 
-def test_sandboxed_adversarial_run_completes_without_tool_escape():
-    """Scenario: adversarial instructions cannot trigger tools. Even confined,
-    the run completes to a delivered reply — the tool-capable node could only
-    ever call `lookup`, which is all its module imports."""
+def test_confined_adversarial_run_completes_without_tool_escape():
+    """Scenario: adversarial instructions cannot trigger tools. Even confined, the run
+    completes to a delivered reply — the tool-capable node could only ever call
+    `lookup`, which is the only tool interface in its world."""
     from poc.demo import ADVERSARIAL
     from poc.values import DeliveryConfirmation
 
@@ -283,11 +397,12 @@ def test_sandboxed_adversarial_run_completes_without_tool_escape():
     assert isinstance(result.terminals["SendReply"], DeliveryConfirmation)
 
 
-def test_free_text_residual_survives_into_the_sandboxed_tool_node():
-    """Scenario: the residual free-text exposure is still disclosed. The sandbox
-    closes ambient-authority escapes; it does NOT close the bounded free-text
-    field, which still reaches the tool-capable node as data. What bounds the
-    damage is the capability scope, not the sandbox."""
+def test_free_text_residual_survives_into_the_confined_tool_node():
+    """Scenario: the residual free-text exposure is still disclosed. Typing the
+    boundary closes marshalling ambiguity and closes ambient authority; it does NOT
+    close the bounded free-text field, which still reaches the tool-capable node as
+    data. What bounds the damage is the capability scope, not the type of the
+    boundary. Recording this keeps the port honest about what it did not buy."""
     from poc.demo import ADVERSARIAL
     from poc.values import ConversationContext
 
@@ -300,9 +415,10 @@ def test_free_text_residual_survives_into_the_sandboxed_tool_node():
 
 
 def test_overhead_is_measured_and_reported_against_the_envelope():
-    """Scenario: overhead is reported against the proposal's envelope. The
-    benchmark reports instantiation and per-crossing cost and states whether the
-    crossing falls within the asserted envelope (per-crossing < ~1ms)."""
+    """Scenario: overhead is reported against the proposal's envelope. The benchmark
+    reports instantiation and per-crossing cost and states whether the crossing falls
+    within the asserted envelope (per-crossing < ~1ms) — now across a typed boundary
+    that lifts and lowers WIT values, where the retired tier passed raw bytes."""
     from poc.sandbox.bench import ENVELOPE_CROSSING_MS, measure
 
     result = measure(repeats=50)
@@ -310,6 +426,6 @@ def test_overhead_is_measured_and_reported_against_the_envelope():
     assert result.compilation_ms > 0
     assert result.crossing_ms >= 0
     assert result.generate_crossings > result.parse_crossings
-    # The measured crossing is expected to sit well within the envelope; assert
-    # the comparison is computed rather than hard-coding a machine-specific bound.
+    # The measured crossing is expected to sit well within the envelope; assert the
+    # comparison is computed rather than hard-coding a machine-specific bound.
     assert result.within_envelope == (result.crossing_ms < ENVELOPE_CROSSING_MS)

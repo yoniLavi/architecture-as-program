@@ -1,0 +1,203 @@
+// The capability boundary, as types.
+//
+// This file is the component tier's whole argument. On the core-wasm tier the
+// boundary was a flat byte ABI — `(ptr, len)` into linear memory, fields framed
+// with 0x1F — and the node's typed signature was reconstructed by convention on
+// each side. Here the signature IS the boundary: each capability kind is a WIT
+// interface, each domain type a WIT record/variant/enum, and a node's `with`
+// clause is the set of interfaces its world imports.
+//
+// Two consequences worth naming, because they are the point of the exercise:
+//
+//   * A capability a node did not declare is not in its world. It cannot be
+//     named from inside the component — there is no import to call, so the host
+//     refuses to instantiate a component that asks for one.
+//
+//   * The closed sets in the graph's types become closed sets at the boundary.
+//     `intent` is a WIT `enum`: a node body *cannot* return an intent outside
+//     the five below, because no such value exists in the generated type. On the
+//     core-wasm tier this was a string plus a membership check in the node body.
+//
+// Version-bumping this package is a breaking change for every built artifact.
+
+package aap:caps@0.1.0;
+
+/// Domain types that cross node boundaries in the CustomerSupport graph.
+///
+/// These mirror `poc/values.py` and the type strings in `graphs/customer-support.json`.
+/// They are shared by the worlds below rather than redeclared per node, so a
+/// producer and a consumer of `customer-query` cannot disagree about its shape.
+interface types {
+    /// The closed intent set. A WIT `enum` has no "other" case: this is the
+    /// graph's "adversarial text cannot widen the intent set" property, enforced
+    /// by the type rather than by a check in the node body.
+    enum intent {
+        billing-question,
+        technical-support,
+        account-change,
+        general-inquiry,
+        unknown,
+    }
+
+    /// Untrusted<RawMessage> — the boundary input. The `untrusted` taint is a
+    /// graph-level (validator) property; WIT carries the payload, not the label.
+    record raw-message {
+        text: string,
+    }
+
+    /// CustomerQuery — what ParseMessage emits once trust is discharged.
+    record customer-query {
+        intent: intent,
+        entities: list<string>,
+        question: string,
+    }
+
+    /// ConversationContext — what the tool-capable node receives. Note what is
+    /// absent: no raw message, no untrusted text field beyond the bounded
+    /// question. The type is the attenuation.
+    record conversation-context {
+        intent: intent,
+        question: string,
+        knowledge: list<string>,
+    }
+
+    record agent-response {
+        text: string,
+    }
+
+    record llm-error {
+        message: string,
+    }
+
+    /// The sum type `ok: AgentResponse | error: LLMError` from the graph, with
+    /// the same role labels. The runtime routes on the case name, so the graph's
+    /// variant edges (`GenerateResponse.ok`, `GenerateResponse.error`) and this
+    /// variant's cases are the same names by construction.
+    variant response-result {
+        ok(agent-response),
+        error(llm-error),
+    }
+
+    /// Reported by the hostile-node suite: did an attempted escape succeed?
+    record escape-verdict {
+        escaped: bool,
+        detail: string,
+    }
+}
+
+/// `LLMClient<inference>` — model access with no tool calling.
+///
+/// The attenuation is structural: this interface offers exactly one function,
+/// and it returns a string. There is no tool-call case to receive and no tool
+/// interface to invoke, so a node holding only this cannot act on what the model
+/// says — only be influenced by it.
+interface inference-llm {
+    infer: func(system: string, prompt: string, task: string) -> string;
+}
+
+/// `LLMClient<[lookup]>` — model access plus exactly the tools in the scope.
+///
+/// On the core-wasm tier a tool call came back as the tagged string
+/// `"C" FS tool FS query` and the node body parsed it. Here it is a typed
+/// `variant`: the host either returns text or a structured `tool-request`, and a
+/// malformed third possibility is not representable.
+interface tool-llm {
+    /// A tool the model asked to invoke. Whether the node *can* invoke it is a
+    /// separate question, answered by which tool interfaces are in its world.
+    record tool-request {
+        tool: string,
+        query: string,
+    }
+
+    /// One round of the tool-orchestration loop: the model either answers, or
+    /// asks for a tool.
+    variant reply {
+        text(string),
+        call(tool-request),
+    }
+
+    generate: func(system: string, prompt: string) -> reply;
+}
+
+/// `DBHandle<'knowledge-base', read>` — read-only, scoped to one store.
+///
+/// There is no `write` function in the interface, so a node holding this handle
+/// has no import through which to mutate the store. The read-only mode of the
+/// graph type is the absence of a function, not a runtime permission check.
+/// Returns a typed `list<string>` — the core-wasm tier returned 0x1E-joined text.
+interface kb-read {
+    lookup: func(query: string) -> list<string>;
+}
+
+/// `ResponseChannel<user-session>` — write-only sink for replies to one session.
+/// Defined for completeness of the five capability kinds; the nodes that hold it
+/// (SendReply, HandleLLMError, NotifyUser) have not been ported to the component
+/// tier and run on the host tier.
+interface response-channel {
+    send: func(text: string) -> bool;
+}
+
+/// `EventEmitter<'support-queue'>` — write-only sink for one topic. As above:
+/// defined here, held only by host-tier nodes (EscalateToHuman) so far.
+interface event-emitter {
+    emit: func(payload: string) -> bool;
+}
+
+// ── Worlds: one per node, naming exactly that node's capability set ──────────
+//
+// A world is the component-model form of a node's signature line in the graph:
+//
+//   ParseMessage : (Untrusted<RawMessage>) -> CustomerQuery  with LLMClient<inference>
+//
+// becomes: import `inference-llm`, export `run: func(raw-message) -> customer-query`.
+// `scripts`-side, `poc/sandbox/interfaces.py` derives the expected import set from
+// the graph JSON and the test suite asserts the built component matches it — so a
+// world that drifts from the node's `with` clause is a test failure, not a subtle
+// over-grant.
+
+/// ParseMessage — holds `LLMClient<inference>`, and nothing else.
+world parse-message {
+    use types.{raw-message, customer-query};
+
+    import inference-llm;
+
+    export run: func(message: raw-message) -> customer-query;
+}
+
+/// GenerateResponse — holds `LLMClient<[lookup]>` and `DBHandle<'knowledge-base', read>`.
+/// The tool-orchestration loop lives inside the node body (as it did on the
+/// core-wasm tier), now over typed WIT calls. A tool outside `[lookup]` has no
+/// interface in this world: it is unreachable, not merely refused.
+world generate-response {
+    use types.{conversation-context, response-result};
+
+    import tool-llm;
+    import kb-read;
+
+    export run: func(ctx: conversation-context) -> response-result;
+}
+
+/// A hostile node body that reaches for ambient authority: filesystem, network,
+/// environment. Its world imports NOTHING — so the component's import set is
+/// empty, and the escapes below have no import to travel through. Compare the
+/// core-wasm tier, where the module still imported powerless WASI stubs.
+world hostile-ambient {
+    use types.{escape-verdict};
+
+    export escape-fs: func() -> escape-verdict;
+    export escape-net: func() -> escape-verdict;
+    export escape-env: func() -> escape-verdict;
+}
+
+/// A hostile node body that declares a capability it was never granted: it is
+/// provisioned as an inference-only node, but its world imports the read-only
+/// knowledge base. The host links only `inference-llm`, leaving `kb-read`
+/// unsatisfied, and instantiation fails before a single instruction runs.
+world hostile-ungranted {
+    use types.{raw-message, customer-query};
+
+    import inference-llm;
+    import kb-read;
+
+    export run: func(message: raw-message) -> customer-query;
+}

@@ -1,16 +1,33 @@
 [workspace]
 resolver = "2"
 members = [
-    "abi",
     "node_parse_message",
     "node_generate_response",
     "hostile_ambient",
     "hostile_ungranted",
 ]
 
-# Small, reproducible modules: optimise for size and drop panic machinery so the
-# committed .wasm artifacts stay tiny and the confinement argument is not muddied
-# by an interpreter or a large runtime.
+[workspace.dependencies]
+# The guest side of the component model: `wit_bindgen::generate!` reads
+# ../../wit/caps.wit and emits typed Rust for the world's imports and exports.
+# It replaces the hand-rolled `abi` crate the core-wasm tier needed — there is no
+# (ptr, len) packing and no 0x1F framing left to get wrong, because both sides of
+# the boundary are generated from the same WIT.
+wit-bindgen = "0.59"
+
+# Small, reproducible components: optimise for size and drop panic machinery so
+# the committed artifacts stay tiny and the confinement argument is not muddied by
+# a large runtime.
+#
+# Note the target these crates build for: `wasm32-unknown-unknown`, NOT
+# `wasm32-wasip1`/`wasip2`. That is deliberate and load-bearing. A wasip1 module
+# links std against WASI, so its import table contains `fd_write`, `environ_get`
+# and friends — powerless under an empty context, but present. A wasip2 build
+# would import `wasi:cli/*` and `wasi:io/*` for the same reason. Building for
+# `unknown-unknown` and converting to a component with *no* WASI adapter leaves an
+# import set containing nothing but the node's declared capability interfaces:
+# "no ambient authority" stops being a fact about how the host configured the
+# runtime and becomes a fact about the artifact itself.
 [profile.release]
 opt-level = "s"
 lto = true

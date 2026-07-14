@@ -1,84 +1,98 @@
-//! `GenerateResponse`, ported to Rust / `wasm32-wasip1`.
+//! `GenerateResponse` as a WASM **component** — the tool-capable node.
 //!
-//! The tool-capable node. Its module imports exactly two host functions —
-//! `cap_generate` (the LLM, which offers only the `lookup` tool) and
-//! `cap_kb_lookup` (the read-only knowledge-base handle) — and nothing else.
-//! The tool-orchestration loop runs here, in the node body: the node decides how
-//! to use its capabilities, and it can only reach the two it was granted.
+//! Contract, unchanged from the graph:
+//!   GenerateResponse : (ConversationContext) -> ok: AgentResponse | error: LLMError
+//!     with LLMClient<[lookup]>, DBHandle<'knowledge-base', read>
 //!
-//! If the model asks for any tool other than `lookup`, the node has no import to
-//! satisfy it and cannot act — the exact analogue of the host tier's `ToolLLM`
-//! refusing an out-of-scope tool, but enforced by the absence of the import
-//! rather than by a runtime check. `exfiltrate` is not refused; it is unreachable.
+//! Its world imports exactly two interfaces — `tool-llm` (the LLM, offering only
+//! the `lookup` tool) and `kb-read` (the read-only knowledge base). The
+//! tool-orchestration loop still lives here, in the node body: the node decides
+//! how to use its capabilities, and it can only reach the two it was granted.
 //!
-//! Output is the node's sum type, framed as `ok FS <text>` or `error FS <msg>`.
+//! The port to typed WIT changed three things worth naming:
+//!
+//!   * **The model's reply is a `variant`, not a tagged string.** The core-wasm
+//!     body parsed `"T" FS text` / `"C" FS tool FS query` out of a flat buffer and
+//!     had a `_ => "malformed model reply"` arm for when that parse failed. A
+//!     malformed reply is no longer representable: `reply` is either `Text` or
+//!     `Call`, so the arm is gone along with the failure mode it handled.
+//!
+//!   * **The knowledge base returns `list<string>`.** No more 0x1E-joining and
+//!     re-splitting a list through a string.
+//!
+//!   * **The output is the graph's sum type.** `response-result` has cases `ok`
+//!     and `error` — the same role labels the graph's variant edges route on, so
+//!     the runtime reads the case name directly instead of re-parsing a tag.
+//!
+//! What did NOT change is the security property, and it is worth being precise
+//! about why. The node still checks `req.tool != "lookup"` below. That check is
+//! not what confines it: `lookup` is the only tool the node has an interface for,
+//! so a model demanding `exfiltrate` finds no import to travel through. The check
+//! exists to turn an unreachable request into a *legible* error rather than
+//! silently ignoring it. Confinement is the world; this is diagnostics.
 
-use abi::{leak_str, take_string, unpack, FS, RS};
+wit_bindgen::generate!({
+    path: "../../wit",
+    world: "generate-response",
+});
 
-abi::abi_exports!();
+// `conversation-context` and `response-result` are re-exported at the crate root
+// by the world's `use types.{...}`; the payload records come from the interface.
+use crate::aap::caps::kb_read;
+use crate::aap::caps::tool_llm::{self, Reply};
+use crate::aap::caps::types::{AgentResponse, LlmError};
 
-#[link(wasm_import_module = "cap")]
-extern "C" {
-    /// One LLM round. Args: `system FS prompt`. Returns `T FS <text>` for a text
-    /// answer, or `C FS <tool> FS <query>` for a tool-call request.
-    fn cap_generate(ptr: i32, len: i32) -> i64;
-    /// Read-only knowledge-base lookup. Args: `query`. Returns RS-joined hits.
-    fn cap_kb_lookup(ptr: i32, len: i32) -> i64;
-}
-
+/// Tool-loop budget, matching the host tier's `ToolLLM._MAX_ROUNDS`.
 const MAX_ROUNDS: usize = 3;
 const SYSTEM: &str = "You are a helpful customer-support agent. Use the lookup tool if needed.";
 
-fn call(f: unsafe extern "C" fn(i32, i32) -> i64, args: &str) -> String {
-    let packed = unsafe { f(args.as_ptr() as i32, args.len() as i32) };
-    let (ptr, len) = unpack(packed);
-    unsafe { take_string(ptr, len) }
-}
+/// The one tool this node's `with` clause grants. Named here only so the error
+/// message below can be specific — the enforcement is the import set.
+const GRANTED_TOOL: &str = "lookup";
 
-#[no_mangle]
-pub extern "C" fn run(ptr: i32, len: i32) -> i64 {
-    let input = unsafe { take_string(ptr, len) };
-    // ConversationContext: intent FS question FS knowledge(RS-joined).
-    let mut fields = input.split(FS);
-    let _intent = fields.next().unwrap_or("");
-    let question = fields.next().unwrap_or("").to_string();
+struct Node;
 
-    let mut convo = question.clone();
-    // Mirrors the host tier's ToolLLM.respond: run up to MAX_ROUNDS; a text reply
-    // ends the loop, a tool reply is serviced and the loop continues. If the
-    // budget is exhausted without a text reply, return the last text seen (empty)
-    // as `ok` — the same outcome the host tier produces, so the two node bodies
-    // stay interchangeable.
-    let mut last_text = String::new();
-    for _ in 0..MAX_ROUNDS {
-        let reply = call(cap_generate, &format!("{SYSTEM}{FS}{convo}"));
-        let mut parts = reply.split(FS);
-        match parts.next() {
-            Some("T") => {
-                last_text = parts.next().unwrap_or("").to_string();
-                return leak_str(&format!("ok{FS}{last_text}"));
-            }
-            Some("C") => {
-                let tool = parts.next().unwrap_or("");
-                let query = parts.next().unwrap_or("");
-                if tool != "lookup" {
-                    // No import exists for any other tool: the node cannot act on
-                    // it. Faithful to the graph's LLMClient<[lookup]> scope.
-                    return leak_str(&format!(
-                        "error{FS}requested tool {tool:?} is outside this node's capability set"
-                    ));
+impl Guest for Node {
+    fn run(ctx: ConversationContext) -> ResponseResult {
+        let question = ctx.question;
+        let mut convo = question.clone();
+
+        for _ in 0..MAX_ROUNDS {
+            match tool_llm::generate(SYSTEM, &convo) {
+                // The model answered. Done.
+                Reply::Text(text) => {
+                    return ResponseResult::Ok(AgentResponse { text });
                 }
-                let hits = call(cap_kb_lookup, query);
-                let joined = hits.replace(RS, "; ");
-                let result = if joined.is_empty() {
-                    "no knowledge-base match".to_string()
-                } else {
-                    joined
-                };
-                convo = format!("{question}\n\n[TOOL RESULT lookup] {result}");
+                // The model asked for a tool.
+                Reply::Call(req) => {
+                    if req.tool != GRANTED_TOOL {
+                        // Unreachable authority, reported legibly. There is no
+                        // import for this tool, so the node could not act on the
+                        // request even if it wanted to; saying so beats dropping it.
+                        return ResponseResult::Error(LlmError {
+                            message: format!(
+                                "requested tool {:?} is outside this node's capability set",
+                                req.tool
+                            ),
+                        });
+                    }
+                    let hits = kb_read::lookup(&req.query);
+                    let result = if hits.is_empty() {
+                        "no knowledge-base match".to_string()
+                    } else {
+                        hits.join("; ")
+                    };
+                    convo = format!("{question}\n\n[TOOL RESULT lookup] {result}");
+                }
             }
-            _ => return leak_str(&format!("error{FS}malformed model reply")),
         }
+
+        // Budget exhausted without a text reply. The host tier returns its last
+        // (empty) text in the same situation; the two bodies stay interchangeable.
+        ResponseResult::Ok(AgentResponse {
+            text: String::new(),
+        })
     }
-    leak_str(&format!("ok{FS}{last_text}"))
 }
+
+export!(Node);

@@ -1,49 +1,65 @@
-//! `ParseMessage`, regenerated in Rust and compiled to `wasm32-wasip1`.
+//! `ParseMessage` as a WASM **component**.
 //!
-//! Same signature, same contract, unchanged graph — a different implementation
-//! language for the node body. This is "code as compiled artifact" made literal:
-//! the Python version in `poc/generated/parse_message.py` and this one both
-//! satisfy the `ParseMessage` contract; the graph does not know or care which
-//! runs. See `poc/generated/parse_message.wasm.prompt.md` for the generation
-//! prompt.
-//!
-//! Contract:
+//! Contract, unchanged from the graph:
 //!   ParseMessage : (Untrusted<RawMessage>) -> CustomerQuery  with LLMClient<inference>
-//!   * discharges trust: raw untrusted text in, structured CustomerQuery out
-//!   * intent confined to the closed Intent set — adversarial text cannot widen it
-//!   * question bounded to MAX_QUESTION_LEN (512)
-//!   * model access ONLY through the injected inference capability
 //!
-//! Capability surface: the module imports exactly one host function, `cap_infer`.
-//! There is no filesystem, socket, environment, clock, or tool-calling import —
-//! not because a method is hidden, but because the import table does not contain
-//! one. That absence is the sandbox tier's enforcement.
+//! What changed from the core-wasm port is the boundary — and the boundary
+//! changed the code. There is no `(ptr, len)` ABI, no 0x1F framing, and no
+//! `alloc` export: the host and this component exchange `raw-message` and
+//! `customer-query` *values*, and the marshalling is generated from
+//! `poc/sandbox/wit/caps.wit`, which the host links against too.
+//!
+//! Two checks that the core-wasm body had to perform are gone, absorbed into the
+//! type:
+//!
+//!   * **The closed intent set.** The old body got a string back from the model
+//!     and tested it with `INTENTS.contains(...)`, so that adversarial text could
+//!     not widen the intent set. Here `Intent` is a WIT `enum`: the widening that
+//!     check was guarding against is not representable at all. `classify` below
+//!     still maps an unknown label to `Unknown`, but it is now a total function
+//!     into a closed type rather than a defensive filter over an open one.
+//!
+//!   * **The absence of a tool surface.** The old body noted in a comment that it
+//!     imported no tool host function. Here it imports the `inference-llm`
+//!     interface, whose one function returns a `string`. There is no tool-request
+//!     case to receive and no tool interface in the world to call.
+//!
+//! Capability surface: this component's import set is exactly
+//! `aap:caps/inference-llm@0.1.0` — not "plus some powerless WASI stubs", but
+//! exactly that and nothing else. `tests/test_poc_sandbox.py` asserts it.
 
-use abi::{leak_str, take_string, unpack, FS, RS};
+wit_bindgen::generate!({
+    path: "../../wit",
+    world: "parse-message",
+});
 
-abi::abi_exports!();
+// `raw-message` and `customer-query` are re-exported at the crate root by the
+// world's `use types.{...}`; `Intent` is reached through its defining interface.
+use crate::aap::caps::inference_llm;
+use crate::aap::caps::types::Intent;
 
-#[link(wasm_import_module = "cap")]
-extern "C" {
-    /// Inference-only LLM call. Args: `system FS prompt FS task`. Returns the
-    /// classification string. No tool-calling counterpart exists to import.
-    fn cap_infer(ptr: i32, len: i32) -> i64;
-}
-
+/// The one free-text field that survives into the structured world. Bounding it
+/// is the node's job — the type system cannot say "short string" here.
 const MAX_QUESTION_LEN: usize = 512;
-const INTENTS: [&str; 5] = [
-    "billing_question",
-    "technical_support",
-    "account_change",
-    "general_inquiry",
-    "unknown",
-];
 
-fn infer(system: &str, prompt: &str, task: &str) -> String {
-    let args = format!("{system}{FS}{prompt}{FS}{task}");
-    let packed = unsafe { cap_infer(args.as_ptr() as i32, args.len() as i32) };
-    let (ptr, len) = unpack(packed);
-    unsafe { take_string(ptr, len) }
+const SYSTEM: &str = "You are an intent classifier for customer-support messages. \
+                      Reply with exactly one of: billing_question, technical_support, \
+                      account_change, general_inquiry, unknown.";
+
+/// Map the model's free-text label onto the closed `Intent` enum.
+///
+/// Total by construction: any label that is not one of the four named intents
+/// becomes `Unknown`. There is no way to return "some other intent" even if the
+/// model insists on one, because `Intent` has no such value — the closed-set
+/// guarantee is held by the type, not by a membership test in this function.
+fn classify(label: &str) -> Intent {
+    match label.trim().to_lowercase().as_str() {
+        "billing_question" => Intent::BillingQuestion,
+        "technical_support" => Intent::TechnicalSupport,
+        "account_change" => Intent::AccountChange,
+        "general_inquiry" => Intent::GeneralInquiry,
+        _ => Intent::Unknown,
+    }
 }
 
 /// Capitalised tokens (`[A-Z][A-Za-z0-9_-]{2,}`), de-duplicated, order-stable —
@@ -73,31 +89,25 @@ fn entities(raw: &str) -> Vec<String> {
     out
 }
 
-#[no_mangle]
-pub extern "C" fn run(ptr: i32, len: i32) -> i64 {
-    let raw = unsafe { take_string(ptr, len) };
+struct Node;
 
-    // Classify via the inference-only handle. Whatever the model returns is
-    // mapped onto the closed set; an unrecognised label falls back to "unknown",
-    // so adversarial text can never introduce a new intent.
-    let label = infer(
-        "You are an intent classifier for customer-support messages. \
-         Reply with exactly one of: billing_question, technical_support, \
-         account_change, general_inquiry, unknown.",
-        &raw,
-        "classify",
-    );
-    let label = label.trim().to_lowercase();
-    let intent = if INTENTS.contains(&label.as_str()) {
-        label.as_str()
-    } else {
-        "unknown"
-    };
+impl Guest for Node {
+    fn run(message: RawMessage) -> CustomerQuery {
+        let raw = message.text;
 
-    let ents = entities(&raw).join(&RS.to_string());
+        // Classify through the inference-only handle — the node's only reach
+        // outside itself, and the only import in its world.
+        let label = inference_llm::infer(SYSTEM, &raw, "classify");
 
-    // Bounded question — the residual free-text channel, still adversarial data.
-    let question: String = raw.chars().take(MAX_QUESTION_LEN).collect();
-
-    leak_str(&format!("{intent}{FS}{ents}{FS}{question}"))
+        CustomerQuery {
+            intent: classify(&label),
+            entities: entities(&raw),
+            // The residual free-text channel. Still adversarial data — but now a
+            // bounded, *named* field of a typed record, not a slice of a blob
+            // whose shape both sides had to agree about by convention.
+            question: raw.chars().take(MAX_QUESTION_LEN).collect(),
+        }
+    }
 }
+
+export!(Node);

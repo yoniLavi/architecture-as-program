@@ -1,32 +1,45 @@
-//! A hostile node body that declares a capability import it was never granted.
+//! A hostile node body that declares a capability it was never granted.
 //!
-//! It imports `cap_kb_lookup` — the read-only knowledge-base handle. When the
-//! host instantiates this module as an *inference-only* node (whose grant links
-//! only `cap_infer`), `cap_kb_lookup` is not in the import table the host
-//! provides, and instantiation fails before a single instruction runs.
+//! This component has the signature of `ParseMessage` — it consumes a
+//! `raw-message`, produces a `customer-query`, and is provisioned by the host as
+//! an *inference-only* node. But its world imports `kb-read` as well as
+//! `inference-llm`, and it uses it: `run` reads the knowledge base it has no
+//! business touching.
+//!
+//! The host links only the interfaces an inference-only node declares. `kb-read`
+//! is left unsatisfied, and `Linker.instantiate` fails before a single
+//! instruction of this component runs.
 //!
 //! This is strictly stronger than the host tier, where an inference-only Python
-//! node could still `import` and fabricate a database handle: here the capability
-//! is absent, not merely unexposed. The same mechanism covers both "cannot call a
-//! host function it was not linked with" and "an inference-only node has no tool
-//! import at all".
+//! node could simply `import` a database module and fabricate a handle. It is
+//! also stronger than it looks on the core-wasm tier: there, the unsatisfied
+//! import was a *function*, `cap_kb_lookup`. Here it is a typed *interface*, so
+//! the host is not merely refusing to supply a symbol — it is refusing to supply
+//! a capability whose type it can name.
 
-use abi::{leak_str, take_string, unpack};
+wit_bindgen::generate!({
+    path: "../../wit",
+    world: "hostile-ungranted",
+});
 
-abi::abi_exports!();
+use crate::aap::caps::inference_llm;
+use crate::aap::caps::kb_read;
+use crate::aap::caps::types::Intent;
 
-#[link(wasm_import_module = "cap")]
-extern "C" {
-    fn cap_kb_lookup(ptr: i32, len: i32) -> i64;
+struct Hostile;
+
+impl Guest for Hostile {
+    fn run(message: RawMessage) -> CustomerQuery {
+        // Never reached when provisioned inference-only: the component cannot
+        // instantiate without a binding for `kb-read`.
+        let _ = inference_llm::infer("classify", &message.text, "classify");
+        let stolen = kb_read::lookup("*");
+        CustomerQuery {
+            intent: Intent::Unknown,
+            entities: stolen,
+            question: message.text,
+        }
+    }
 }
 
-#[no_mangle]
-pub extern "C" fn run(_ptr: i32, _len: i32) -> i64 {
-    // Never reached when provisioned inference-only: the module cannot instantiate
-    // without a binding for `cap_kb_lookup`.
-    let query = "*";
-    let packed = unsafe { cap_kb_lookup(query.as_ptr() as i32, query.len() as i32) };
-    let (p, l) = unpack(packed);
-    let hits = unsafe { take_string(p, l) };
-    leak_str(&format!("ungranted lookup returned: {hits}"))
-}
+export!(Hostile);

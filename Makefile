@@ -13,7 +13,12 @@ DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC)
 
 RUST_DIR    := $(ROOT)/poc/sandbox/rust
 WASM_OUT    := $(ROOT)/poc/sandbox/wasm
-WASM_TARGET := wasm32-wasip1
+# NOT wasm32-wasip1/wasip2: those link std against WASI, so the artifact would
+# import fd_write/environ_get (wasip1) or wasi:cli/* (wasip2) even when it never
+# uses them. Building for unknown-unknown and converting to a component with no
+# WASI adapter leaves an import set containing only the node's capability
+# interfaces — which is the property the component tier exists to demonstrate.
+WASM_TARGET := wasm32-unknown-unknown
 WASM_MODULES := node_parse_message node_generate_response hostile_ambient hostile_ungranted
 
 build: validate-graphs $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html $(DIST)/grammar.md
@@ -34,18 +39,32 @@ validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_val
 test:
 	@uv run pytest
 
-# Build the sandbox-tier WASM node artifacts from their Rust sources and copy
-# them into poc/sandbox/wasm/ (which is committed). Requires a Rust toolchain
-# with the wasm32-wasip1 target: `rustup target add wasm32-wasip1`. This is NOT
-# part of `make build` or the pre-commit hooks — the committed .wasm artifacts
-# let the sandbox tests run without a Rust toolchain; rebuild only when the Rust
-# node sources change.
+# Build the component-tier WASM node artifacts and copy them into
+# poc/sandbox/wasm/ (which is committed).
+#
+# Two steps, and the second is the interesting one:
+#   1. cargo builds each node crate to a *core* module. wit_bindgen::generate!
+#      reads poc/sandbox/wit/caps.wit and emits the typed bindings, plus a
+#      `component-type` custom section describing the crate's world.
+#   2. `wasm-tools component new` reads that section and wraps the core module
+#      into a *component* whose imports and exports are the WIT interfaces. No
+#      `--adapt` flag is passed: no WASI adapter is linked, so the component
+#      imports nothing but its declared capability interfaces.
+#
+# Requires a Rust toolchain with the wasm32-unknown-unknown target
+# (`rustup target add wasm32-unknown-unknown`) and wasm-tools
+# (`brew install wasm-tools` / `cargo install wasm-tools`). This is NOT part of
+# `make build` or the pre-commit hooks — the committed artifacts let the sandbox
+# tests run without either toolchain. Rebuild only when the Rust sources or the
+# WIT change.
 wasm:
 	cargo build --manifest-path $(RUST_DIR)/Cargo.toml --release --target $(WASM_TARGET)
 	@mkdir -p $(WASM_OUT)
 	@for m in $(WASM_MODULES); do \
-		cp $(RUST_DIR)/target/$(WASM_TARGET)/release/$$m.wasm $(WASM_OUT)/ ; \
-		echo "  wrote poc/sandbox/wasm/$$m.wasm" ; \
+		wasm-tools component new \
+			$(RUST_DIR)/target/$(WASM_TARGET)/release/$$m.wasm \
+			-o $(WASM_OUT)/$$m.wasm ; \
+		echo "  wrote poc/sandbox/wasm/$$m.wasm (component)" ; \
 	done
 
 # Generate pseudocode and diagram from canonical graph JSON
