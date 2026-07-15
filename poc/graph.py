@@ -155,6 +155,29 @@ def load_graph_dict(name_or_path: str | Path) -> dict:
     return json.loads(path.read_text())
 
 
+def _merge_identities(
+    graph_nodes: list[dict],
+    argument: Mapping[str, Mapping[str, str]] | None,
+) -> dict[str, dict[str, str]]:
+    """Combine graph-declared capability identities with the `identities=`
+    argument. The graph JSON is the base — each node's `capability_identities`
+    map — and the argument overrides it at the `(node, capability type)`
+    granularity: the argument wins where both name an identity for the same slot,
+    the graph declaration applies everywhere else. Overriding one slot therefore
+    never drops a node's other graph-declared identities. The merged map is
+    validated downstream by the same rule the runtime already enforced on the
+    argument, so a graph-declared identity for an unheld capability is rejected at
+    assembly exactly as an argument one is (and at validation time too)."""
+    merged: dict[str, dict[str, str]] = {
+        n["name"]: dict(n["capability_identities"])
+        for n in graph_nodes
+        if n.get("capability_identities")
+    }
+    for node_name, per_cap in (argument or {}).items():
+        merged.setdefault(node_name, {}).update(per_cap)
+    return merged
+
+
 def assemble(
     graph: dict,
     *,
@@ -174,15 +197,21 @@ def assemble(
     runs on the host tier. The two tiers compose in one graph, which is the
     proposal's incremental-migration path (opaque host node → confined node).
 
-    `identities` names capability *identity* at the graph boundary: it maps a
-    node name to `{capability type → identity label}`. Two nodes that declare the
-    same capability type but distinct identity labels receive *distinct* handle
-    instances; two that name the same label share one instance (identity, not
-    node, is the unit). Any capability with no identity declared keeps today's
-    shared-by-type provisioning, so identity is opt-in and simple graphs are
-    unaffected. This is the narrow half of Technical Note A's capability-routing
-    item — naming identity — and the prerequisite a later revocation change needs
-    to target a specific instance.
+    Capability *identity* names a distinct instance of a capability type: two
+    nodes that declare the same capability type but distinct identity labels
+    receive *distinct* handle instances; two that name the same label share one
+    instance (identity, not node, is the unit). Any capability with no identity
+    declared keeps today's shared-by-type provisioning, so identity is opt-in and
+    simple graphs are unaffected. Identity is spelled in the **canonical graph
+    JSON** — each node's optional `capability_identities` map (declared-capability
+    type → label) — so it lives in the source of truth rather than only in this
+    call. On a sub-graph-reference node the same map routes a named instance across
+    the composition boundary. The `identities` argument here stays as an escape
+    hatch and **overrides** the graph per `(node, capability type)`: the argument
+    wins where both name an identity for one slot, the graph applies elsewhere.
+    This is the narrow half of Technical Note A's capability-routing item — naming
+    identity — and the prerequisite a later revocation change needs to target a
+    specific instance.
 
     `revocable_instances` and `rotatable_instances` name identity instances — as
     `(capability type, identity label)` pairs, matching the pool `identities` builds
@@ -236,7 +265,16 @@ def assemble(
     # type get distinct handle instances (pooled by label so a shared label means
     # a shared instance); nodes without a declared identity fall through to the
     # shared-by-type default in `handles` above.
-    identities = identities or {}
+    #
+    # The canonical graph JSON is the source of identity: each node may carry a
+    # `capability_identities` map (declared-capability type → label). The
+    # `identities=` argument stays as an escape hatch and overrides the graph at
+    # the (node, capability) granularity — the argument wins where both name an
+    # identity for the same slot, the graph applies everywhere else, so overriding
+    # one slot never silently drops a node's other declared identities. This is
+    # what makes the graph, not the Python call site, the source of truth while
+    # keeping the existing API working.
+    identities = _merge_identities(graph["nodes"], identities)
     cap_set = set(capabilities)
     identity_pool: dict[tuple[str, str], object] = {}
     # (node name, capability type) → the identity-pool key it binds. Recorded now

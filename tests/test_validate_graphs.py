@@ -423,6 +423,66 @@ class TestCrossGraphCheck(unittest.TestCase):
             self.assertEqual(validate_files(paths), [])
 
 
+class TestCapabilityIdentities(unittest.TestCase):
+    """Graph-source capability identity: a node may name a distinct instance of a
+    capability it holds. The validator's sole semantic rule mirrors the runtime's
+    assembly-time rejection — an identity may be declared only for a capability the
+    node's `inputs` names."""
+
+    def _graph_with_identity(self, node_name: str, cap: str, label: str) -> dict:
+        g = _good_single_graph()
+        for n in g["nodes"]:
+            if n["name"] == node_name:
+                n["capability_identities"] = {cap: label}
+        return g
+
+    def _run(self, graph: dict) -> list[str]:
+        with tempfile.TemporaryDirectory() as td:
+            paths = _write({"g.json": graph}, Path(td))
+            return validate_files(paths)
+
+    def test_valid_identity_accepted(self):
+        # `Store` holds `DBHandle<'store', read>`; naming an instance of it is fine.
+        errors = self._run(self._graph_with_identity("Store", "DBHandle<'store', read>", "primary"))
+        self.assertEqual(errors, [], msg=f"unexpected errors: {errors}")
+
+    def test_identity_for_unheld_capability_rejected(self):
+        # `Ingest` does not hold the DB capability, so an identity for it is invalid.
+        errors = self._run(self._graph_with_identity("Ingest", "DBHandle<'store', read>", "x"))
+        self.assertTrue(
+            any("does not hold" in e for e in errors),
+            msg=f"expected unheld-capability rejection; got: {errors}",
+        )
+
+    def test_identity_for_unknown_capability_rejected(self):
+        errors = self._run(self._graph_with_identity("Store", "DBHandle<'nope', read>", "x"))
+        self.assertTrue(
+            any("not a declared capability" in e for e in errors),
+            msg=f"expected unknown-capability rejection; got: {errors}",
+        )
+
+    def test_malformed_identity_field_rejected(self):
+        g = _good_single_graph()
+        for n in g["nodes"]:
+            if n["name"] == "Store":
+                n["capability_identities"] = ["not", "a", "map"]
+        self.assertTrue(
+            any("must be an object" in e for e in self._run(g)),
+            msg="expected shape rejection for a non-object identity field",
+        )
+
+    def test_empty_identity_label_rejected(self):
+        errors = self._run(self._graph_with_identity("Store", "DBHandle<'store', read>", ""))
+        self.assertTrue(
+            any("must be a non-empty string" in e for e in errors),
+            msg=f"expected empty-label rejection; got: {errors}",
+        )
+
+    def test_no_identity_declaration_is_clean(self):
+        """A graph with no identity declarations validates exactly as before."""
+        self.assertEqual(self._run(_good_single_graph()), [])
+
+
 class TestTrustLattice(unittest.TestCase):
     """The two-point trust lattice (`Untrusted ⊑ Trusted`) exercised
     directly: an edge is rejected exactly when it demands more trust

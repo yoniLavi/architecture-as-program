@@ -227,6 +227,172 @@ def test_identity_for_a_capability_a_node_lacks_is_rejected(graph, identities, m
         assemble(graph, backend=StubLLM(), stores=STORES, identities=identities)
 
 
+# ── Capability identity declared in the canonical graph source ─────
+#
+# Identity is now spelled in the graph JSON (`capability_identities` per node),
+# not only in the assembly API. These tests build the declaration into the graph
+# dict, assemble *without* any `identities=` argument, and confirm the runtime
+# derives its instance routing from the source of truth — so identity, pseudocode,
+# and diagrams all agree.
+
+
+def _with_graph_identity(graph: dict, node: str, cap: str, label: str) -> dict:
+    """Return a copy-ish of `graph` with `capability_identities` set on one node.
+    Mutates the shared fixture dict's node in place, which is fine per-test since
+    the fixture is function-scoped."""
+    for n in graph["nodes"]:
+        if n["name"] == node:
+            n.setdefault("capability_identities", {})[cap] = label
+    return graph
+
+
+def test_graph_declared_identity_routes_distinct_instances(graph):
+    """Spec: identity declared in the graph JSON routes distinct instances, exactly
+    as if it had been passed to the assembly API — no `identities=` argument."""
+    _with_graph_identity(graph, "SendReply", RC, "session_a")
+    _with_graph_identity(graph, "NotifyUser", RC, "session_b")
+
+    g = assemble(graph, backend=StubLLM(), stores=STORES)  # no identities= argument
+
+    a = g.handle_for(g.nodes["SendReply"], RC)
+    b = g.handle_for(g.nodes["NotifyUser"], RC)
+    assert isinstance(a, ResponseChannel) and isinstance(b, ResponseChannel)
+    assert a is not b
+
+    a.send("delivered to A")
+    assert a.sent == ["delivered to A"]
+    assert b.sent == []  # independent state, from the graph source alone
+
+
+def test_graph_and_argument_identity_agree_on_shared_label(graph):
+    """A label shared between the graph and the argument still means one instance —
+    the two sources compose rather than fight when they name the same identity."""
+    _with_graph_identity(graph, "SendReply", RC, "primary")
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"HandleLLMError": {RC: "primary"}},  # argument names the same label
+    )
+    assert g.handle_for(g.nodes["SendReply"], RC) is g.handle_for(g.nodes["HandleLLMError"], RC)
+
+
+def test_argument_overrides_graph_identity_per_slot(graph):
+    """Precedence (design decision): the `identities=` argument overrides the graph
+    at the (node, capability) granularity. The graph shares one instance between
+    two nodes; overriding one node's slot splits them, leaving the other's
+    graph-declared identity intact."""
+    _with_graph_identity(graph, "SendReply", RC, "shared")
+    _with_graph_identity(graph, "NotifyUser", RC, "shared")
+
+    # Without the override both share; assert the graph baseline first.
+    baseline = assemble(graph, backend=StubLLM(), stores=STORES)
+    assert baseline.handle_for(baseline.nodes["SendReply"], RC) is baseline.handle_for(
+        baseline.nodes["NotifyUser"], RC
+    )
+
+    # The argument retargets only SendReply's slot; NotifyUser keeps "shared".
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "override"}},
+    )
+    assert g.handle_for(g.nodes["SendReply"], RC) is not g.handle_for(g.nodes["NotifyUser"], RC)
+
+
+def test_graph_declared_identity_and_validator_agree_on_unheld_capability():
+    """Spec: an identity for a capability a node does not hold is rejected both by
+    the validator (validation time) and by `assemble` (assembly time)."""
+    g = load_graph_dict("customer-support")
+    # ParseMessage holds an inference LLM, not a ResponseChannel.
+    _with_graph_identity(g, "ParseMessage", RC, "x")
+
+    assert validate_graph_dict(g), "validator should reject an unheld-capability identity"
+    with pytest.raises(AssemblyError):
+        assemble(g, backend=StubLLM(), stores=STORES)
+
+
+def test_revocable_targets_a_graph_declared_identity(graph):
+    """Revocation still targets an instance whose identity is declared in the graph
+    (not the argument) — the two features layer cleanly."""
+    _with_graph_identity(graph, "SendReply", RC, "session_a")
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        revocable_instances=[(RC, "session_a")],  # names a graph-declared identity
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    assert handle.send("before").delivered
+    g.revoke(RC, "session_a")
+    with pytest.raises(RevokedCapabilityError):
+        handle.send("after")
+
+
+# ── Identity routed across a sub-graph boundary ────────────────────
+#
+# A node whose signature matches another graph is a sub-graph reference. The
+# parent declares `capability_identities` on that node to bind a *named* instance
+# to the sub-graph's capability slot, so composition carries identity, not merely
+# capability type. (The runtime does not recursively execute sub-graphs, so this
+# is exercised at the parent-graph assembly level — the one composition level this
+# change carries identity across.)
+
+
+def _platform_with_subgraphs() -> dict:
+    """A parent graph that routes distinct `ResponseChannel` instances into two
+    sub-graph-reference nodes via graph-declared identity."""
+    return {
+        "name": "Platform",
+        "parameters": ["PlatformRequest", RC],
+        "capabilities": [RC],
+        "nodes": [
+            {
+                "name": "Dispatch",
+                "inputs": ["PlatformRequest"],
+                "output": "sub: SubRequest | sibling: SiblingRequest",
+            },
+            {
+                "name": "SubService",
+                "inputs": ["SubRequest", RC],
+                "output": "Outcome",
+                "capability_identities": {RC: "sub_session"},
+            },
+            {
+                "name": "SiblingService",
+                "inputs": ["SiblingRequest", RC],
+                "output": "Outcome",
+                "capability_identities": {RC: "sibling_session"},
+            },
+        ],
+        "data_edges": [
+            {"from": "Dispatch.sub", "to": "SubService"},
+            {"from": "Dispatch.sibling", "to": "SiblingService"},
+        ],
+    }
+
+
+def test_parent_routes_a_distinct_instance_into_a_sub_graph_node():
+    """Spec: a parent binds a named instance to a sub-graph's capability slot; the
+    sub-graph node receives that instance and a sibling instance the parent did not
+    route to it is not visible."""
+    g = assemble(_platform_with_subgraphs(), backend=StubLLM(), stores=STORES)
+
+    sub = g.handle_for(g.nodes["SubService"], RC)
+    sibling = g.handle_for(g.nodes["SiblingService"], RC)
+    assert isinstance(sub, ResponseChannel) and isinstance(sibling, ResponseChannel)
+    assert sub is not sibling  # distinct instances routed across the boundary
+
+    # Routing derives from the graph source, recorded in `instances`.
+    assert g.instances[("SubService", RC)] is sub
+    assert g.instances[("SiblingService", RC)] is sibling
+
+    sub.send("to the routed sub-graph")
+    assert sub.sent == ["to the routed sub-graph"]
+    assert sibling.sent == []  # the sibling's instance is not visible to SubService
+
+
 # ── Capability revocation ──────────────────────────────────────────
 #
 # Revocation withdraws one *named* capability instance's authority at runtime, on

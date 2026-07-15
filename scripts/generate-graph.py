@@ -55,6 +55,7 @@ def generate_pseudocode(g):
 
         data_inputs = [i for i in inputs if i not in caps_set]
         node_caps = [i for i in inputs if i in caps_set]
+        identities = node.get("capability_identities", {})
 
         lines.append(f"  node {n} :")
         if len(data_inputs) <= 2:
@@ -66,7 +67,11 @@ def generate_pseudocode(g):
                 lines.append(f"     {data_inputs[j]}{end}")
         lines.append(f"    \u2192 {output}")
         if node_caps:
-            lines.append(f"    with {', '.join(node_caps)}")
+            # A declared capability identity is rendered as `Type @label`, so a
+            # distinct instance is visible in the pseudocode and cannot drift from
+            # the JSON that generated it.
+            rendered_caps = [f"{c} @{identities[c]}" if c in identities else c for c in node_caps]
+            lines.append(f"    with {', '.join(rendered_caps)}")
         if node.get("discharges_trust"):
             lines.append("    # discharges trust")
         lines.append("")
@@ -164,11 +169,15 @@ def generate_fletcher(g):
         n = nd["name"]
         pos = positions.get(n, [0, 0])
         node_caps = [i for i in nd["inputs"] if is_capability(i, caps)]
+        identities = nd.get("capability_identities", {})
 
         if node_caps:
             parts = []
             for c in node_caps:
                 e = esc(c)
+                if c in identities:
+                    # `\@` is the Typst escape for a literal @ in markup content.
+                    e = f"{e} \\@{esc(identities[c])}"
                 if "LLM" in c:
                     parts.append(f"#llm-cap[{e}]")
                 else:

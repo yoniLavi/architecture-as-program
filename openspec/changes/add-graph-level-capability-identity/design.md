@@ -24,7 +24,15 @@ the generator renders.
 - **Decision: `assemble` derives identity from the graph; the Python argument overrides.** The graph becomes
   the source; `identities=` stays as an escape hatch (and for tests) but defaults to the graph's
   declarations. This keeps the dogfooding honest (intent lives in the artifact) without breaking the
-  existing API.
+  existing API. **Precedence (resolves the first open question): the argument overrides the graph at the
+  `(node, capability type)` granularity, not wholesale.** `assemble` starts from the graph's per-node
+  declarations and overlays the argument's; where both name an identity for the same `(node, cap)`, the
+  argument wins; where only one does, that one applies; a node the argument does not mention keeps its graph
+  declaration untouched. Override rather than error, because the argument's whole purpose is to be an escape
+  hatch (retargeting one slot in a test without editing the source), and per-`(node, cap)` rather than
+  per-node so overriding one slot does not silently drop a node's other graph-declared identities. The
+  merged map is then validated by the *same* rule the existing code already applies (unknown node / unknown
+  capability / capability-not-held), so an override cannot smuggle in an invalid declaration.
 - **Decision: validate the same rule the runtime already enforces.** An identity may be declared only for a
   capability the node actually holds; a label may be shared across nodes (shared instance) or distinct
   (distinct instances). The validator gains one check; the runtime rule is unchanged, just fed from the JSON.
@@ -50,7 +58,8 @@ Additive. The new field is optional; absent it, graphs validate, render, and ass
 to demonstrate distinct instances and sub-graph routing.
 
 ## Open Questions
-- Precedence when both the graph and the `identities=` argument name an identity — override or error?
+- ~~Precedence when both the graph and the `identities=` argument name an identity — override or error?~~
+  *Resolved:* the argument overrides the graph per `(node, capability type)`; see the assembly decision above.
 - How much of the sub-graph *slot* surface to build now vs defer: does the parent name instances positionally,
   by capability type, or by an explicit slot name? (This is the routing paragraph's option (ii) and is the
   larger language-design obligation.)

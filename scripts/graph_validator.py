@@ -156,9 +156,70 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
 
     _validate_edges(path, node_map, caps, edges, errors)
     _validate_node_trust_flow(path, node_map, caps, errors)
+    _validate_identities(path, node_map, caps, errors)
     _validate_layout(path, node_map, graph.get("layout", {}), errors)
 
     return node_map
+
+
+def _validate_capability_identities_shape(
+    path: Path, name: str, ci: object, errors: list[str]
+) -> dict | None:
+    """Shape-only check for a node's optional `capability_identities` field:
+    it must be an object mapping capability-type strings to non-empty label
+    strings. Returns the map if well-shaped, else None (with errors appended).
+    Kept separate from the semantic check so a malformed field fails loudly
+    rather than being silently ignored."""
+    if not isinstance(ci, dict):
+        errors.append(
+            f"{path.name}: node {name!r} `capability_identities` must be an object "
+            f"mapping a capability type to an identity label"
+        )
+        return None
+    ok = True
+    for cap_type, label in ci.items():
+        if not isinstance(label, str) or not label:
+            errors.append(
+                f"{path.name}: node {name!r} identity label for {cap_type!r} must be "
+                f"a non-empty string"
+            )
+            ok = False
+    return ci if ok else None
+
+
+def _validate_identities(
+    path: Path,
+    node_map: dict[str, dict],
+    caps: list[str],
+    errors: list[str],
+) -> None:
+    """Validate optional per-node `capability_identities` declarations.
+
+    An identity labels a distinct instance of a capability the node holds, so the
+    sole semantic rule — the *same* one the runtime enforces at assembly time (see
+    `poc/graph.py`) — is that the labelled type is actually a capability the node
+    declares in its `inputs`. Catching it here means a misrouted identity is a
+    validation error, mirroring the runtime's assembly-time rejection, rather than
+    surfacing only when someone tries to assemble the graph."""
+    cap_set = set(caps)
+    for name, n in node_map.items():
+        if "capability_identities" not in n:
+            continue
+        ci = _validate_capability_identities_shape(path, name, n["capability_identities"], errors)
+        if ci is None:
+            continue
+        for cap_type in ci:
+            if cap_type not in cap_set:
+                errors.append(
+                    f"{path.name}: node {name!r} declares an identity for {cap_type!r}, "
+                    f"which is not a declared capability of the graph"
+                )
+            elif cap_type not in n["inputs"]:
+                errors.append(
+                    f"{path.name}: node {name!r} declares an identity for capability "
+                    f"{cap_type!r} it does not hold; an identity may be declared only for "
+                    f"a capability the node's `inputs` names"
+                )
 
 
 def _validate_edges(
