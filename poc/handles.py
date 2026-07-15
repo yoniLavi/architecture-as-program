@@ -5,11 +5,17 @@ This is where "capabilities as declared requirements" becomes concrete: a node
 receives handle objects as explicit arguments and has no other way to reach
 external authority. The handle's *surface* is the enforcement:
 
-* `InferenceLLM`  (`LLMClient<inference>`)   — model access, NO tool calling.
-* `ToolLLM`       (`LLMClient<[tools]>`)     — model access + only its named tools.
-* `ReadDBHandle`  (`DBHandle<scope, read>`)  — read only, scoped to one store.
-* `ResponseChannel`(`ResponseChannel<...>`)  — write-only sink.
-* `EventEmitter`  (`EventEmitter<topic>`)    — write-only sink.
+* `InferenceLLM`     (`LLMClient<inference>`)       — model access, NO tool calling.
+* `ToolLLM`          (`LLMClient<[tools]>`)         — model access + only its named tools.
+* `ReadDBHandle`     (`DBHandle<scope, read>`)      — read only, scoped to one store.
+* `ReadWriteDBHandle`(`DBHandle<scope, read-write>`)— read *and* write, scoped to one store.
+* `AppendDBHandle`   (`DBHandle<scope, append>`)    — append only, NO read (write-once log).
+* `ResponseChannel`  (`ResponseChannel<...>`)       — write-only sink.
+* `EventEmitter`     (`EventEmitter<topic>`)        — write-only sink.
+
+The three `DBHandle` surfaces make the mode lattice concrete: `read-write` covers both `read` and
+`append`, while `read` and `append` are mutually incomparable — neither handle's operations are a
+superset of the other's (a reader cannot append; an appender cannot read).
 
 Fidelity: this is host-discipline enforcement. `InferenceLLM` *has no* tool
 method, so a node holding one cannot call a tool — but Python cannot stop a
@@ -122,6 +128,44 @@ class ReadDBHandle:
 
 
 @dataclass
+class ReadWriteDBHandle:
+    """`DBHandle<scope, read-write>` — read *and* write a single named store.
+
+    Owns a private copy of its store slice (see `provision`), so writes through
+    this handle stay local to one assembly and never leak back into the shared
+    `stores` mapping or another graph's view. `write` appends a record to the
+    list at `key`, and `read` returns it — enough to make a write-then-read
+    observable without modelling transactions or deletion."""
+
+    scope: str
+    _data: dict[str, list[str]]
+
+    def read(self, key: str) -> list[str]:
+        return list(self._data.get(key, []))
+
+    def write(self, key: str, value: str) -> None:
+        self._data.setdefault(key, []).append(value)
+
+
+@dataclass
+class AppendDBHandle:
+    """`DBHandle<scope, append>` — append-only access to a write-once log.
+
+    Deliberately has no `read`: a node that can append to an audit store must not
+    thereby be able to read it back. This is the least-authority sibling of
+    `ReadDBHandle` (which has no `write`), and it makes the `read`/`append`
+    incomparability of the mode lattice concrete at the surface. `appended`
+    exposes the log for inspection by the host/tests, not through a capability
+    operation the node holds."""
+
+    scope: str
+    appended: list[str] = field(default_factory=list)
+
+    def append(self, record: str) -> None:
+        self.appended.append(record)
+
+
+@dataclass
 class ResponseChannel:
     """`ResponseChannel<session>` — write-only sink for replies to one session."""
 
@@ -189,11 +233,21 @@ def provision(
         scope = ast.args[0].value
         mode = ast.args[1]
         mode_name = mode.name if isinstance(mode, TName) else ""
-        if mode_name != "read":
-            # The security vertical only needs read; widening modes are a
-            # straightforward extension but out of scope for this slice.
-            raise ValueError(f"PoC models only read-mode DBHandle, got: {cap_type!r}")
-        return ReadDBHandle(scope, dict(stores.get(scope, {})))
+        contents = stores.get(scope, {})
+        if mode_name == "read":
+            # Read-only: a shallow copy suffices since the handle never mutates.
+            return ReadDBHandle(scope, dict(contents))
+        if mode_name == "read-write":
+            # Writable: deep-copy the list values so writes stay local to this
+            # assembly and never leak into the shared `stores` mapping.
+            return ReadWriteDBHandle(scope, {k: list(v) for k, v in contents.items()})
+        if mode_name == "append":
+            # Append-only log; starts empty (audit stores are written, not seeded).
+            return AppendDBHandle(scope)
+        raise ValueError(
+            f"unrecognised DBHandle mode {mode_name!r} in {cap_type!r}; "
+            f"modes are read, read-write, append"
+        )
 
     if ast.head == "ResponseChannel":
         scope = _scope_label(ast)

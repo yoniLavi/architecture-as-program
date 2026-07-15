@@ -12,11 +12,13 @@ import pytest
 
 from poc.graph import AssemblyError, assemble, load_graph_dict, validate_graph_dict
 from poc.handles import (
+    AppendDBHandle,
     CapabilityError,
     Caretaker,
     EventEmitter,
     InferenceLLM,
     ReadDBHandle,
+    ReadWriteDBHandle,
     ResponseChannel,
     RevokedCapabilityError,
     Revoker,
@@ -82,6 +84,25 @@ def test_read_db_handle_has_no_write_method():
     assert not hasattr(db, "write")
 
 
+def test_read_write_db_handle_reads_and_writes():
+    """`DBHandle<scope, read-write>` grants both operations; a written record is
+    visible to a subsequent read through the same handle."""
+    db = ReadWriteDBHandle("billing", {})
+    assert db.read("acct-1") == []
+    db.write("acct-1", "invoice #42")
+    assert db.read("acct-1") == ["invoice #42"]
+
+
+def test_append_db_handle_has_no_read_method():
+    """`DBHandle<scope, append>` is append-only: a node that can write the audit
+    log must not be able to read it back. The absence of `read` is the enforcement,
+    mirroring `ReadDBHandle` having no `write`."""
+    db = AppendDBHandle("audit")
+    db.append("outcome recorded")
+    assert not hasattr(db, "read")
+    assert db.appended == ["outcome recorded"]  # host/test inspection, not a node op
+
+
 def test_sinks_are_write_only():
     assert not hasattr(ResponseChannel("s"), "read")
     assert not hasattr(EventEmitter("t"), "read")
@@ -96,6 +117,8 @@ def test_sinks_are_write_only():
         ("LLMClient<inference>", InferenceLLM),
         ("LLMClient<[lookup]>", ToolLLM),
         ("DBHandle<'knowledge-base', read>", ReadDBHandle),
+        ("DBHandle<'billing', read-write>", ReadWriteDBHandle),
+        ("DBHandle<'audit', append>", AppendDBHandle),
         ("ResponseChannel<user-session>", ResponseChannel),
         ("EventEmitter<'support-queue'>", EventEmitter),
     ],
@@ -103,6 +126,29 @@ def test_sinks_are_write_only():
 def test_provision_builds_the_right_handle(cap, expected):
     handle = provision(cap, backend=StubLLM(), stores=STORES)
     assert isinstance(handle, expected)
+
+
+def test_provision_rejects_an_unmodelled_db_mode():
+    """A DBHandle mode the runtime does not model fails loudly, naming the modes it
+    does know — fail-closed rather than silently picking one."""
+    with pytest.raises(ValueError, match="read, read-write, append"):
+        provision("DBHandle<'x', truncate>", backend=StubLLM(), stores=STORES)
+
+
+def test_read_write_provision_does_not_alias_the_shared_stores():
+    """The read-write handle owns a private copy of its store slice: a write through
+    one assembly's handle does not leak into the shared `stores` or a fresh one."""
+    stores = {"billing": {"acct-1": ["opening balance"]}}
+    first = provision("DBHandle<'billing', read-write>", backend=StubLLM(), stores=stores)
+    assert isinstance(first, ReadWriteDBHandle)
+    first.write("acct-1", "charge")
+
+    # The shared mapping is untouched...
+    assert stores["billing"]["acct-1"] == ["opening balance"]
+    # ...and a fresh provision sees only the original contents, not the write.
+    second = provision("DBHandle<'billing', read-write>", backend=StubLLM(), stores=stores)
+    assert isinstance(second, ReadWriteDBHandle)
+    assert second.read("acct-1") == ["opening balance"]
 
 
 def test_provisioned_tool_llm_carries_exactly_its_declared_tools():
@@ -391,6 +437,32 @@ def test_parent_routes_a_distinct_instance_into_a_sub_graph_node():
     sub.send("to the routed sub-graph")
     assert sub.sent == ["to the routed sub-graph"]
     assert sibling.sent == []  # the sibling's instance is not visible to SubService
+
+
+def test_shipped_support_platform_assembles_and_routes_identity():
+    """Spec: the canonical `SupportPlatform` graph now assembles end-to-end — every
+    capability it declares (including `read-write` and `append` DB handles) is
+    provisionable — and its graph-declared `ResponseChannel<user-session>`
+    identities route distinct instances to `CustomerSupport` and `BillingService`.
+    This exercises capability-identity routing across a sub-graph boundary on the
+    *shipped* graph, not a synthetic stand-in."""
+    platform = load_graph_dict("support-platform")
+    g = assemble(platform, backend=StubLLM(), stores=STORES)
+
+    assert g.name == "SupportPlatform"
+    # Every declared capability was provisioned (assembly did not skip any).
+    assert set(g.handles) == set(platform["capabilities"])
+
+    customer = g.handle_for(g.nodes["CustomerSupport"], RC)
+    billing = g.handle_for(g.nodes["BillingService"], RC)
+    assert isinstance(customer, ResponseChannel) and isinstance(billing, ResponseChannel)
+    assert customer is not billing  # distinct instances routed across the boundary
+    # Each matches the identity declared for it in the graph source.
+    assert g.instances[("CustomerSupport", RC)] is customer
+    assert g.instances[("BillingService", RC)] is billing
+
+    customer.send("reply to the customer")
+    assert billing.sent == []  # billing's channel is not visible to customer support
 
 
 # ── Capability revocation ──────────────────────────────────────────
