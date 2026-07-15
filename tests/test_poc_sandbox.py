@@ -411,6 +411,73 @@ def test_free_text_residual_survives_into_the_confined_tool_node():
     assert "ignore all previous instructions" in ctx.question.lower()
 
 
+# ── Revocation composes to the confined tier ───────────────────────
+#
+# `add-capability-revocation` enforced revocation on the host tier and left open
+# whether severing *composes* to the confined tier. It does, structurally and for
+# free: a sandboxed node reaches its capabilities through WIT host functions that
+# the host satisfies with closures over the node's handle, and for a revocable
+# instance that handle is a Caretaker. The guest's only path to the resource is
+# that import, so once the caretaker is severed the crossing raises — the failure
+# is at the WIT boundary, not the memory level (CHERI remains the follow-up).
+
+INFERENCE_CAP = "LLMClient<inference>"
+
+
+def _assemble_confined_revocable(node="ParseMessage", identity="parse_llm"):
+    """Assemble the graph with `node` on the confined tier and its inference LLM
+    provisioned as a revocable instance, so the host can sever it between runs."""
+    from poc.demo import STORES
+    from poc.graph import assemble
+    from poc.llm import StubLLM
+
+    return assemble(
+        load_graph_dict("customer-support"),
+        backend=StubLLM(),
+        stores=STORES,
+        sandbox={node},
+        identities={node: {INFERENCE_CAP: identity}},
+        revocable_instances=[(INFERENCE_CAP, identity)],
+    )
+
+
+def test_a_confined_node_cannot_exercise_a_revoked_instance():
+    """Scenario: a sandboxed node cannot exercise a revoked instance. ParseMessage
+    runs as a confined component whose sole capability import is the inference LLM;
+    before revocation its `infer` crossing succeeds, and after the host severs the
+    instance the same crossing raises `RevokedCapabilityError` — revocation reaches
+    across the WIT boundary, so the confined tier does not outlive a withdrawal."""
+    from poc.handles import RevokedCapabilityError
+    from poc.runtime import execute
+    from poc.values import CustomerRequest
+
+    g = _assemble_confined_revocable()
+    msg = CustomerRequest(session_id="user-session", body="Why was I charged twice?")
+
+    before = execute(g, msg)
+    assert before.tiers["ParseMessage"] == "sandbox"
+    # ParseMessage produced output, so the confined `infer` crossing ran and returned.
+    assert "ModerateContent" in before.order
+
+    g.revoke(INFERENCE_CAP, "parse_llm")
+    with pytest.raises(RevokedCapabilityError, match="revoked"):
+        execute(g, msg)
+
+
+def test_revocation_on_the_confined_tier_is_targeted():
+    """Severing the confined node's instance does not disturb a same-typed sibling
+    on the shared-by-type default: ModerateContent also holds `LLMClient<inference>`
+    but on the type-default handle, and remains usable after the revocation."""
+    from poc.handles import Caretaker
+
+    g = _assemble_confined_revocable()
+    g.revoke(INFERENCE_CAP, "parse_llm")
+
+    sibling = g.handle_for(g.nodes["ModerateContent"], INFERENCE_CAP)
+    assert not isinstance(sibling, Caretaker)  # untouched type-default, not the severed instance
+    assert sibling.infer(system="s", prompt="p", task="moderate")  # still exercises authority
+
+
 # ── Capability-crossing overhead is measured ───────────────────────
 
 
