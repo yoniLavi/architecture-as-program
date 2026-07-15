@@ -42,6 +42,16 @@ artifact moves, and how the build/citation tooling generalises to N papers.
 - **Decision: the methodology claim is human-directed, AI-executed.** `METHODOLOGY.md` states the division of
   authority explicitly and points to git history + `openspec/changes/` as the evidence. No autonomy claim;
   overclaiming would undermine the very record it rests on.
+- **Decision: directory naming is content-named with an ordinal prefix** — `papers/01-vision/` and
+  `papers/02-demonstrator/`. The ordinal conveys the longitudinal sequence; the date lives *inside* each
+  document (where it is authoritative and, for the frozen paper, faithful to its freeze commit) rather than in
+  a dirname that would duplicate and could contradict it. Date-stamped dirnames were rejected for that
+  duplication.
+- **Decision: keep `dist/proposal.*` as aliases to Paper 2 for one transition, then drop them.** The repo
+  publishes to GitHub Pages and external links may point at `dist/proposal.html`; a clean cutover would break
+  them silently. So the corpus build additionally emits `dist/proposal.{pdf,md,html}` as copies of Paper 2's
+  outputs during the transition, with a note (in the Makefile and README) that they are deprecated aliases to
+  be removed once inbound links are updated.
 
 ## Risks / Trade-offs
 - **Freeze leakage.** A frozen paper rebuilding from evolving inputs corrupts the record. → Self-contained
@@ -65,8 +75,9 @@ artifact moves, and how the build/citation tooling generalises to N papers.
    with current figures; citation hygiene green.
 
 ## Open Questions
-- Directory naming: `papers/01-vision/` + `papers/02-demonstrator/` (ordered, content-named; dates live inside
-  the documents) vs date-stamped dir names. Leaning content-named + ordinal prefix.
-- Keep `dist/proposal.*` aliases pointing at Paper 2 for one transition, or cut over cleanly?
+- ~~Directory naming~~ *Resolved:* `papers/01-vision/` + `papers/02-demonstrator/` (content-named + ordinal;
+  dates inside the documents). See Decisions.
+- ~~Keep `dist/proposal.*` aliases or cut over cleanly?~~ *Resolved:* keep as deprecated aliases to Paper 2 for
+  one transition, then drop. See Decisions.
 - Should `METHODOLOGY.md` grow into its own paper later (a paper *about* the process)? Deferred; noted as a
   possible future corpus entry.

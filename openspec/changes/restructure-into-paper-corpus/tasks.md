@@ -1,6 +1,6 @@
 ## 1. Corpus scaffolding
 - [ ] 1.1 Create `papers/01-vision/` and `papers/02-demonstrator/`
-- [ ] 1.2 Decide and record final directory naming (content-named + ordinal prefix vs date-stamped)
+- [ ] 1.2 Use `papers/01-vision/` and `papers/02-demonstrator/` (content-named + ordinal; dates inside docs)
 
 ## 2. Freeze Paper 1 (the founding vision)
 - [ ] 2.1 Extract `proposal.typ` at `59898cc~1` into `papers/01-vision/` (keep its *June 2026* date verbatim)
@@ -21,7 +21,8 @@
       (graphs/diagrams/grammar) unchanged and reused by living papers
 - [ ] 4.2 Make `scripts/check-citations.py` paper-aware (an entry is used if any paper cites it)
 - [ ] 4.3 Update `.pre-commit-config.yaml` so `make build` / citation checks cover the corpus
-- [ ] 4.4 Decide whether to keep `dist/proposal.*` aliases for one transition or cut over
+- [ ] 4.4 Emit `dist/proposal.{pdf,md,html}` as deprecated aliases to Paper 2 for one transition (note in
+      Makefile + README that they will be removed once inbound/GitHub Pages links are updated)
 
 ## 5. Methodology + docs
 - [ ] 5.1 Add top-level `METHODOLOGY.md`: human-directed, AI-executed, spec-driven; git + `openspec/changes/`
