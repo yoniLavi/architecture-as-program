@@ -20,9 +20,12 @@ from poc.handles import (
     ResponseChannel,
     RevokedCapabilityError,
     Revoker,
+    Rotator,
     ToolLLM,
+    manage,
     provision,
     revocable,
+    rotatable,
 )
 from poc.llm import LLMRequest, LLMResponse, StubLLM, ToolCall
 from poc.variants import UNSAFE_VARIANTS
@@ -367,6 +370,171 @@ def test_no_revocable_declaration_leaves_provisioning_unchanged(graph):
     handle = g.handle_for(g.nodes["SendReply"], RC)
     assert isinstance(handle, ResponseChannel)  # bare handle, not a caretaker
     assert g.revokers == {}
+
+
+# ── Capability rotation ────────────────────────────────────────────
+#
+# Rotation re-points a named instance at a new backing handle at runtime, reusing
+# the same caretaker the node holds — same identity, new target. Like revocation
+# it is host-tier, opt-in, targeted, and administered by a separate authority; the
+# two are granted independently. Distinct backing `ResponseChannel` objects (with
+# their own `.sent` lists) make the re-point observable.
+
+
+def test_rotator_re_points_the_caretaker_target():
+    """The node's use is served by the original handle before rotation and the new
+    one after — same caretaker object throughout."""
+    first, second = ResponseChannel("a"), ResponseChannel("b")
+    caretaker, rotator = rotatable(first)
+    caretaker.send("to first")
+    rotator.rotate(second)
+    caretaker.send("to second")
+    assert first.sent == ["to first"]
+    assert second.sent == ["to second"]  # served by the new target after rotation
+
+
+def test_rotation_preserves_capability_kind():
+    """A caretaker promised the node a fixed surface; rotating to a different kind
+    would break it, so the Rotator refuses."""
+    _caretaker, rotator = rotatable(ResponseChannel("a"))
+    with pytest.raises(CapabilityError, match="preserves capability kind"):
+        rotator.rotate(ReadDBHandle("kb", {}))
+
+
+def test_manage_mints_authorities_independently():
+    """`manage` grants revoke and rotate independently — least authority."""
+    _, revoker, rotator = manage(ResponseChannel("a"), rotatable=True)
+    assert rotator is not None
+    assert revoker is None  # not requested
+
+
+def test_rotate_then_use_through_the_assembled_graph(graph):
+    """End-to-end (spec: rotation re-points authority): a node bound to a rotatable
+    instance is served by the new handle after the host rotates it."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        rotatable_instances=[(RC, "session_a")],
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    handle.send("before")
+
+    replacement = ResponseChannel("rotated-in")
+    g.rotate(RC, "session_a", replacement)
+    handle.send("after")
+
+    assert replacement.sent == ["after"]  # new target serves subsequent use
+
+
+def test_rotation_is_targeted_to_one_instance(graph):
+    """Rotating one instance leaves its distinct-identity sibling and the
+    shared-by-type default unchanged."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}, "NotifyUser": {RC: "session_b"}},
+        rotatable_instances=[(RC, "session_a")],
+    )
+    sibling = g.handle_for(g.nodes["NotifyUser"], RC)
+    replacement = ResponseChannel("rotated-in")
+    g.rotate(RC, "session_a", replacement)
+
+    g.handle_for(g.nodes["SendReply"], RC).send("to new")
+    sibling.send("to sibling")
+    assert replacement.sent == ["to new"]
+    # Sibling untouched — its own object, not the replacement, and never saw "to new".
+    assert sibling.sent == ["to sibling"]
+
+
+def test_nodes_never_receive_rotate_authority(graph):
+    """The rotate authority is held only by the host; the node's caretaker exposes
+    no rotate operation and is not a Rotator."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        rotatable_instances=[(RC, "session_a")],
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    assert not hasattr(handle, "rotate")
+    assert not isinstance(handle, Rotator)
+    assert isinstance(g.rotators[(RC, "session_a")], Rotator)
+
+
+def test_revocable_and_rotatable_compose_on_one_instance(graph):
+    """An instance can be both: rotate re-points it, revoke severs it, and severed
+    wins (a revoked instance stays revoked after a rotate)."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        revocable_instances=[(RC, "session_a")],
+        rotatable_instances=[(RC, "session_a")],
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    replacement = ResponseChannel("rotated-in")
+    g.rotate(RC, "session_a", replacement)
+    handle.send("served by new target")
+    assert replacement.sent == ["served by new target"]
+
+    g.revoke(RC, "session_a")
+    with pytest.raises(RevokedCapabilityError):
+        handle.send("nope")
+    # Severed wins even over a further rotation.
+    g.rotate(RC, "session_a", ResponseChannel("another"))
+    with pytest.raises(RevokedCapabilityError):
+        handle.send("still nope")
+
+
+def test_rotatable_but_not_revocable_exposes_only_rotate(graph):
+    """Authorities are granted independently: a rotatable-only instance has a
+    rotator but no revoker."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        rotatable_instances=[(RC, "session_a")],
+    )
+    assert (RC, "session_a") in g.rotators
+    assert (RC, "session_a") not in g.revokers
+    with pytest.raises(KeyError, match="no revocable instance"):
+        g.revoke(RC, "session_a")
+
+
+def test_rotatable_must_name_a_declared_identity(graph):
+    with pytest.raises(AssemblyError, match=r"rotatable instance .* not a declared identity"):
+        assemble(
+            graph,
+            backend=StubLLM(),
+            stores=STORES,
+            identities={"SendReply": {RC: "session_a"}},
+            rotatable_instances=[(RC, "session_b")],
+        )
+
+
+def test_rotating_an_unprovisioned_instance_raises(graph):
+    g = assemble(graph, backend=StubLLM(), stores=STORES)
+    with pytest.raises(KeyError, match="no rotatable instance"):
+        g.rotate(RC, "session_a", ResponseChannel("x"))
+
+
+def test_no_rotatable_declaration_leaves_provisioning_unchanged(graph):
+    """Opt-in: with no rotatable declaration, no caretaker and no rotator."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    assert isinstance(handle, ResponseChannel)
+    assert g.rotators == {}
 
 
 @pytest.mark.parametrize("variant", sorted(UNSAFE_VARIANTS))

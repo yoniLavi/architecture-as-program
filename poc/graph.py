@@ -17,7 +17,7 @@ from pathlib import Path
 
 from graph_validator import validate_files
 
-from .handles import Revoker, provision, revocable
+from .handles import Revoker, Rotator, manage, provision
 from .llm import LLMBackend
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -74,6 +74,11 @@ class AssembledGraph:
     # single revoker can also be handed off as a passable ocap token (the
     # true-ocap alternative to the `revoke(...)` convenience method below).
     revokers: dict[tuple[str, str], Revoker] = field(default_factory=dict)
+    # (capability type, identity label) → the authority to re-point that instance's
+    # caretaker at a new backing handle. Present only for instances declared
+    # rotatable; host-held like `revokers`, and granted independently of it (an
+    # instance may be revocable, rotatable, both, or neither).
+    rotators: dict[tuple[str, str], Rotator] = field(default_factory=dict)
 
     def revoke(self, cap_type: str, identity: str) -> None:
         """Sever the named revocable capability instance. Afterwards every node
@@ -91,6 +96,26 @@ class AssembledGraph:
                 f"no revocable instance {(cap_type, identity)!r}; "
                 f"revocable instances are {sorted(self.revokers)}"
             ) from None
+
+    def rotate(self, cap_type: str, identity: str, new_handle: object) -> None:
+        """Re-point the named rotatable capability instance at `new_handle`.
+        Afterwards every node bound to `(cap_type, identity)` is served by the new
+        handle on its next use; siblings of the same type are untouched.
+
+        The replacement must be the same capability kind as the current target
+        (a `ResponseChannel` rotates to a `ResponseChannel`, never to a `DBHandle`),
+        so the surface a node holds cannot change kind underneath it — `Rotator`
+        raises `CapabilityError` otherwise. Like `revoke`, this is a host authority
+        no node receives. Raises `KeyError` if the instance was not provisioned
+        rotatable — rotation is opt-in."""
+        try:
+            rotator = self.rotators[(cap_type, identity)]
+        except KeyError:
+            raise KeyError(
+                f"no rotatable instance {(cap_type, identity)!r}; "
+                f"rotatable instances are {sorted(self.rotators)}"
+            ) from None
+        rotator.rotate(new_handle)
 
     def handle_for(self, node: Node, cap_type: str) -> object:
         """The handle instance `node` binds for capability `cap_type`.
@@ -138,6 +163,7 @@ def assemble(
     sandbox: Iterable[str] = (),
     identities: Mapping[str, Mapping[str, str]] | None = None,
     revocable_instances: Iterable[tuple[str, str]] = (),
+    rotatable_instances: Iterable[tuple[str, str]] = (),
 ) -> AssembledGraph:
     """Validate and assemble a graph dict into a runnable `AssembledGraph`.
 
@@ -158,16 +184,20 @@ def assemble(
     item — naming identity — and the prerequisite a later revocation change needs
     to target a specific instance.
 
-    `revocable_instances` names identity instances — as `(capability type, identity
-    label)` pairs, matching the pool `identities` builds — whose authority the host
-    can withdraw at runtime. Each named instance is provisioned behind a caretaker
-    (a forwarding proxy), and the paired revoker is kept on the assembled graph in
-    `revokers`, reachable via `graph.revoke(cap_type, identity)`; nodes only ever
-    receive the caretaker. Revocation is opt-in and layered on identity: an instance
-    is revocable only if some node declares that `(capability, identity)`, and
-    un-named instances (type-only and plain-identity) are provisioned bare, exactly
-    as before. This is the narrow, host-tier half of Technical Note A's revocation
-    item; rotation and the redeployment form remain open."""
+    `revocable_instances` and `rotatable_instances` name identity instances — as
+    `(capability type, identity label)` pairs, matching the pool `identities` builds
+    — that the host can administer at runtime: revoke (withdraw authority) and/or
+    rotate (re-point at a new backing handle). An instance named in either set is
+    provisioned behind a caretaker (a forwarding proxy); the paired revoker/rotator
+    is kept on the assembled graph in `revokers`/`rotators`, reachable via
+    `graph.revoke(...)` / `graph.rotate(...)`. Nodes only ever receive the
+    caretaker. Both are opt-in and layered on identity: an instance is
+    revocable/rotatable only if some node declares that `(capability, identity)`,
+    the two authorities are granted independently (an instance may be one, both, or
+    neither), and un-named instances (type-only and plain-identity) are provisioned
+    bare, exactly as before. This is the narrow, host-tier form of Technical Note
+    A's revocation-and-rotation item; the redeployment form and the sandbox tier
+    remain open."""
     errors = validate_graph_dict(graph)
     if errors:
         raise AssemblyError(errors)
@@ -234,22 +264,36 @@ def assemble(
                 identity_pool[key] = provision(cap_type, backend=backend, stores=stores)
             bindings.append((node_name, cap_type, key))
 
-    # Opt-in revocation: wrap each named identity instance behind a caretaker and
-    # keep the paired revoker for the host. Only instances some node actually binds
-    # can be made revocable — otherwise there is nothing to sever — so an unbound
-    # `(cap_type, identity)` is a loud assembly error, not a silent no-op.
+    # Opt-in revocation/rotation: wrap each named identity instance behind a
+    # caretaker once, and mint the paired host authorities — a revoker if the
+    # instance is revocable, a rotator if rotatable, both if both. Only instances
+    # some node actually binds can be managed — otherwise there is nothing to sever
+    # or re-point — so an unbound `(cap_type, identity)` is a loud assembly error,
+    # not a silent no-op. The two sets are de-duplicated and unioned so an instance
+    # named in both is wrapped exactly once.
+    revocable_set = set(revocable_instances)
+    rotatable_set = set(rotatable_instances)
     revokers: dict[tuple[str, str], Revoker] = {}
-    for key in dict.fromkeys(revocable_instances):  # de-dup, preserve order
+    rotators: dict[tuple[str, str], Rotator] = {}
+    for key in dict.fromkeys([*revocable_instances, *rotatable_instances]):  # union, ordered
         if key not in identity_pool:
+            kind = "revocable" if key in revocable_set else "rotatable"
             raise AssemblyError(
                 [
-                    f"revocable instance {key!r} is not a declared identity; an instance "
-                    f"is revocable only if some node declares that (capability, identity)"
+                    f"{kind} instance {key!r} is not a declared identity; an instance "
+                    f"is {kind} only if some node declares that (capability, identity)"
                 ]
             )
-        caretaker, revoker = revocable(identity_pool[key])
+        caretaker, revoker, rotator = manage(
+            identity_pool[key],
+            revocable=key in revocable_set,
+            rotatable=key in rotatable_set,
+        )
         identity_pool[key] = caretaker
-        revokers[key] = revoker
+        if revoker is not None:
+            revokers[key] = revoker
+        if rotator is not None:
+            rotators[key] = rotator
 
     instances: dict[tuple[str, str], object] = {
         (node_name, cap_type): identity_pool[key] for node_name, cap_type, key in bindings
@@ -264,4 +308,5 @@ def assemble(
         handles=handles,
         instances=instances,
         revokers=revokers,
+        rotators=rotators,
     )

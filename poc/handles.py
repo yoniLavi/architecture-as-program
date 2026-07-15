@@ -217,83 +217,147 @@ def _scope_label(app: TApp) -> str:
     return ""
 
 
-# ── Runtime revocation: the ocap caretaker pattern ─────────────────
+# ── Runtime revocation and rotation: the ocap caretaker pattern ────
 #
 # Provisioning binds a capability instance for a whole run. Revocation withdraws
-# one instance's authority *mid-run* without touching the resource or the graph.
-# The mechanism is Miller's caretaker (`@miller_robust_2006`): a node holds a
-# forwarding proxy (the `Caretaker`), and a *separate* authority (the `Revoker`)
-# severs it. Using a capability and administering it are different authorities —
-# a node receives only the caretaker, never the revoker.
+# one instance's authority *mid-run*, and rotation re-points it at a new resource,
+# both without touching the graph. The mechanism is Miller's caretaker
+# (`@miller_robust_2006`): a node holds a forwarding proxy (the `Caretaker`), and
+# *separate* authorities administer it — a `Revoker` severs it, a `Rotator`
+# re-points it. Using a capability and administering it are different authorities:
+# a node receives only the caretaker, never a revoker or rotator.
+#
+# One cell, three roles. The caretaker forwards to the cell's *current* target and
+# raises if the cell is severed; a Revoker sets `revoked`, a Rotator sets `target`.
+# Revocation and rotation are thus two levers on one indirection, not two
+# mechanisms — and severed wins (a revoked instance stays revoked after a rotate).
 
 
 @dataclass
-class _Severance:
-    """The single mutable bit a caretaker and its revoker share. Kept in its own
-    cell so neither object reaches into the other: the caretaker only reads it,
-    the revoker only sets it."""
+class _Cell:
+    """The mutable state a caretaker shares with its revoker/rotator: the current
+    forwarding `target` and whether the instance has been severed. Kept in its own
+    cell so the authorities never reach into the caretaker (or each other) — the
+    caretaker only reads it, a `Revoker` only sets `revoked`, a `Rotator` only sets
+    `target`."""
 
+    target: object
     revoked: bool = False
 
 
 class Caretaker:
-    """A severable forwarding proxy for a capability handle.
+    """A severable, re-pointable forwarding proxy for a capability handle.
 
-    Delegates the wrapped handle's *entire* surface via `__getattr__`, so a node
+    Delegates the current target's *entire* surface via `__getattr__`, so a node
     cannot distinguish a caretaker from the bare handle through the capability
     operations (`send` / `read` / `infer` / `respond` / `emit`) — the absence of a
     method is forwarded too (a caretaker over `InferenceLLM` reports no `respond`).
-    Once severed, every attribute access raises `RevokedCapabilityError`.
+    Once severed, every attribute access raises `RevokedCapabilityError`; after a
+    rotation, accesses are served by the new target.
 
-    The caretaker deliberately exposes *no* revoke operation: severing goes through
-    the paired `Revoker`, which a node never holds. The revoked check fires at
-    attribute-*fetch* time; because the PoC executor runs nodes synchronously,
-    revocation is well-defined only *between* node runs (a node that already
-    fetched a method finishes its own run), which matches the design's scope."""
+    The caretaker deliberately exposes *no* revoke or rotate operation: those go
+    through the paired `Revoker` / `Rotator`, which a node never holds. The checks
+    fire at attribute-*fetch* time; because the PoC executor runs nodes
+    synchronously, revocation and rotation are well-defined only *between* node
+    runs (a node that already fetched a method finishes its own run), which matches
+    the design's scope."""
 
-    def __init__(self, wrapped: object, severance: _Severance):
-        # Set through object.__setattr__ so these two are real instance attributes
-        # (found by normal lookup) and never fall through to __getattr__ below.
-        object.__setattr__(self, "_wrapped", wrapped)
-        object.__setattr__(self, "_severance", severance)
+    def __init__(self, cell: _Cell):
+        # Set through object.__setattr__ so `_cell` is a real instance attribute
+        # (found by normal lookup) and never falls through to __getattr__ below.
+        object.__setattr__(self, "_cell", cell)
 
     def __getattr__(self, name: str):
         # Reached only for attributes the caretaker itself lacks — i.e. everything
-        # belonging to the wrapped handle. That is precisely the transparency: the
-        # caretaker owns nothing but its two private slots, so all real use routes
-        # here and hits the revoked check first.
-        if object.__getattribute__(self, "_severance").revoked:
-            wrapped = object.__getattribute__(self, "_wrapped")
+        # belonging to the target handle. That is precisely the transparency: the
+        # caretaker owns nothing but its one private slot, so all real use routes
+        # here and hits the revoked check first, then the *current* target.
+        cell = object.__getattribute__(self, "_cell")
+        if cell.revoked:
             raise RevokedCapabilityError(
-                f"{type(wrapped).__name__} capability was revoked; attempted use of {name!r}"
+                f"{type(cell.target).__name__} capability was revoked; attempted use of {name!r}"
             )
-        return getattr(object.__getattribute__(self, "_wrapped"), name)
+        return getattr(cell.target, name)
 
 
 class Revoker:
     """The authority to sever one caretaker — held by the host, never by a node.
 
-    A distinct object from the caretaker it governs (they share only a `_Severance`
-    cell), so revoking is administratively separate from using. Revocation is
-    idempotent: severing an already-severed instance is a no-op."""
+    A distinct object from the caretaker it governs (they share only a `_Cell`), so
+    revoking is administratively separate from using. Revocation is idempotent:
+    severing an already-severed instance is a no-op, and it wins over rotation (a
+    revoked instance stays revoked)."""
 
-    def __init__(self, severance: _Severance):
-        self._severance = severance
+    def __init__(self, cell: _Cell):
+        self._cell = cell
 
     def revoke(self) -> None:
-        self._severance.revoked = True
+        self._cell.revoked = True
 
     @property
     def revoked(self) -> bool:
-        return self._severance.revoked
+        return self._cell.revoked
+
+
+class Rotator:
+    """The authority to re-point one caretaker at a new backing handle — held by
+    the host, never by a node.
+
+    A distinct object from the caretaker and from any `Revoker` over the same
+    instance; they share only the `_Cell`. The replacement must be the *same
+    capability kind* as the current target, so the surface the node holds cannot
+    change kind underneath it. Rotating a severed instance is allowed but pointless
+    — the revoked flag still wins, so use continues to fail."""
+
+    def __init__(self, cell: _Cell):
+        self._cell = cell
+
+    def rotate(self, new_handle: object) -> None:
+        current = self._cell.target
+        if type(new_handle) is not type(current):
+            raise CapabilityError(
+                f"cannot rotate a {type(current).__name__} capability to a "
+                f"{type(new_handle).__name__}; rotation preserves capability kind"
+            )
+        self._cell.target = new_handle
+
+    @property
+    def target(self) -> object:
+        return self._cell.target
+
+
+def manage(
+    handle: object, *, revocable: bool = False, rotatable: bool = False
+) -> tuple[Caretaker, Revoker | None, Rotator | None]:
+    """Wrap a handle in a caretaker and mint the requested host-side authorities.
+
+    Grant revoke and rotate independently (least authority): `revocable=True` mints
+    a `Revoker`, `rotatable=True` mints a `Rotator`, both mints both — all over one
+    caretaker and one shared cell. A node receives only the caretaker; the minted
+    authorities stay with the host. Returns `(caretaker, revoker_or_None,
+    rotator_or_None)`."""
+    cell = _Cell(target=handle)
+    caretaker = Caretaker(cell)
+    revoker = Revoker(cell) if revocable else None
+    rotator = Rotator(cell) if rotatable else None
+    return caretaker, revoker, rotator
 
 
 def revocable(handle: object) -> tuple[Caretaker, Revoker]:
-    """Wrap a capability handle so its authority can be withdrawn at runtime.
+    """Convenience: wrap a handle so its authority can be withdrawn at runtime.
 
-    Returns a `(caretaker, revoker)` pair sharing one severance cell. Give the
-    caretaker to the node (it forwards to `handle` until severed, then raises
-    `RevokedCapabilityError`) and keep the revoker with the host. That separation
-    is the whole point: a node holding only the caretaker cannot revoke anything."""
-    severance = _Severance()
-    return Caretaker(handle, severance), Revoker(severance)
+    Returns a `(caretaker, revoker)` pair. Give the caretaker to the node (it
+    forwards to `handle` until severed, then raises `RevokedCapabilityError`) and
+    keep the revoker with the host. Thin wrapper over `manage(revocable=True)`."""
+    caretaker, revoker, _ = manage(handle, revocable=True)
+    assert revoker is not None
+    return caretaker, revoker
+
+
+def rotatable(handle: object) -> tuple[Caretaker, Rotator]:
+    """Convenience: wrap a handle so it can be re-pointed at a new resource at
+    runtime. Returns a `(caretaker, rotator)` pair. Thin wrapper over
+    `manage(rotatable=True)`."""
+    caretaker, _, rotator = manage(handle, rotatable=True)
+    assert rotator is not None
+    return caretaker, rotator
