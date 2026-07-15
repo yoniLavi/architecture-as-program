@@ -36,8 +36,12 @@ class ExecutionError(RuntimeError):
 
 
 def _capability_handles(graph: AssembledGraph, node: Node) -> list[object]:
-    """The node's capability handles, in the order they appear in its inputs."""
-    return [graph.handles[inp] for inp in node.inputs if inp in graph.handles]
+    """The node's capability handles, in the order they appear in its inputs.
+
+    Resolved through `handle_for`, so a node that declared a distinct capability
+    identity at assembly time receives its own instance rather than the
+    shared-by-type default."""
+    return [graph.handle_for(node, inp) for inp in node.inputs if inp in graph.handles]
 
 
 def _entry_node(graph: AssembledGraph) -> Node:

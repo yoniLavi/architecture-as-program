@@ -62,11 +62,25 @@ class AssembledGraph:
     capabilities: list[str]
     nodes: dict[str, Node]
     edges: list[Edge]
-    handles: dict[str, object]  # capability type string → handle instance
+    handles: dict[str, object]  # capability type string → default (shared-by-type) instance
+    # (node name, capability type) → the instance that node binds, present only
+    # where the node declares a distinct capability *identity*. Absent means the
+    # node falls back to the shared-by-type instance in `handles` — the type-only
+    # default that keeps identity-agnostic graphs behaving exactly as before.
+    instances: dict[tuple[str, str], object] = field(default_factory=dict)
+
+    def handle_for(self, node: Node, cap_type: str) -> object:
+        """The handle instance `node` binds for capability `cap_type`.
+
+        When the node declared an identity for that capability at assembly time,
+        this is its distinct per-identity instance; otherwise it is the
+        shared-by-type default. This one method is where capability *identity*
+        (per named instance) resolves ahead of capability *type* (shared)."""
+        return self.instances.get((node.name, cap_type), self.handles[cap_type])
 
     def handles_for(self, node: Node) -> dict[str, object]:
         """The capability handles a node declares, keyed by capability type."""
-        return {inp: self.handles[inp] for inp in node.inputs if inp in self.handles}
+        return {inp: self.handle_for(node, inp) for inp in node.inputs if inp in self.handles}
 
     def data_input_type(self, node: Node) -> str | None:
         """The single non-capability input type of a node (or None for a source
@@ -99,6 +113,7 @@ def assemble(
     backend: LLMBackend,
     stores: Mapping[str, Mapping[str, list[str]]] | None = None,
     sandbox: Iterable[str] = (),
+    identities: Mapping[str, Mapping[str, str]] | None = None,
 ) -> AssembledGraph:
     """Validate and assemble a graph dict into a runnable `AssembledGraph`.
 
@@ -107,7 +122,17 @@ def assemble(
 
     `sandbox` names the nodes to run on the confined WASM tier; every other node
     runs on the host tier. The two tiers compose in one graph, which is the
-    proposal's incremental-migration path (opaque host node → confined node)."""
+    proposal's incremental-migration path (opaque host node → confined node).
+
+    `identities` names capability *identity* at the graph boundary: it maps a
+    node name to `{capability type → identity label}`. Two nodes that declare the
+    same capability type but distinct identity labels receive *distinct* handle
+    instances; two that name the same label share one instance (identity, not
+    node, is the unit). Any capability with no identity declared keeps today's
+    shared-by-type provisioning, so identity is opt-in and simple graphs are
+    unaffected. This is the narrow half of Technical Note A's capability-routing
+    item — naming identity — and the prerequisite a later revocation change needs
+    to target a specific instance."""
     errors = validate_graph_dict(graph)
     if errors:
         raise AssemblyError(errors)
@@ -137,15 +162,46 @@ def assemble(
             src_node, src_port = fr, None
         edges.append(Edge(src_node=src_node, src_port=src_port, dst_node=e["to"]))
 
+    capabilities = list(graph["capabilities"])
     handles: dict[str, object] = {
-        cap: provision(cap, backend=backend, stores=stores) for cap in graph["capabilities"]
+        cap: provision(cap, backend=backend, stores=stores) for cap in capabilities
     }
+
+    # Identity-aware provisioning. Distinct identity labels for one capability
+    # type get distinct handle instances (pooled by label so a shared label means
+    # a shared instance); nodes without a declared identity fall through to the
+    # shared-by-type default in `handles` above.
+    identities = identities or {}
+    cap_set = set(capabilities)
+    identity_pool: dict[tuple[str, str], object] = {}
+    instances: dict[tuple[str, str], object] = {}
+    for node_name, per_cap in identities.items():
+        node = nodes.get(node_name)
+        if node is None:
+            raise AssemblyError([f"identity declared for unknown node {node_name!r}"])
+        for cap_type, label in per_cap.items():
+            if cap_type not in cap_set:
+                raise AssemblyError(
+                    [f"identity declared for unknown capability {cap_type!r} on node {node_name!r}"]
+                )
+            if cap_type not in node.inputs:
+                raise AssemblyError(
+                    [
+                        f"node {node_name!r} does not declare capability {cap_type!r}, "
+                        f"so it cannot be given an identity for it"
+                    ]
+                )
+            key = (cap_type, label)
+            if key not in identity_pool:
+                identity_pool[key] = provision(cap_type, backend=backend, stores=stores)
+            instances[(node_name, cap_type)] = identity_pool[key]
 
     return AssembledGraph(
         name=graph["name"],
         parameters=list(graph["parameters"]),
-        capabilities=list(graph["capabilities"]),
+        capabilities=capabilities,
         nodes=nodes,
         edges=edges,
         handles=handles,
+        instances=instances,
     )
