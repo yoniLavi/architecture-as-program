@@ -13,12 +13,16 @@ import pytest
 from poc.graph import AssemblyError, assemble, load_graph_dict, validate_graph_dict
 from poc.handles import (
     CapabilityError,
+    Caretaker,
     EventEmitter,
     InferenceLLM,
     ReadDBHandle,
     ResponseChannel,
+    RevokedCapabilityError,
+    Revoker,
     ToolLLM,
     provision,
+    revocable,
 )
 from poc.llm import LLMRequest, LLMResponse, StubLLM, ToolCall
 from poc.variants import UNSAFE_VARIANTS
@@ -218,6 +222,151 @@ def test_identity_for_a_capability_a_node_lacks_is_rejected(graph, identities, m
     silently provisioning an instance no node binds."""
     with pytest.raises(AssemblyError, match=match):
         assemble(graph, backend=StubLLM(), stores=STORES, identities=identities)
+
+
+# ── Capability revocation ──────────────────────────────────────────
+#
+# Revocation withdraws one *named* capability instance's authority at runtime, on
+# the host tier, via the ocap caretaker pattern: the node holds a forwarding proxy
+# and a separate revoker severs it. It layers on identity — only instances a node
+# binds by (capability type, identity label) can be made revocable — and is opt-in,
+# so un-revoked provisioning is byte-for-byte unchanged. `ResponseChannel` is again
+# the probe: its `.send` is an observable use that must succeed then fail.
+
+
+def test_caretaker_forwards_the_wrapped_surface_until_revoked():
+    """Before revocation a caretaker is indistinguishable from the bare handle:
+    the same operation runs and reaches the underlying resource."""
+    channel = ResponseChannel("s")
+    caretaker, _revoker = revocable(channel)
+    assert isinstance(caretaker, Caretaker)
+    conf = caretaker.send("hello")
+    assert conf.delivered
+    assert channel.sent == ["hello"]  # forwarded to the real handle
+
+
+def test_caretaker_forwards_method_absence():
+    """`__getattr__` delegation forwards *absence* too: a caretaker over an
+    inference LLM has no `respond`, just like the handle it wraps — so a node
+    cannot distinguish the proxy through the capability surface."""
+    caretaker, _ = revocable(InferenceLLM(StubLLM()))
+    assert hasattr(caretaker, "infer")
+    assert not hasattr(caretaker, "respond")
+    assert not hasattr(caretaker, "call_tool")
+
+
+def test_revoked_caretaker_raises_on_use():
+    """After the revoker severs it, every operation raises — loud failure, not a
+    silent no-op — and the underlying resource is never reached."""
+    channel = ResponseChannel("s")
+    caretaker, revoker = revocable(channel)
+    revoker.revoke()
+    with pytest.raises(RevokedCapabilityError, match="ResponseChannel"):
+        caretaker.send("hello")
+    assert channel.sent == []  # authority withdrawn before the resource was touched
+
+
+def test_revocation_is_idempotent():
+    caretaker, revoker = revocable(ResponseChannel("s"))
+    revoker.revoke()
+    revoker.revoke()  # no error, still severed
+    assert revoker.revoked
+    with pytest.raises(RevokedCapabilityError):
+        caretaker.send("x")
+
+
+def test_revoke_then_use_through_the_assembled_graph(graph):
+    """End-to-end (spec: revocation severs authority): a node's instance works
+    before revocation and fails after, driven through the assembly API."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        revocable_instances=[(RC, "session_a")],
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    assert handle.send("before").delivered  # succeeds before revocation
+
+    g.revoke(RC, "session_a")
+    with pytest.raises(RevokedCapabilityError):
+        handle.send("after")
+
+
+def test_revocation_is_targeted_to_one_instance(graph):
+    """Spec: revoking one instance leaves its distinct-identity sibling — and the
+    shared-by-type default — fully usable."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={
+            "SendReply": {RC: "session_a"},
+            "NotifyUser": {RC: "session_b"},
+        },
+        revocable_instances=[(RC, "session_a")],
+    )
+    revoked = g.handle_for(g.nodes["SendReply"], RC)
+    sibling = g.handle_for(g.nodes["NotifyUser"], RC)  # distinct identity
+    type_default = g.handles[RC]  # shared-by-type default
+
+    g.revoke(RC, "session_a")
+
+    with pytest.raises(RevokedCapabilityError):
+        revoked.send("nope")
+    assert sibling.send("ok").delivered  # untouched
+    assert type_default.send("ok").delivered  # untouched
+
+
+def test_nodes_never_receive_revoke_authority(graph):
+    """Spec: the revoke authority is held only by the host. A node receives a
+    caretaker with no revoke operation; the paired revoker lives on the graph."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        revocable_instances=[(RC, "session_a")],
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    # The caretaker exposes the capability surface but no way to revoke.
+    assert not hasattr(handle, "revoke")
+    assert not isinstance(handle, Revoker)
+    # The authority to revoke lives on the assembled graph, which no node holds.
+    assert isinstance(g.revokers[(RC, "session_a")], Revoker)
+
+
+def test_revocable_must_name_a_declared_identity(graph):
+    """An instance is revocable only if some node binds it — declaring an unbound
+    (capability, identity) revocable fails loudly rather than protecting nothing."""
+    with pytest.raises(AssemblyError, match="not a declared identity"):
+        assemble(
+            graph,
+            backend=StubLLM(),
+            stores=STORES,
+            identities={"SendReply": {RC: "session_a"}},
+            revocable_instances=[(RC, "session_b")],  # no node binds session_b
+        )
+
+
+def test_revoking_an_unprovisioned_instance_raises(graph):
+    g = assemble(graph, backend=StubLLM(), stores=STORES)
+    with pytest.raises(KeyError, match="no revocable instance"):
+        g.revoke(RC, "session_a")
+
+
+def test_no_revocable_declaration_leaves_provisioning_unchanged(graph):
+    """Spec: revocation is opt-in. With no revocable declaration, no caretaker is
+    introduced and no revoker exists — provisioning is exactly as before."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    assert isinstance(handle, ResponseChannel)  # bare handle, not a caretaker
+    assert g.revokers == {}
 
 
 @pytest.mark.parametrize("variant", sorted(UNSAFE_VARIANTS))

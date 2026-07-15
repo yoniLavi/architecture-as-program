@@ -33,6 +33,12 @@ class CapabilityError(RuntimeError):
     e.g. calling a tool outside an `LLMClient`'s allowlist."""
 
 
+class RevokedCapabilityError(RuntimeError):
+    """Raised when code exercises a capability instance that has been revoked at
+    runtime. The loud-failure sibling of `CapabilityError`: an out-of-scope tool
+    call was never granted; a revoked handle *was* granted and then withdrawn."""
+
+
 # ── LLM handles ────────────────────────────────────────────────────
 
 
@@ -209,3 +215,85 @@ def _scope_label(app: TApp) -> str:
     if isinstance(arg, TName):
         return arg.name
     return ""
+
+
+# ── Runtime revocation: the ocap caretaker pattern ─────────────────
+#
+# Provisioning binds a capability instance for a whole run. Revocation withdraws
+# one instance's authority *mid-run* without touching the resource or the graph.
+# The mechanism is Miller's caretaker (`@miller_robust_2006`): a node holds a
+# forwarding proxy (the `Caretaker`), and a *separate* authority (the `Revoker`)
+# severs it. Using a capability and administering it are different authorities —
+# a node receives only the caretaker, never the revoker.
+
+
+@dataclass
+class _Severance:
+    """The single mutable bit a caretaker and its revoker share. Kept in its own
+    cell so neither object reaches into the other: the caretaker only reads it,
+    the revoker only sets it."""
+
+    revoked: bool = False
+
+
+class Caretaker:
+    """A severable forwarding proxy for a capability handle.
+
+    Delegates the wrapped handle's *entire* surface via `__getattr__`, so a node
+    cannot distinguish a caretaker from the bare handle through the capability
+    operations (`send` / `read` / `infer` / `respond` / `emit`) — the absence of a
+    method is forwarded too (a caretaker over `InferenceLLM` reports no `respond`).
+    Once severed, every attribute access raises `RevokedCapabilityError`.
+
+    The caretaker deliberately exposes *no* revoke operation: severing goes through
+    the paired `Revoker`, which a node never holds. The revoked check fires at
+    attribute-*fetch* time; because the PoC executor runs nodes synchronously,
+    revocation is well-defined only *between* node runs (a node that already
+    fetched a method finishes its own run), which matches the design's scope."""
+
+    def __init__(self, wrapped: object, severance: _Severance):
+        # Set through object.__setattr__ so these two are real instance attributes
+        # (found by normal lookup) and never fall through to __getattr__ below.
+        object.__setattr__(self, "_wrapped", wrapped)
+        object.__setattr__(self, "_severance", severance)
+
+    def __getattr__(self, name: str):
+        # Reached only for attributes the caretaker itself lacks — i.e. everything
+        # belonging to the wrapped handle. That is precisely the transparency: the
+        # caretaker owns nothing but its two private slots, so all real use routes
+        # here and hits the revoked check first.
+        if object.__getattribute__(self, "_severance").revoked:
+            wrapped = object.__getattribute__(self, "_wrapped")
+            raise RevokedCapabilityError(
+                f"{type(wrapped).__name__} capability was revoked; attempted use of {name!r}"
+            )
+        return getattr(object.__getattribute__(self, "_wrapped"), name)
+
+
+class Revoker:
+    """The authority to sever one caretaker — held by the host, never by a node.
+
+    A distinct object from the caretaker it governs (they share only a `_Severance`
+    cell), so revoking is administratively separate from using. Revocation is
+    idempotent: severing an already-severed instance is a no-op."""
+
+    def __init__(self, severance: _Severance):
+        self._severance = severance
+
+    def revoke(self) -> None:
+        self._severance.revoked = True
+
+    @property
+    def revoked(self) -> bool:
+        return self._severance.revoked
+
+
+def revocable(handle: object) -> tuple[Caretaker, Revoker]:
+    """Wrap a capability handle so its authority can be withdrawn at runtime.
+
+    Returns a `(caretaker, revoker)` pair sharing one severance cell. Give the
+    caretaker to the node (it forwards to `handle` until severed, then raises
+    `RevokedCapabilityError`) and keep the revoker with the host. That separation
+    is the whole point: a node holding only the caretaker cannot revoke anything."""
+    severance = _Severance()
+    return Caretaker(handle, severance), Revoker(severance)

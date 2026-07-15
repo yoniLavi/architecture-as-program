@@ -17,7 +17,7 @@ from pathlib import Path
 
 from graph_validator import validate_files
 
-from .handles import provision
+from .handles import Revoker, provision, revocable
 from .llm import LLMBackend
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -68,6 +68,29 @@ class AssembledGraph:
     # node falls back to the shared-by-type instance in `handles` — the type-only
     # default that keeps identity-agnostic graphs behaving exactly as before.
     instances: dict[tuple[str, str], object] = field(default_factory=dict)
+    # (capability type, identity label) → the authority to sever that instance's
+    # caretaker at runtime. Present only for instances declared revocable at
+    # assembly; the host holds this map, nodes never do. Exposed directly so a
+    # single revoker can also be handed off as a passable ocap token (the
+    # true-ocap alternative to the `revoke(...)` convenience method below).
+    revokers: dict[tuple[str, str], Revoker] = field(default_factory=dict)
+
+    def revoke(self, cap_type: str, identity: str) -> None:
+        """Sever the named revocable capability instance. Afterwards every node
+        bound to `(cap_type, identity)` fails with `RevokedCapabilityError` on its
+        next use; siblings of the same type are untouched. Idempotent.
+
+        This method *is* the separation between using and administering authority:
+        it lives on the assembled graph, which the host holds and no node receives.
+        Raises `KeyError` if that instance was not provisioned revocable —
+        revocation is opt-in, so only declared-revocable instances can be severed."""
+        try:
+            self.revokers[(cap_type, identity)].revoke()
+        except KeyError:
+            raise KeyError(
+                f"no revocable instance {(cap_type, identity)!r}; "
+                f"revocable instances are {sorted(self.revokers)}"
+            ) from None
 
     def handle_for(self, node: Node, cap_type: str) -> object:
         """The handle instance `node` binds for capability `cap_type`.
@@ -114,6 +137,7 @@ def assemble(
     stores: Mapping[str, Mapping[str, list[str]]] | None = None,
     sandbox: Iterable[str] = (),
     identities: Mapping[str, Mapping[str, str]] | None = None,
+    revocable_instances: Iterable[tuple[str, str]] = (),
 ) -> AssembledGraph:
     """Validate and assemble a graph dict into a runnable `AssembledGraph`.
 
@@ -132,7 +156,18 @@ def assemble(
     shared-by-type provisioning, so identity is opt-in and simple graphs are
     unaffected. This is the narrow half of Technical Note A's capability-routing
     item — naming identity — and the prerequisite a later revocation change needs
-    to target a specific instance."""
+    to target a specific instance.
+
+    `revocable_instances` names identity instances — as `(capability type, identity
+    label)` pairs, matching the pool `identities` builds — whose authority the host
+    can withdraw at runtime. Each named instance is provisioned behind a caretaker
+    (a forwarding proxy), and the paired revoker is kept on the assembled graph in
+    `revokers`, reachable via `graph.revoke(cap_type, identity)`; nodes only ever
+    receive the caretaker. Revocation is opt-in and layered on identity: an instance
+    is revocable only if some node declares that `(capability, identity)`, and
+    un-named instances (type-only and plain-identity) are provisioned bare, exactly
+    as before. This is the narrow, host-tier half of Technical Note A's revocation
+    item; rotation and the redeployment form remain open."""
     errors = validate_graph_dict(graph)
     if errors:
         raise AssemblyError(errors)
@@ -174,7 +209,10 @@ def assemble(
     identities = identities or {}
     cap_set = set(capabilities)
     identity_pool: dict[tuple[str, str], object] = {}
-    instances: dict[tuple[str, str], object] = {}
+    # (node name, capability type) → the identity-pool key it binds. Recorded now
+    # and resolved into `instances` after revocable wrapping, so a node binds the
+    # caretaker (not the bare handle) whenever its instance is revocable.
+    bindings: list[tuple[str, str, tuple[str, str]]] = []
     for node_name, per_cap in identities.items():
         node = nodes.get(node_name)
         if node is None:
@@ -194,7 +232,28 @@ def assemble(
             key = (cap_type, label)
             if key not in identity_pool:
                 identity_pool[key] = provision(cap_type, backend=backend, stores=stores)
-            instances[(node_name, cap_type)] = identity_pool[key]
+            bindings.append((node_name, cap_type, key))
+
+    # Opt-in revocation: wrap each named identity instance behind a caretaker and
+    # keep the paired revoker for the host. Only instances some node actually binds
+    # can be made revocable — otherwise there is nothing to sever — so an unbound
+    # `(cap_type, identity)` is a loud assembly error, not a silent no-op.
+    revokers: dict[tuple[str, str], Revoker] = {}
+    for key in dict.fromkeys(revocable_instances):  # de-dup, preserve order
+        if key not in identity_pool:
+            raise AssemblyError(
+                [
+                    f"revocable instance {key!r} is not a declared identity; an instance "
+                    f"is revocable only if some node declares that (capability, identity)"
+                ]
+            )
+        caretaker, revoker = revocable(identity_pool[key])
+        identity_pool[key] = caretaker
+        revokers[key] = revoker
+
+    instances: dict[tuple[str, str], object] = {
+        (node_name, cap_type): identity_pool[key] for node_name, cap_type, key in bindings
+    }
 
     return AssembledGraph(
         name=graph["name"],
@@ -204,4 +263,5 @@ def assemble(
         edges=edges,
         handles=handles,
         instances=instances,
+        revokers=revokers,
     )
