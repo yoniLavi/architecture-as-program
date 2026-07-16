@@ -38,8 +38,46 @@ Additive. A new script and a new `dist/` artifact; existing tests unchanged (the
 build gains one target.
 
 ## Open Questions
-- Artifact format: Markdown table (`dist/evaluation.md`) for direct inclusion, or JSON + a rendering step?
-  (Leaning Markdown, matching `dist/grammar.md`.)
+- ~~Artifact format~~ **Resolved: Markdown** (`dist/evaluation.md`), matching `dist/grammar.md`, so a paper
+  can include it directly with no rendering step.
 - Whether the prompt-injection section should run the composed (`SupportPlatform`) path once
   `add-subgraph-execution` lands, in addition to the single-graph `CustomerSupport` path. (Deferred to that
-  change's completion.)
+  change's completion. The corpus already *assembles* `SupportPlatform`; it cannot yet execute it.)
+
+## Decisions taken during implementation
+- **Decision: the harness lives in `poc/evaluate.py`, not `scripts/evaluate.py`.** The proposal said "e.g.
+  `scripts/evaluate.py`", but `scripts/` is stdlib-only by a stated rule (`pyproject.toml`: "the stdlib-only
+  validator/parser in scripts/ must never import these"). The harness is a *consumer* of `poc` — variants,
+  runtime, bench, demo — so it belongs with the code it imports, and the layering rule stays literally true
+  rather than surviving on a technicality about guarded imports. The Makefile invokes it as a module, exactly
+  as `poc.demo` and `poc.sandbox.bench` are already run.
+- **Decision: the full artifact is generated in every environment; the build gains the `poc` group.** The
+  overhead and sandbox-tier sections need `wasmtime`, which was absent from the build path (`dependencies = []`,
+  and CI ran `make build` with no `--group poc`). The alternative — degrade gracefully and label unmeasured
+  sections — was rejected: it would mean the same commit produced a different paper on different machines, and
+  the published Evaluation section would carry holes precisely where the artifact is supposed to remove
+  hand-maintenance. `make build` therefore runs the harness via `uv run --group poc`, which installs the group
+  on demand and so needs no CI change. The cost is honest and recorded: the build is no longer stdlib-only
+  (noted in `pyproject.toml`), and the pre-commit `make-build` hook now depends on wasmtime.
+- **Decision: pin the reason class, not just the verdict.** `launder_trust` type-checks on every edge and is
+  rejected by the trust lattice; `bypass_pipeline` is rejected as an edge type mismatch. Pinning only
+  "rejected" would let laundering start failing for the *wrong* reason — an edge typo — while the table stayed
+  green and the trust-lattice claim quietly stopped being tested. The two signatures are disjoint on the
+  current corpus, and `classify` treats a case matching both (or neither) as a divergence rather than guessing.
+- **Decision: the corpus pins itself against silent growth.** `run_corpus` asserts its pinned mutation set
+  *equals* `UNSAFE_VARIANTS`. Adding a variant without pinning it fails the build, rather than being counted as
+  caught without ever being checked.
+- **Decision: the canonical graphs are corpus cases too.** A validator that rejected everything would catch
+  every unsafe wiring and be worthless, so the safe half is what keeps the unsafe half meaningful.
+- **Decision: the artifact records the machine.** The overhead figures are wall-clock timings and therefore
+  machine-dependent; the artifact states the platform/processor/python/wasmtime that produced them and claims
+  only an order of magnitude against the envelope. This is a known consequence of generating rather than
+  pinning the numbers: the same commit yields slightly different figures on different hardware.
+
+## Known duplication (accepted, small)
+`poc/demo.py` narrates the host-vs-sandbox escapes for a human; `poc/evaluate.py` probes them as structured
+facts; `tests/test_poc_sandbox.py` asserts them. That is three derivations of the same underlying facts. The
+mutations and the timings — the two things the design named — are genuinely imported, not re-derived. Folding
+the escape probes into one definition would mean either the demo importing the harness or a new shared module;
+both were judged more churn than the ~15 lines are worth *for now*. If a fourth consumer appears, collapse
+them: `poc/demo.py` becoming a presenter over `poc/evaluate.py`'s facts is the natural shape.

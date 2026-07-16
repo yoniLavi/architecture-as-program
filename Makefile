@@ -1,6 +1,11 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 DIST := $(ROOT)/dist
 PY   := uv run python3
+# The evaluation harness is the one build step that is not stdlib-only: it reports
+# capability-boundary overhead and sandbox-tier results, both of which need
+# wasmtime (the `poc` group). `uv run --group poc` installs it on demand, so this
+# needs no separate setup step in CI.
+PY_POC := uv run --group poc python3
 
 # ── Shared research artifact ─────────────────────────────────────────
 # graphs/*.json and diagrams/*.typ live at the repository root and back
@@ -43,12 +48,13 @@ P2_DOCS := $(P2_OUT)/proposal.pdf $(P2_OUT)/proposal.md $(P2_OUT)/proposal.html
 # dist/papers/02-demonstrator/ (see README).
 ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 
-.PHONY: build clean validate-graphs test wasm check-freeze grammar paper1 paper2 aliases
+.PHONY: build clean validate-graphs test wasm check-freeze grammar evaluation paper1 paper2 aliases
 
-build: validate-graphs check-freeze grammar paper1 paper2 aliases
+build: validate-graphs check-freeze grammar evaluation paper1 paper2 aliases
 	@echo "Build complete."
 
 grammar: $(DIST)/grammar.md
+evaluation: $(DIST)/evaluation.md
 paper1: $(P1_DOCS)
 paper2: $(P2_DOCS)
 aliases: $(ALIASES)
@@ -58,6 +64,18 @@ aliases: $(ALIASES)
 # drift from the implementation without failing the build.
 $(DIST)/grammar.md: scripts/emit-grammar.py scripts/type_parser.py $(GRAPHS_SRC) | $(DIST)
 	$(PY) scripts/emit-grammar.py
+
+# Evaluation artifact — the demonstrator's own evidence, run and consolidated:
+# the graph-mutation corpus (each case pinned to an expected verdict *and* the
+# reason class it must be caught by), the capability-boundary overhead against
+# @sec:performance's envelope, and the prompt-injection outcome on both tiers.
+# Generated like the grammar card so the paper's Evaluation section cannot drift
+# from the code: a divergence from a pin fails the build rather than quietly
+# rewriting the table.
+POC_SRC  := $(wildcard poc/*.py) $(wildcard poc/sandbox/*.py)
+POC_WASM := $(wildcard poc/sandbox/wasm/*.wasm)
+$(DIST)/evaluation.md: $(POC_SRC) $(POC_WASM) $(GRAPHS_SRC) scripts/graph_validator.py scripts/type_parser.py | $(DIST)
+	$(PY_POC) -m poc.evaluate
 
 # Validate the shared graph JSON files: structural, type-aware, cross-graph.
 # Depends on `test` so validator-logic changes are tested before use.
