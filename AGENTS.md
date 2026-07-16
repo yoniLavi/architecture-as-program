@@ -21,20 +21,28 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 ## What this repo is
 
-A research proposal arguing that AI coding agents + functional reactive programming + object-capability security converge on a new development paradigm: the **signal graph** as simultaneously architecture model, security policy, and source of truth.
+A longitudinal research program arguing that AI coding agents + functional reactive programming + object-capability security converge on a new development paradigm: the **signal graph** as simultaneously architecture model, security policy, and source of truth.
 
-This is a **writing project**, not a software project. The primary output is a formatted proposal document. There is no application code.
+It is structured as a **corpus of papers backed by a shared, evolving research artifact** (see `papers/README.md` and `METHODOLOGY.md`):
+
+- **Paper 1 — the founding vision** (`papers/01-vision/`) is **frozen**: it reproduces the repository's state at the freeze commit `59898cc~1` (dated *June 2026*, before the executable demonstrator `poc/` existed). It is self-contained (carries its own pinned graph/diagram inputs) and errata-only — do not edit it; `scripts/check-freeze.py` fails the build if it drifts.
+- **Paper 2 — the demonstrator paper** (`papers/02-demonstrator/`) is the **living** document: it builds from the shared root artifact and folds in what the demonstrator has since substantiated. This is the paper you normally edit.
+
+This is primarily a **writing project**: the papers are the outputs that matter. But they are backed by a real, tested toolchain (below), not vapourware.
 
 ## Key files
 
 | File | Role |
 |---|---|
-| `proposal.typ` | The proposal source (Typst markup). This is the artifact that matters. |
-| `citations.bib` | BibTeX bibliography. Every entry must be cited in the proposal; every citation must have an entry. |
-| `graphs/*.json` | Canonical signal graph definitions. Single source of truth for both pseudocode and diagrams. |
-| `Makefile` | Builds `dist/proposal.pdf`, `dist/proposal.md`, and `dist/proposal.html` from source. |
-| `.pre-commit-config.yaml` | Pre-commit hooks (ruff, graph validation, pytest, `make build`, citation check). Install once per clone with `uv run pre-commit install`. |
-| `scripts/` | Build support: graph generator, pandoc cross-ref filter, markdown cleanup, unused citation checker. |
+| `papers/02-demonstrator/proposal.typ` | The living paper's source (Typst). **This is the document you normally edit.** |
+| `papers/01-vision/proposal.typ` | The frozen founding-vision paper. **Do not edit** (errata-only; guarded by `scripts/check-freeze.py`). |
+| `papers/README.md` | How the corpus is organised; living vs frozen; the two `01-vision/` symlinks. |
+| `METHODOLOGY.md` | The research process: human-directed, AI-executed, spec-driven; the evidence trail. |
+| `citations.bib` | Shared BibTeX bibliography for the whole corpus. An entry is "used" if *any* paper cites it; every citation must resolve. |
+| `graphs/*.json` | Canonical signal graph definitions (the shared artifact). Single source of truth for pseudocode and diagrams in living papers. |
+| `Makefile` | Builds the corpus into `dist/papers/<id>/`, plus deprecated `dist/proposal.*` aliases to Paper 2. |
+| `.pre-commit-config.yaml` | Pre-commit hooks (ruff, graph validation, pytest, `make build`, citation check, freeze guard). Install once per clone with `uv run pre-commit install`. |
+| `scripts/` | Build support: graph generator, pandoc cross-ref filter, markdown/html cleanup, citation checker, freeze guard. |
 
 ## Proposal structure
 
@@ -51,6 +59,8 @@ The proposal follows a deliberate argument arc:
 9. **Annex B** — Areas for collaboration
 
 ## When editing the proposal
+
+"The proposal" below means **Paper 2** (`papers/02-demonstrator/proposal.typ`), the living document. Paper 1 is frozen — never edit it; corrections go in `papers/01-vision/ERRATA.md`.
 
 - **Maintain hedging on unproven claims.** The type system does not exist yet. Claims about properties it would provide use conditional language ("would be inexpressible", "in a well-typed realisation", "in a sound realisation of the type system"). Do not strengthen these to present tense without an implementation to back them.
 - **Keep citations accurate.** Every factual claim about prior work should be traceable to a citation. If adding a new claim, add the citation. Run `make build` to catch broken references (typst will error) and `scripts/check-citations.py` to catch orphaned bib entries.
@@ -70,8 +80,8 @@ Although this is a writing project, the proposal ships with a working, tested Po
 - **Why the boundary is typed, and why `unknown-unknown`** — two properties follow, and both are asserted in tests rather than in prose. (1) **No ambient authority at all**: an earlier `wasm32-wasip1` version was confined by an *empty WASI context*, but its modules still *imported* `fd_write`/`environ_get`/`path_open` — powerless, yet present, so confinement was a fact about the host's configuration. Components built for `unknown-unknown` with **no WASI adapter** do not import them at all (`wasi_imports()` returns `[]`; the hostile component imports nothing whatsoever). A `wasip2` build would reintroduce this via `wasi:cli/*`. (2) **The boundary cannot drift from the graph**: `poc/sandbox/interfaces.py` *derives* each node's expected interface set from its `with` clause in the graph JSON (via `type_parser`), and a test compares it against the built component's actual imports — an over-granting world fails the suite. Typing also absorbed two node-body checks into types: `intent` is a WIT `enum` (the closed set is now unrepresentable to widen, so the old membership check is gone) and the model's reply is a WIT `variant` (a malformed reply has no encoding).
 - **Overhead measurement** — `poc/sandbox/bench.py` (`uv run --group poc python -m poc.sandbox.bench`) reports component compilation, per-node instantiation, and per-capability-crossing cost against the envelope in @sec:performance. Current numbers: a crossing costs **tens of µs** (~25µs; well inside the <1ms envelope) *even though every crossing now lifts/lowers typed WIT values*; instantiation tens of µs; compilation a one-time few ms. **Do not compare these to the pre-component figures**: the benchmark's timing loop was fixed at the same time (it now warms and takes the best of several rounds; it previously timed a single cold pass, which charged JIT warm-up to whatever it measured first — and since the crossing cost is a *difference* of two timings, that could distort it by an order of magnitude). The supported claim is only that typing the boundary did not move the crossing out of its order of magnitude.
 - **Tests** — `tests/` is a pytest suite covering the parser, the validator, the runtime, and both enforcement tiers: **127 tests + 21 subtests, all passing** (`make test` or `uv run pytest`; run with `--group poc` to include the sandbox tests, which otherwise skip). The validator and parser stay dependency-free so the pre-commit hook remains portable; the runtime's optional dependencies (Anthropic SDK for `--live`, `wasmtime` for the sandbox tier) live in the `poc` dependency group (`uv sync --group poc`) and must never leak into `scripts/`.
-- **Build outputs** — `make build` produces `dist/proposal.{pdf,md,html}`, the rendered graph/diagram SVGs, and `dist/grammar.md`. `dist/` is gitignored.
-- **Citation hygiene** — `scripts/check-citations.py` (orphaned bib entries) and `scripts/validate-bib.py` run as checks; every bib entry must be cited and every citation must resolve (Typst errors on broken refs).
+- **Build outputs** — `make build` produces the whole corpus under `dist/papers/<id>/proposal.{pdf,md,html}` (each with the figures it references), the shared rendered graph/diagram SVGs, `dist/grammar.md`, and deprecated `dist/proposal.{pdf,md,html}` aliases to Paper 2 for one link-migration transition. `dist/` is gitignored. Living papers reference the shared figures root-absolutely (`/dist/...`, compiled with `typst --root`); the frozen paper reads its own figure tree through the committed `papers/01-vision/dist` symlink.
+- **Citation hygiene** — paper-aware. `scripts/check-citations.py` treats a bib entry as used if *any* paper cites it (over the shared `citations.bib`); `scripts/validate-bib.py` also runs. Every citation must resolve (Typst errors on broken refs per paper). `scripts/check-freeze.py` guards the frozen paper against silent edits.
 
 The toolchain is **not** the Phase 1 language: it implements no noninterference proof, flow-sensitive wiring, or coercion lattice (see Technical Note A). The sandbox tier makes capability confinement unforgeable *at the WASM boundary* for the nodes ported to it, but not at the memory level (CHERI) and not for host-tier nodes. Typing the boundary closes ambient authority and marshalling ambiguity; it does **not** close the free-text residual (adversarial data in a *permitted* field still reaches the tool-capable node — a test asserts this on the confined tier on purpose, so stronger enforcement is not misread as a stronger claim). It is early evidence that the graph-level analyses and capability confinement are implementable with modest tooling.
 
@@ -86,8 +96,8 @@ This repo uses **trunk-based development**: work lands on `main`. **Never create
 ## Build
 
 ```sh
-make build        # Validate graphs, run tests, build PDF + markdown + HTML + grammar card
-make test         # Run the type-parser and graph-validator unit tests (pytest)
+make build        # Validate graphs, run tests, guard the freeze, build the whole corpus (PDF + md + HTML per paper) + grammar card
+make test         # Run the type-parser, graph-validator, and runtime unit tests (pytest)
 make wasm         # Rebuild the sandbox-tier .wasm artifacts from Rust (needs a Rust toolchain)
 make clean        # Remove dist/
 ```

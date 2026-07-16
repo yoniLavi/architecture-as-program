@@ -2,6 +2,10 @@ ROOT := $(shell git rev-parse --show-toplevel)
 DIST := $(ROOT)/dist
 PY   := uv run python3
 
+# ── Shared research artifact ─────────────────────────────────────────
+# graphs/*.json and diagrams/*.typ live at the repository root and back
+# every *living* paper. Their rendered figures land in dist/graphs and
+# dist/diagrams; living papers reference them root-absolutely (/dist/...).
 GRAPHS_SRC := $(filter-out graphs/schema.json,$(wildcard graphs/*.json))
 GRAPHS_TXT := $(patsubst graphs/%.json,$(DIST)/graphs/%.graph,$(GRAPHS_SRC))
 GRAPHS_SVG := $(patsubst graphs/%.json,$(DIST)/graphs/%.svg,$(GRAPHS_SRC))
@@ -9,8 +13,155 @@ GRAPHS_SVG := $(patsubst graphs/%.json,$(DIST)/graphs/%.svg,$(GRAPHS_SRC))
 DIAGRAMS_SRC := $(wildcard diagrams/*.typ)
 DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC))
 
-.PHONY: build clean validate-graphs test wasm
+# ── Paper corpus ─────────────────────────────────────────────────────
+# Documents live under papers/<id>/; outputs under dist/papers/<id>/.
+#
+# Paper 1 (frozen) is self-contained: it carries its own pinned graph
+# JSONs and diagram source and builds *only* from them, so it can never
+# drift as the shared artifact evolves. Its frozen proposal.typ references
+# figures with relative `dist/...` paths (it is byte-identical to the
+# freeze commit and must not be edited); the committed symlink
+# papers/01-vision/dist -> ../../dist/papers/01-vision makes those paths
+# resolve to its own output tree, for both typst (file-relative) and
+# pandoc (cwd-relative).
+P1_DIR := papers/01-vision
+P1_OUT := $(DIST)/papers/01-vision
+P1_GRAPHS_SRC := $(filter-out $(P1_DIR)/graphs/schema.json,$(wildcard $(P1_DIR)/graphs/*.json))
+P1_GRAPH_TXT  := $(patsubst $(P1_DIR)/graphs/%.json,$(P1_OUT)/graphs/%.graph,$(P1_GRAPHS_SRC))
+P1_GRAPH_SVG  := $(patsubst $(P1_DIR)/graphs/%.json,$(P1_OUT)/graphs/%.svg,$(P1_GRAPHS_SRC))
+P1_DIAG_SVG   := $(patsubst $(P1_DIR)/diagrams/%.typ,$(P1_OUT)/diagrams/%.svg,$(wildcard $(P1_DIR)/diagrams/*.typ))
+P1_DOCS := $(P1_OUT)/proposal.pdf $(P1_OUT)/proposal.md $(P1_OUT)/proposal.html
 
+# Paper 2 (living) builds from the shared top-level artifact.
+P2_DIR := papers/02-demonstrator
+P2_OUT := $(DIST)/papers/02-demonstrator
+P2_DOCS := $(P2_OUT)/proposal.pdf $(P2_OUT)/proposal.md $(P2_OUT)/proposal.html
+
+# Deprecated compatibility aliases: dist/proposal.{pdf,md,html} are copies of
+# Paper 2's outputs, kept for one transition so existing inbound links and the
+# GitHub Pages deploy keep working. Remove once those links point at
+# dist/papers/02-demonstrator/ (see README).
+ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
+
+.PHONY: build clean validate-graphs test wasm check-freeze grammar paper1 paper2 aliases
+
+build: validate-graphs check-freeze grammar paper1 paper2 aliases
+	@echo "Build complete."
+
+grammar: $(DIST)/grammar.md
+paper1: $(P1_DOCS)
+paper2: $(P2_DOCS)
+aliases: $(ALIASES)
+
+# Grammar card — built from scripts/type_parser.py and the canonical
+# graph JSONs so that the documented grammar and subtype rules cannot
+# drift from the implementation without failing the build.
+$(DIST)/grammar.md: scripts/emit-grammar.py scripts/type_parser.py $(GRAPHS_SRC) | $(DIST)
+	$(PY) scripts/emit-grammar.py
+
+# Validate the shared graph JSON files: structural, type-aware, cross-graph.
+# Depends on `test` so validator-logic changes are tested before use.
+# (Paper 1's pinned graphs are frozen historical inputs, guarded by check-freeze
+# rather than re-validated against the current schema.)
+validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_validator.py scripts/type_parser.py graphs/schema.json
+	@$(PY) scripts/validate-graphs.py
+
+# Guard the frozen paper against silent edits: its sources must match the
+# freeze commit. Skips (with a warning) if the commit is unavailable, e.g. a
+# shallow CI checkout.
+check-freeze:
+	@$(PY) scripts/check-freeze.py
+
+# Run the test suite (type parser + graph validator + runtime) via pytest.
+test:
+	@uv run pytest
+
+# ── Shared figure generation (backs living papers) ──────────────────
+# Generate pseudocode and diagram source from canonical graph JSON.
+$(DIST)/graphs/%.graph $(DIST)/graphs/%.typ: graphs/%.json scripts/generate-graph.py | $(DIST)/graphs
+	$(PY) scripts/generate-graph.py $<
+
+# Compile diagram Typst to SVG.
+$(DIST)/graphs/%.svg: $(DIST)/graphs/%.typ
+	typst compile $< $@ --format svg --root $(ROOT)
+
+# Hand-written illustrative diagrams.
+$(DIST)/diagrams/%.svg: diagrams/%.typ | $(DIST)/diagrams
+	typst compile $< $@ --format svg --root $(ROOT)
+
+# ── Paper 1 (frozen): figures from its own pinned inputs ────────────
+$(P1_OUT)/graphs/%.graph $(P1_OUT)/graphs/%.typ: $(P1_DIR)/graphs/%.json scripts/generate-graph.py | $(P1_OUT)/graphs
+	$(PY) scripts/generate-graph.py $< $(P1_OUT)/graphs
+
+$(P1_OUT)/graphs/%.svg: $(P1_OUT)/graphs/%.typ
+	typst compile $< $@ --format svg --root $(ROOT)
+
+$(P1_OUT)/diagrams/%.svg: $(P1_DIR)/diagrams/%.typ | $(P1_OUT)/diagrams
+	typst compile $< $@ --format svg --root $(ROOT)
+
+# Paper 1 documents. typst reads figures through the papers/01-vision/dist
+# symlink; --root keeps that (real) path inside the project root.
+$(P1_OUT)/proposal.pdf: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) | $(P1_OUT)
+	typst compile $(P1_DIR)/proposal.typ $@ --root $(ROOT)
+
+# pandoc for Paper 1 runs from the paper directory so its relative `dist/...`
+# figure paths resolve through the symlink; project files are reached via ../../.
+$(P1_OUT)/proposal.md: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P1_OUT)
+	cd $(P1_DIR) && pandoc proposal.typ -f typst -t markdown --wrap=none \
+		--lua-filter=$(ROOT)/scripts/resolve-crossrefs.lua \
+		--citeproc --bibliography=$(ROOT)/citations.bib --csl=$(ROOT)/scripts/ieee.csl \
+		-o $@
+	$(PY) scripts/clean-markdown.py $@
+
+$(P1_OUT)/proposal.html: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css scripts/clean-html.py | $(P1_OUT)
+	cd $(P1_DIR) && pandoc proposal.typ -f typst -t html --standalone --wrap=none \
+		--lua-filter=$(ROOT)/scripts/resolve-crossrefs.lua \
+		--citeproc --bibliography=$(ROOT)/citations.bib --csl=$(ROOT)/scripts/ieee.csl \
+		--css=proposal.css \
+		-o $@
+	$(PY) scripts/clean-html.py $@
+	cp scripts/proposal.css $(P1_OUT)/
+
+# ── Paper 2 (living): figures from the shared artifact ──────────────
+$(P2_OUT)/proposal.pdf: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) | $(P2_OUT)
+	typst compile $(P2_DIR)/proposal.typ $@ --root $(ROOT)
+
+$(P2_OUT)/proposal.md: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P2_OUT)
+	pandoc $(P2_DIR)/proposal.typ -f typst -t markdown --wrap=none \
+		--lua-filter=scripts/resolve-crossrefs.lua \
+		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
+		-o $@
+	$(PY) scripts/clean-markdown.py $@
+
+# HTML output is self-contained in its own dir: copy in the referenced SVGs and
+# the stylesheet so the page renders standalone (clean-html.py rewrites figure
+# paths to bare graphs/… and diagrams/… relative to the HTML).
+$(P2_OUT)/proposal.html: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css scripts/clean-html.py | $(P2_OUT)
+	pandoc $(P2_DIR)/proposal.typ -f typst -t html --standalone --wrap=none \
+		--lua-filter=scripts/resolve-crossrefs.lua \
+		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
+		--css=proposal.css \
+		-o $@
+	$(PY) scripts/clean-html.py $@
+	cp scripts/proposal.css $(P2_OUT)/
+	@mkdir -p $(P2_OUT)/graphs $(P2_OUT)/diagrams
+	cp $(GRAPHS_SVG) $(P2_OUT)/graphs/
+	cp $(DIAGRAMS_SVG) $(P2_OUT)/diagrams/
+
+# ── Deprecated aliases → Paper 2 (transition only) ──────────────────
+$(DIST)/proposal.pdf: $(P2_OUT)/proposal.pdf | $(DIST)
+	cp $< $@
+
+$(DIST)/proposal.md: $(P2_OUT)/proposal.md | $(DIST)
+	cp $< $@
+
+# The alias HTML lives directly in dist/, where its bare graphs/… and diagrams/…
+# figure references resolve against the shared dist/graphs and dist/diagrams.
+$(DIST)/proposal.html: $(P2_OUT)/proposal.html scripts/proposal.css | $(DIST)
+	cp $(P2_OUT)/proposal.html $@
+	cp scripts/proposal.css $(DIST)/
+
+# ── WASM sandbox tier (unchanged) ───────────────────────────────────
 RUST_DIR    := $(ROOT)/poc/sandbox/rust
 WASM_OUT    := $(ROOT)/poc/sandbox/wasm
 # NOT wasm32-wasip1/wasip2: those link std against WASI, so the artifact would
@@ -20,24 +171,6 @@ WASM_OUT    := $(ROOT)/poc/sandbox/wasm
 # interfaces — which is the property the component tier exists to demonstrate.
 WASM_TARGET := wasm32-unknown-unknown
 WASM_MODULES := node_parse_message node_generate_response hostile_ambient hostile_ungranted
-
-build: validate-graphs $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html $(DIST)/grammar.md
-	@echo "Build complete."
-
-# Grammar card — built from scripts/type_parser.py and the canonical
-# graph JSONs so that the documented grammar and subtype rules cannot
-# drift from the implementation without failing the build.
-$(DIST)/grammar.md: scripts/emit-grammar.py scripts/type_parser.py $(GRAPHS_SRC) | $(DIST)
-	$(PY) scripts/emit-grammar.py
-
-# Validate all graph JSON files: structural, type-aware, cross-graph.
-# Depends on `test` so validator-logic changes are tested before use.
-validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_validator.py scripts/type_parser.py graphs/schema.json
-	@$(PY) scripts/validate-graphs.py
-
-# Run the test suite (type parser + graph validator) via pytest.
-test:
-	@uv run pytest
 
 # Build the component-tier WASM node artifacts and copy them into
 # poc/sandbox/wasm/ (which is committed).
@@ -67,46 +200,8 @@ wasm:
 		echo "  wrote poc/sandbox/wasm/$$m.wasm (component)" ; \
 	done
 
-# Generate pseudocode and diagram from canonical graph JSON
-$(DIST)/graphs/%.graph $(DIST)/graphs/%.typ: graphs/%.json scripts/generate-graph.py | $(DIST)/graphs
-	$(PY) scripts/generate-graph.py $<
-
-# Compile diagram Typst to SVG
-$(DIST)/graphs/%.svg: $(DIST)/graphs/%.typ
-	typst compile $< $@ --format svg
-
-# Hand-written illustrative diagrams
-$(DIST)/diagrams/%.svg: diagrams/%.typ | $(DIST)/diagrams
-	typst compile $< $@ --format svg
-
-$(DIST)/proposal.pdf: proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) | $(DIST)
-	typst compile $< $@
-
-$(DIST)/proposal.md: proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(DIST)
-	pandoc $< -f typst -t markdown --wrap=none \
-		--lua-filter=scripts/resolve-crossrefs.lua \
-		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
-		-o $@
-	$(PY) scripts/clean-markdown.py $@
-
-# Typst has experimental native HTML export (typst compile --format html --features html)
-# but as of 0.13/0.14 it lacks CSS output and asset handling. Using pandoc for now.
-$(DIST)/proposal.html: proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css | $(DIST)
-	pandoc $< -f typst -t html --standalone --wrap=none \
-		--lua-filter=scripts/resolve-crossrefs.lua \
-		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
-		--css=proposal.css \
-		-o $@
-	$(PY) scripts/clean-html.py $@
-	cp scripts/proposal.css $(DIST)/
-
-$(DIST):
-	mkdir -p $@
-
-$(DIST)/graphs: | $(DIST)
-	mkdir -p $@
-
-$(DIST)/diagrams: | $(DIST)
+# ── Output directories ──────────────────────────────────────────────
+$(DIST) $(DIST)/graphs $(DIST)/diagrams $(P1_OUT) $(P1_OUT)/graphs $(P1_OUT)/diagrams $(P2_OUT):
 	mkdir -p $@
 
 clean:

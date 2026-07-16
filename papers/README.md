@@ -1,0 +1,52 @@
+# The paper corpus
+
+The written outputs of this research program live here, one directory per paper,
+ordered by an ordinal prefix. The date each paper claims lives *inside* the
+document, where it is authoritative; the directory name carries only the sequence
+and a content label.
+
+All papers are backed by a single **shared research artifact** at the repository
+root — `graphs/`, `scripts/`, `poc/`, `tests/`, and `citations.bib`. The corpus
+is a set of *views* onto one evolving body of work: one artifact, one test suite,
+one bibliography.
+
+| Paper | Directory | Status | Builds from |
+|---|---|---|---|
+| 1. The founding vision | `01-vision/` | **Frozen** (errata-only) | Its own pinned inputs |
+| 2. The demonstrator paper | `02-demonstrator/` | Living | The shared root artifact |
+
+## Living vs frozen papers
+
+A **living** paper (Paper 2) builds from the shared artifact at the root and is
+rewritten as the artifact evolves. Its figures are the current, canonical ones.
+
+A **frozen** paper (Paper 1) is a historical record: it reproduces the
+repository's state at a freeze commit — for Paper 1, the last state before the
+executable demonstrator (`poc/`) existed, which the document dates *June 2026*.
+A frozen paper is **self-contained**: it carries its *own* copies of the graph
+JSONs and diagram sources it references as of the freeze (`01-vision/graphs/`,
+`01-vision/diagrams/`) and builds only from them, so later evolution of the
+shared artifact can never alter its rendered figures. A frozen paper is changed
+only by **dated errata** (`01-vision/ERRATA.md`), never by silent rewriting;
+`scripts/check-freeze.py` fails the build if its sources drift from the freeze
+commit.
+
+### A note on the two symlinks in `01-vision/`
+
+The frozen `proposal.typ` is byte-identical to the freeze commit and so cannot be
+edited to re-point its file references. Two committed symlinks make its original
+relative paths resolve correctly against the shared bibliography and its own
+figure tree:
+
+- `01-vision/citations.bib → ../../citations.bib` — the shared bibliography.
+- `01-vision/dist → ../../dist/papers/01-vision` — its frozen figure outputs, so
+  the paper's relative `dist/…` figure references resolve for both typst
+  (file-relative) and pandoc (cwd-relative).
+
+## Building
+
+`make build` (from the repository root) builds the whole corpus. Outputs land
+under `dist/papers/<id>/` — `proposal.{pdf,md,html}` plus the figures each paper
+references. For one transition, `dist/proposal.{pdf,md,html}` are also emitted as
+deprecated aliases to Paper 2, so existing inbound links keep working; they will
+be removed once those links point at `dist/papers/02-demonstrator/`.

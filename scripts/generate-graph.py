@@ -2,11 +2,15 @@
 """Generate pseudocode (.graph) and Fletcher diagram (.typ) from a graph JSON definition.
 
 Usage:
-    python3 scripts/generate-graph.py graphs/<name>.json
+    python3 scripts/generate-graph.py graphs/<name>.json [output-dir]
 
-Outputs:
-    graphs/<name>.graph      — pseudocode for inclusion in proposal
-    diagrams/<name>.typ      — Fletcher diagram source
+Outputs (into <output-dir>, default dist/graphs):
+    <output-dir>/<name>.graph      — pseudocode for inclusion in proposal
+    <output-dir>/<name>.typ        — Fletcher diagram source
+
+The optional output directory lets a frozen paper regenerate its figures into
+its own tree (e.g. dist/papers/01-vision/graphs) from its pinned graph JSONs,
+so its rendered figures never drift with the shared artifact.
 """
 
 import json
@@ -246,15 +250,15 @@ def generate_fletcher(g):
 
 
 def main():
-    if len(sys.argv) != 2:
-        sys.exit(f"Usage: {sys.argv[0]} <graph.json>")
+    if len(sys.argv) not in (2, 3):
+        sys.exit(f"Usage: {sys.argv[0]} <graph.json> [output-dir]")
 
     json_path = Path(sys.argv[1])
     g = load_graph(json_path)
     stem = json_path.stem
 
-    # Write pseudocode and Fletcher diagram to dist/graphs/
-    out_dir = Path("dist/graphs")
+    # Write pseudocode and Fletcher diagram to the output dir (default dist/graphs/).
+    out_dir = Path(sys.argv[2]) if len(sys.argv) == 3 else Path("dist/graphs")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     graph_path = out_dir / f"{stem}.graph"

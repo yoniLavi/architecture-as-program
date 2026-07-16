@@ -50,8 +50,11 @@ def clean(text: str) -> str:
         text,
     )
 
-    # Fix image paths: dist/diagrams/foo.svg → diagrams/foo.svg (markdown lives in dist/)
-    text = re.sub(r'src="dist/', 'src="', text)
+    # Fix image paths: a living paper references figures root-absolutely
+    # (/dist/diagrams/foo.svg), a frozen paper relatively (dist/diagrams/foo.svg);
+    # both become diagrams/foo.svg (markdown lives beside its copied SVGs).
+    text = re.sub(r'src="/?dist/', 'src="', text)
+    text = re.sub(r"\]\(/?dist/", "](", text)
 
     # Collapse runs of 3+ blank lines into 2
     text = re.sub(r"\n{4,}", "\n\n\n", text)

@@ -35,7 +35,13 @@ def extract_typ_citations(typ_path: Path) -> set[str]:
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
     bib_files = list(root.glob("*.bib"))
-    typ_files = list(root.glob("*.typ"))
+
+    # Paper-aware: the corpus shares one bibliography, so an entry counts as used
+    # if *any* paper cites it. Scan every paper's document sources under papers/
+    # (plus any legacy top-level .typ), excluding generated figure sources under
+    # each paper's dist symlink.
+    typ_files = [p for p in (root / "papers").rglob("*.typ") if "dist" not in p.parts]
+    typ_files += list(root.glob("*.typ"))
 
     if not bib_files or not typ_files:
         return 0

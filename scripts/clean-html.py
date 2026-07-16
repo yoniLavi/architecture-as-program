@@ -19,8 +19,11 @@ def clean(text: str) -> str:
         flags=re.DOTALL,
     )
 
-    # Fix image paths: dist/diagrams/foo.svg → diagrams/foo.svg (HTML lives in dist/)
-    text = re.sub(r'src="dist/', 'src="', text)
+    # Fix image paths so they resolve next to the HTML: a living paper references
+    # figures root-absolutely (/dist/diagrams/foo.svg), a frozen paper relatively
+    # (dist/diagrams/foo.svg); both become diagrams/foo.svg, and the Makefile copies
+    # the SVGs alongside the output.
+    text = re.sub(r'src="/?dist/', 'src="', text)
 
     return text
 

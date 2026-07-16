@@ -1,0 +1,118 @@
+{
+  "name": "CustomerSupport",
+
+  "parameters": [
+    "CustomerRequest",
+    "DBHandle<'knowledge-base', read>",
+    "LLMClient<inference>",
+    "LLMClient<[lookup]>",
+    "ResponseChannel<user-session>",
+    "EventEmitter<'support-queue'>"
+  ],
+
+  "capabilities": [
+    "DBHandle<'knowledge-base', read>",
+    "LLMClient<inference>",
+    "LLMClient<[lookup]>",
+    "ResponseChannel<user-session>",
+    "EventEmitter<'support-queue'>"
+  ],
+
+  "nodes": [
+    {
+      "name": "ReceiveMessage",
+      "inputs": ["CustomerRequest"],
+      "output": "Untrusted<RawMessage>"
+    },
+    {
+      "name": "ParseMessage",
+      "inputs": ["Untrusted<RawMessage>", "LLMClient<inference>"],
+      "output": "CustomerQuery",
+      "discharges_trust": true
+    },
+    {
+      "name": "ModerateContent",
+      "inputs": ["CustomerQuery", "LLMClient<inference>"],
+      "output": "ok: ModeratedQuery | violation: PolicyViolation | escalation: EscalationRequest"
+    },
+    {
+      "name": "FetchContext",
+      "inputs": ["ModeratedQuery", "DBHandle<'knowledge-base', read>"],
+      "output": "ConversationContext"
+    },
+    {
+      "name": "GenerateResponse",
+      "inputs": ["ConversationContext", "LLMClient<[lookup]>", "DBHandle<'knowledge-base', read>"],
+      "output": "ok: AgentResponse | error: LLMError"
+    },
+    {
+      "name": "SendReply",
+      "inputs": ["AgentResponse", "ResponseChannel<user-session>"],
+      "output": "DeliveryConfirmation"
+    },
+    {
+      "name": "HandleLLMError",
+      "inputs": ["LLMError", "ResponseChannel<user-session>"],
+      "output": "DeliveryConfirmation"
+    },
+    {
+      "name": "NotifyUser",
+      "inputs": ["PolicyViolation", "ResponseChannel<user-session>"],
+      "output": "DeliveryConfirmation"
+    },
+    {
+      "name": "EscalateToHuman",
+      "inputs": ["EscalationRequest", "EventEmitter<'support-queue'>"],
+      "output": "EscalationTicket"
+    }
+  ],
+
+  "data_edges": [
+    { "from": "ReceiveMessage",              "to": "ParseMessage" },
+    { "from": "ParseMessage",                "to": "ModerateContent" },
+    { "from": "ModerateContent.ok",          "to": "FetchContext" },
+    { "from": "ModerateContent.violation",   "to": "NotifyUser" },
+    { "from": "ModerateContent.escalation",  "to": "EscalateToHuman" },
+    { "from": "FetchContext",                "to": "GenerateResponse" },
+    { "from": "GenerateResponse.ok",         "to": "SendReply" },
+    { "from": "GenerateResponse.error",      "to": "HandleLLMError" }
+  ],
+
+  "layout": {
+    "zones": {
+      "untrusted": {
+        "label": "UNTRUSTED",
+        "color": "#b33",
+        "background": "#fef0f0",
+        "nodes": ["ReceiveMessage", "ParseMessage"]
+      },
+      "structured": {
+        "label": "STRUCTURED",
+        "color": "#272",
+        "background": "#f0f7f0",
+        "nodes": [
+          "ModerateContent", "FetchContext", "GenerateResponse",
+          "SendReply", "HandleLLMError", "NotifyUser", "EscalateToHuman"
+        ]
+      }
+    },
+    "positions": {
+      "ReceiveMessage":   [0, 0],
+      "ParseMessage":     [0, 1],
+      "ModerateContent":  [0, 2.2],
+      "NotifyUser":       [-1.2, 3.4],
+      "FetchContext":     [0, 3.4],
+      "EscalateToHuman":  [1.2, 3.4],
+      "GenerateResponse": [0, 4.4],
+      "SendReply":        [0, 5.4],
+      "HandleLLMError":   [1.2, 5.4]
+    },
+    "edge_colors": {
+      "ok": "#272",
+      "error": "#b33",
+      "violation": "#b33",
+      "escalation": "#c80"
+    },
+    "untrusted_label_color": "#b33"
+  }
+}
