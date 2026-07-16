@@ -93,6 +93,10 @@ Work on this repo is driven through **OpenSpec** (`openspec/`). Read `openspec/A
 
 This repo uses **trunk-based development**: work lands on `main`. **Never create a branch unless explicitly asked to.** Commit directly to `main`.
 
+**Commit as you go.** Don't wait to be asked. When a change reaches a coherent, self-contained state and the gate is green (`make build` / the pre-commit hooks pass), commit it with a clear message rather than accumulating a large uncommitted working tree. Prefer several focused commits over one sprawling one; each commit should leave `main` buildable. This is the default — the standing instruction to "commit only when the user asks" does **not** apply here.
+
+**When to hold off and check in first:** if the work involves a decision the user should weigh in on before it's recorded in history — an ambiguous requirement, a non-obvious design trade-off, something hard to reverse, or anything outward-facing (pushing, publishing, posting) — surface it and let the user decide instead of committing past it. Approval to commit routine progress is not approval to push or publish; those still need an explicit ask.
+
 ## Build
 
 ```sh
