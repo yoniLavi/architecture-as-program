@@ -139,6 +139,62 @@ class EscalationTicket:
     ticket_id: str
 
 
+# ── Composition-level types (the SupportPlatform boundary) ─────────
+#
+# These exist at the *platform* altitude: the types `SupportPlatform` wires
+# between its service sub-graphs, as distinct from the types flowing inside any
+# one of them.
+
+
+@dataclass(frozen=True)
+class HTTPRoute:
+    """`HTTPRoute<'platform:*'>` — inbound traffic at the platform boundary.
+
+    The platform's data parameter, before dispatch has decided which service owns
+    it. `RouteRequest` narrows it to a domain request type; no service graph ever
+    sees this type, which is the point — `CustomerSupport` takes a
+    `CustomerRequest` and so serves both a standalone deployment (a direct HTTP
+    adaptor) and this composed one without signature churn."""
+
+    path: str
+    session_id: str
+    body: str
+
+
+@dataclass(frozen=True)
+class AgentRequest:
+    session_id: str
+    body: str
+
+
+@dataclass(frozen=True)
+class BillingRequest:
+    session_id: str
+    body: str
+
+
+@dataclass(frozen=True)
+class AuditConfirmation:
+    record_id: str
+
+
+# `ServiceOutcome` is the boundary output every service sub-graph presents to the
+# platform, and it is a *type alias for the union of that sub-graph's terminal
+# types* — option (i) of Technical Note A's "sub-graph output aggregation", which
+# the proposal names as the working convention of the composition example.
+# `CustomerSupport` terminates at `DeliveryConfirmation` (its three reply paths) or
+# `EscalationTicket` (its escalation path), and exactly one of those is reached per
+# run, so the value the boundary hands back is always a member of this union.
+#
+# It is an alias rather than a wrapper deliberately: no aggregation node exists in
+# the graph, and inventing a runtime wrapper here would encode a design decision
+# (option iii) the proposal has not made. The cost is that nothing checks the
+# alias — the graph language has no alias mechanism, so `ServiceOutcome` is a name
+# the JSON asserts and the tooling cannot relate to the terminals it abbreviates.
+# That gap is real and remains open in Technical Note A.
+ServiceOutcome = DeliveryConfirmation | EscalationTicket
+
+
 # ── Variant tagging for sum-typed node outputs ─────────────────────
 
 

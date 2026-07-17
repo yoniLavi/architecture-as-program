@@ -38,6 +38,12 @@ class AssemblyError(RuntimeError):
 TIER_HOST = "host"
 TIER_SANDBOX = "sandbox"
 
+# Not an enforcement tier, and reported separately for that reason: a sub-graph
+# node's body is another graph, so no tier "runs" it. Its internal nodes each
+# report their own tier in the nested result. Calling this "host" would claim a
+# confinement story for a node that has none of its own.
+TIER_GRAPH = "graph"
+
 
 @dataclass
 class Node:
@@ -155,6 +161,31 @@ def load_graph_dict(name_or_path: str | Path) -> dict:
     return json.loads(path.read_text())
 
 
+def graphs_by_name() -> dict[str, dict]:
+    """Every canonical graph, indexed by its declared `name`.
+
+    Note the indirection: a graph's *name* (`CustomerSupport`) is not its
+    *filename* (`customer-support.json`), so a sub-graph reference — which names a
+    graph, not a file — cannot be resolved by `load_graph_dict`. This is the same
+    name-keyed index the cross-graph validator builds to check those references,
+    which is why it resolves the same set."""
+    index: dict[str, dict] = {}
+    for path in sorted(GRAPHS_DIR.glob("*.json")):
+        if path.name == "schema.json":
+            continue
+        graph = json.loads(path.read_text())
+        index[graph["name"]] = graph
+    return index
+
+
+def load_graph_by_name(name: str) -> dict | None:
+    """The canonical graph declaring `name`, or None if no graph does.
+
+    None is the answer to "is this node a sub-graph reference?" — an ordinary node
+    simply names no graph."""
+    return graphs_by_name().get(name)
+
+
 def _merge_identities(
     graph_nodes: list[dict],
     argument: Mapping[str, Mapping[str, str]] | None,
@@ -181,12 +212,13 @@ def _merge_identities(
 def assemble(
     graph: dict,
     *,
-    backend: LLMBackend,
+    backend: LLMBackend | None = None,
     stores: Mapping[str, Mapping[str, list[str]]] | None = None,
     sandbox: Iterable[str] = (),
     identities: Mapping[str, Mapping[str, str]] | None = None,
     revocable_instances: Iterable[tuple[str, str]] = (),
     rotatable_instances: Iterable[tuple[str, str]] = (),
+    handles: Mapping[str, object] | None = None,
 ) -> AssembledGraph:
     """Validate and assemble a graph dict into a runnable `AssembledGraph`.
 
@@ -226,7 +258,16 @@ def assemble(
     neither), and un-named instances (type-only and plain-identity) are provisioned
     bare, exactly as before. This is the narrow, host-tier form of Technical Note
     A's revocation-and-rotation item; the redeployment form and the sandbox tier
-    remain open."""
+    remain open.
+
+    `handles` supplies already-provisioned capability handles by capability type,
+    instead of minting new ones from `backend`/`stores`. This is what makes a
+    *sub-graph* a sub-graph rather than a second independent program: when the
+    runtime executes a node whose body is another graph, it assembles that graph
+    with the handles the parent routed to that node, so the child exercises the
+    parent's authority and cannot quietly provision more of its own. A capability
+    with no supplied handle is provisioned as before, so `backend` is required only
+    when something actually needs provisioning."""
     errors = validate_graph_dict(graph)
     if errors:
         raise AssemblyError(errors)
@@ -257,9 +298,33 @@ def assemble(
         edges.append(Edge(src_node=src_node, src_port=src_port, dst_node=e["to"]))
 
     capabilities = list(graph["capabilities"])
-    handles: dict[str, object] = {
-        cap: provision(cap, backend=backend, stores=stores) for cap in capabilities
+    supplied = dict(handles or {})
+
+    def _provision(cap_type: str) -> object:
+        """Mint a handle, or fail with a message that names what was missing.
+        Provisioning needs a backend; a graph assembled purely from supplied
+        handles (a sub-graph) legitimately has none."""
+        if backend is None:
+            raise AssemblyError(
+                [
+                    f"capability {cap_type!r} has no supplied handle and no backend to "
+                    f"provision one from"
+                ]
+            )
+        return provision(cap_type, backend=backend, stores=stores)
+
+    provisioned: dict[str, object] = {
+        cap: supplied[cap] if cap in supplied else _provision(cap) for cap in capabilities
     }
+
+    unknown_supplied = set(supplied) - set(capabilities)
+    if unknown_supplied:
+        raise AssemblyError(
+            [
+                f"handle supplied for capability {c!r}, which this graph does not declare"
+                for c in sorted(unknown_supplied)
+            ]
+        )
 
     # Identity-aware provisioning. Distinct identity labels for one capability
     # type get distinct handle instances (pooled by label so a shared label means
@@ -299,7 +364,7 @@ def assemble(
                 )
             key = (cap_type, label)
             if key not in identity_pool:
-                identity_pool[key] = provision(cap_type, backend=backend, stores=stores)
+                identity_pool[key] = _provision(cap_type)
             bindings.append((node_name, cap_type, key))
 
     # Opt-in revocation/rotation: wrap each named identity instance behind a
@@ -343,7 +408,7 @@ def assemble(
         capabilities=capabilities,
         nodes=nodes,
         edges=edges,
-        handles=handles,
+        handles=provisioned,
         instances=instances,
         revokers=revokers,
         rotators=rotators,

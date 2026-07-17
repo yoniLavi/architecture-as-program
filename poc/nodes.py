@@ -15,18 +15,23 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .generated.parse_message import parse_message
-from .handles import InferenceLLM, ReadDBHandle, ResponseChannel, ToolLLM
+from .handles import AppendDBHandle, InferenceLLM, ReadDBHandle, ResponseChannel, ToolLLM
 from .values import (
+    AgentRequest,
     AgentResponse,
+    AuditConfirmation,
+    BillingRequest,
     ConversationContext,
     CustomerRequest,
     DeliveryConfirmation,
     EscalationRequest,
     EscalationTicket,
+    HTTPRoute,
     LLMError,
     ModeratedQuery,
     PolicyViolation,
     RawMessage,
+    ServiceOutcome,
     Untrusted,
     Variant,
 )
@@ -112,6 +117,64 @@ def escalate_to_human(req: EscalationRequest, emitter) -> EscalationTicket:
     return EscalationTicket(ticket_id=ticket_id)
 
 
+# ── SupportPlatform's own leaves ────────────────────────────────────
+#
+# The composition graph's service nodes (`CustomerSupport`, `AgentDashboard`,
+# `BillingService`) need no implementations: a node whose name resolves to a graph
+# *is* that graph, and the runtime executes it by nested assembly. Only the
+# platform's own leaf nodes need bodies, and only those on a path actually taken —
+# `AgentDashboard` and `BillingService` are not graphs in this repository and have
+# no implementations here, so the agent and billing branches do not run. That is a
+# deliberate scope boundary of the composition demonstration, not an oversight:
+# neither is needed to show that a boundary signal crosses into a sub-graph and its
+# output crosses back.
+
+
+def route_request(route: HTTPRoute) -> Variant:
+    """Dispatch inbound platform traffic to the service that owns it.
+
+    The narrowing step that lets `CustomerSupport` keep a domain entry type: the
+    platform's `HTTPRoute` never reaches a service graph."""
+    if route.path.startswith("/agent"):
+        return Variant(
+            role="agent", value=AgentRequest(session_id=route.session_id, body=route.body)
+        )
+    if route.path.startswith("/billing"):
+        return Variant(
+            role="billing", value=BillingRequest(session_id=route.session_id, body=route.body)
+        )
+    return Variant(
+        role="customer", value=CustomerRequest(session_id=route.session_id, body=route.body)
+    )
+
+
+def record_audit(outcome: ServiceOutcome, audit: AppendDBHandle) -> AuditConfirmation:
+    """Append a service's outcome to the audit log.
+
+    Its `DBHandle<'audit', append>` has no `read`, so the node that records
+    outcomes cannot read the log back — the append/read incomparability of the mode
+    lattice, at the composition altitude.
+
+    `outcome` is a `ServiceOutcome`: the union of whichever terminal type the
+    service sub-graph actually reached. Both members are matched explicitly rather
+    than stringified, so a third terminal type appearing in a service graph fails
+    here instead of being silently audited as its `repr`."""
+    if isinstance(outcome, DeliveryConfirmation):
+        record = f"delivered to {outcome.session_id} (ok={outcome.delivered})"
+        key = outcome.session_id
+    elif isinstance(outcome, EscalationTicket):
+        record = f"escalated as {outcome.ticket_id}"
+        key = outcome.ticket_id
+    else:
+        raise TypeError(
+            f"not a ServiceOutcome: {type(outcome).__name__}. The boundary type is the "
+            f"union of the service sub-graph's terminal types (Technical Note A, "
+            f"sub-graph output aggregation)."
+        )
+    audit.append(record)
+    return AuditConfirmation(record_id=f"AUD-{abs(hash(key)) % 100000:05d}")
+
+
 # Registry keyed by the graph's node names.
 REGISTRY: dict[str, NodeImpl] = {
     "ReceiveMessage": receive_message,
@@ -123,4 +186,7 @@ REGISTRY: dict[str, NodeImpl] = {
     "HandleLLMError": handle_llm_error,
     "NotifyUser": notify_user,
     "EscalateToHuman": escalate_to_human,
+    # SupportPlatform's leaves (the service nodes are sub-graphs, not entries here).
+    "RouteRequest": route_request,
+    "RecordAudit": record_audit,
 }

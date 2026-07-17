@@ -54,9 +54,46 @@ Additive. Single-graph execution is unchanged; only a node that resolves to a lo
 path. Existing `customer-support` execution is byte-for-byte the same.
 
 ## Open Questions
-- Should the runtime load referenced sub-graphs by canonical name from `graphs/` (as the parent is loaded), or
-  should the caller pass a graph registry? (Leaning: load by name, matching `load_graph_dict`, with an
-  optional override for tests.)
-- How to surface a sub-graph-internal execution error at the parent level so the message is comprehensible at
-  the composition altitude (Technical Note A, "Graph-scale comprehension"). Minimal: wrap with the sub-graph
-  node's name; the richer story is deferred.
+- ~~Load by canonical name, or a caller-passed registry?~~ **Resolved: load by name, with an override for
+  tests.** With one correction to the premise: a graph's *name* (`CustomerSupport`) is not its *filename*
+  (`customer-support.json`), so `load_graph_dict` cannot resolve a sub-graph reference at all. The runtime
+  builds a name-keyed index (`graphs_by_name`), which is the same index the cross-graph validator builds, so
+  the two resolve the same set. It is built once per top-level `execute` rather than per node.
+- ~~How to surface a sub-graph-internal execution error?~~ **Resolved: the minimal form.** A nested
+  `ExecutionError` is re-raised prefixed with the sub-graph node's name, so a parent-level reader is not handed
+  a bare node name from two altitudes down. The richer story (Technical Note A, "Graph-scale comprehension")
+  is still deferred.
+
+## Corrections to this design, found during implementation
+- **The premise "its one boundary output type, e.g. `ServiceOutcome`" was wrong, and the conclusion was right
+  anyway.** `CustomerSupport` has *four* terminal nodes emitting *two* types (`DeliveryConfirmation`,
+  `EscalationTicket`); `ServiceOutcome` is emitted by nothing and has no Python type. This looked at first like
+  a blocker — the shipped graph appearing to need the multi-terminal aggregation this change scopes out. It is
+  not one: the proposal (§5 and Technical Note A) already defines `ServiceOutcome` as the *union alias* of the
+  sub-graph's terminal types, option (i), "the working convention used by the composition example". Since
+  `CustomerSupport`'s branches are exclusive, exactly one terminal is reached per run and the lifted value is
+  always a member of that union. So the end-to-end demonstration is honest under the proposal's own stated
+  convention, and `poc/values.py` spells the alias exactly as the proposal does
+  (`ServiceOutcome = DeliveryConfirmation | EscalationTicket`) rather than inventing a wrapper, which would
+  have silently committed to option (iii).
+- **The real gap is adjacent, and was found by chasing the above.** Nothing *checks* the alias: the graph
+  language has no alias mechanism, and the cross-graph validator relates a sub-graph node's *inputs* to the
+  child's parameters while never examining the output side — a sub-graph node could declare any output type at
+  all and no check would object. Recorded in Technical Note A (sub-graph output aggregation) and pinned by a
+  test rather than left in prose. Closing it needs a language decision, not a patch, so it stays open.
+
+## Decisions taken during implementation
+- **Decision: a sub-graph cannot provision authority, by construction.** `execute` holds no backend or stores,
+  so the nested assembly is given *only* the handles the parent routed (`assemble(..., handles=...)`). A child
+  needing a capability the parent did not supply fails loudly rather than minting one. Confinement across the
+  boundary is therefore a property of the plumbing, not a rule to remember — which is the same argument the
+  proposal makes for capabilities generally, one level up.
+- **Decision: a sub-graph node reports no enforcement tier.** It reports `TIER_GRAPH` ("graph"), because no
+  tier ran it — its body is a graph, and the nodes inside report their own tiers in the nested result. Calling
+  it `host` would claim a confinement story for a node that has none of its own.
+- **Decision: refuse multi-terminal runs rather than choose.** A sub-graph run reaching several terminals has
+  no single boundary value; the runtime raises and names the aggregation question. Picking one would make the
+  parent's declared output type a fiction.
+- **Decision: the nested run is kept in the trace.** `ExecutionResult.subgraphs` carries each sub-graph's own
+  result, so a composed execution is inspectable at both altitudes — which is what lets the tests assert the
+  *inside* of the sub-graph rather than only its output.
