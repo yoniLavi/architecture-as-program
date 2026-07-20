@@ -220,7 +220,7 @@ def render_card(canonical_types: list[str]) -> str:
         "input is rejected as stale. Trust discharge is therefore "
         "always visible at the graph level; the `Untrusted<T>` ≰ `T` "
         "rule is enforced structurally rather than by a coercion "
-        "lattice (see Technical Note A of the proposal for the "
+        "lattice (see the demonstrator paper's research agenda for the "
         "coercion-problem discussion)."
     )
     lines.append("")

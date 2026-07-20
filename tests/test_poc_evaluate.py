@@ -177,7 +177,14 @@ def test_main_writes_both_artifacts(tmp_path, monkeypatch, capsys):
 def test_the_data_carries_every_figure_the_paper_states():
     payload = json.loads(serialise(run()))
 
-    assert set(payload) == {"environment", "corpus", "overhead", "injection", "tiers"}
+    assert set(payload) == {"environment", "corpus", "overhead", "injection", "tiers", "display"}
+
+    # The paper prints `display` verbatim rather than rounding numbers itself, so
+    # these must be strings: typst and pandoc's typst reader format the same float
+    # differently (0.04 vs 4.0e-2), and the PDF and HTML would disagree.
+    assert all(isinstance(v, str) for v in payload["display"].values())
+    assert payload["display"]["crossing_us"] == f"{payload['overhead']['crossing_us']:.1f}"
+    assert payload["display"]["mutations_caught_pct"] == "100%"
 
     corpus = payload["corpus"]
     assert {c["name"] for c in corpus["cases"]} == {c.name for c in CORPUS}

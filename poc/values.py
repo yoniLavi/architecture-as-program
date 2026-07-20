@@ -180,7 +180,7 @@ class AuditConfirmation:
 
 # `ServiceOutcome` is the boundary output every service sub-graph presents to the
 # platform, and it is a *type alias for the union of that sub-graph's terminal
-# types* — option (i) of Technical Note A's "sub-graph output aggregation", which
+# types* — option (i) of the research agenda's "sub-graph output aggregation", which
 # the proposal names as the working convention of the composition example.
 # `CustomerSupport` terminates at `DeliveryConfirmation` (its three reply paths) or
 # `EscalationTicket` (its escalation path), and exactly one of those is reached per
@@ -191,7 +191,7 @@ class AuditConfirmation:
 # (option iii) the proposal has not made. The cost is that nothing checks the
 # alias — the graph language has no alias mechanism, so `ServiceOutcome` is a name
 # the JSON asserts and the tooling cannot relate to the terminals it abbreviates.
-# That gap is real and remains open in Technical Note A.
+# That gap is real and remains open in the research agenda.
 ServiceOutcome = DeliveryConfirmation | EscalationTicket
 
 

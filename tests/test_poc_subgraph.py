@@ -16,7 +16,7 @@ A note on `ServiceOutcome`, since it looks like a hole and is not one.
 `CustomerSupport` ends at four terminals emitting two types
 (`DeliveryConfirmation`, `EscalationTicket`), while `SupportPlatform` declares its
 `CustomerSupport` node outputs `ServiceOutcome`. That name is the *union alias* of
-those terminal types — option (i) of Technical Note A's sub-graph output
+those terminal types — option (i) of the research agenda's sub-graph output
 aggregation, which the proposal names as the working convention of the composition
 example. Exactly one terminal is reached per run (the branches are exclusive), so
 the value handed back is always a member of the union. What is genuinely open is
@@ -427,7 +427,7 @@ def test_nothing_checks_the_service_outcome_alias():
     terminal types, but the graph language has no alias mechanism and the
     cross-graph validator only relates a sub-graph node's *inputs* to the child's
     parameters — it never looks at the output side. So the alias is asserted by the
-    JSON and verified by nothing (Technical Note A, "Sub-graph output
+    JSON and verified by nothing (research agenda, "Sub-graph output
     aggregation")."""
     child = load_graph_dict("customer-support")
     sources = {e["from"].split(".")[0] for e in child["data_edges"]}

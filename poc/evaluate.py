@@ -23,7 +23,7 @@ What this artifact is not: a soundness proof. The corpus is curated and
 illustrative. It counts the mistakes we thought to write down, not the mistakes
 that exist. The distinction is kept in the artifact itself, not just here, because
 a table of all-caught mutations is exactly the kind of thing a reader generalises
-from. See Technical Note A.
+from. See the paper's threats to validity.
 
 Run:  uv run --group poc python -m poc.evaluate
 """
@@ -373,7 +373,7 @@ def render(
         "were caught. That is evidence the graph-level analyses are implementable and "
         "catch the mistakes they target. It is **not** a soundness result — no claim is "
         "made that the corpus is exhaustive, nor that an uncaught class does not exist. "
-        "See Technical Note A."
+        "See the demonstrator paper's threats to validity."
     )
     lines.append("")
 
@@ -609,6 +609,7 @@ def serialise(ev: Evaluation) -> str:
     prose around them is the paper's own; the figures are not retyped."""
     canonical = [o for o in ev.outcomes if o.case.kind == "canonical"]
     mutations = [o for o in ev.outcomes if o.case.kind == "mutation"]
+    caught = sum(1 for o in mutations if o.actual == REJECTED)
     b = ev.bench
     inference_imports = capability_imports("node_parse_message")
 
@@ -630,7 +631,7 @@ def serialise(ev: Evaluation) -> str:
             "canonical_total": len(canonical),
             "canonical_accepted": sum(1 for o in canonical if o.actual == ACCEPTED),
             "mutation_total": len(mutations),
-            "mutation_rejected": sum(1 for o in mutations if o.actual == REJECTED),
+            "mutation_rejected": caught,
         },
         "overhead": {
             "compilation_ms": b.compilation_ms,
@@ -667,6 +668,25 @@ def serialise(ev: Evaluation) -> str:
             ],
             "inference_node_imports": list(inference_imports),
             "ambient_imports": len(wasi_imports("node_parse_message")),
+        },
+        # Pre-formatted for display. Rounding is a presentation decision, but it
+        # belongs with the measurement rather than in each renderer: the paper
+        # builds to PDF via typst and to markdown/HTML via pandoc, whose float
+        # formatting disagree (typst renders 0.04, pandoc's typst reader renders
+        # the same value as 4.0e-2). Emitting strings settles it once, and keeps
+        # the number of significant figures a claim the harness makes rather than
+        # one the typesetter improvises.
+        "display": {
+            "compilation_ms": f"{b.compilation_ms:.2f}",
+            "instantiation_ms": f"{b.instantiation_ms:.3f}",
+            "crossing_us": f"{b.crossing_ms * 1000.0:.1f}",
+            "parse_invocation_ms": f"{b.parse_invocation_ms:.3f}",
+            "generate_invocation_ms": f"{b.generate_invocation_ms:.3f}",
+            "projected_overhead": f"{b.projected_overhead:.2%}",
+            "envelope_crossing_ms": f"{ENVELOPE_CROSSING_MS:.0f}",
+            "envelope_node_work_ms": f"{ENVELOPE_NODE_WORK_MS:.0f}",
+            "envelope_max_overhead": f"{ENVELOPE_MAX_OVERHEAD:.0%}",
+            "mutations_caught_pct": f"{caught / len(mutations):.0%}" if mutations else "n/a",
         },
     }
     return json.dumps(data, indent=2, sort_keys=False) + "\n"

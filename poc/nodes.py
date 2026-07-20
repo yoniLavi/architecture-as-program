@@ -168,7 +168,7 @@ def record_audit(outcome: ServiceOutcome, audit: AppendDBHandle) -> AuditConfirm
     else:
         raise TypeError(
             f"not a ServiceOutcome: {type(outcome).__name__}. The boundary type is the "
-            f"union of the service sub-graph's terminal types (Technical Note A, "
+            f"union of the service sub-graph's terminal types (research agenda, "
             f"sub-graph output aggregation)."
         )
     audit.append(record)

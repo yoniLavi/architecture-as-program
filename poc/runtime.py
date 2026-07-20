@@ -87,7 +87,7 @@ def _route_handles(parent: AssembledGraph, node: Node, child: dict) -> dict[str,
     """Bind the handles the parent provisioned for `node` to the child's capability
     parameters, position by position.
 
-    This is routing option (i) of Technical Note A's *hierarchical capability
+    This is routing option (i) of the research agenda's *hierarchical capability
     routing*: the sub-graph exposes a flat parameter list, the parent matches it by
     position and type, and fan-out to the sub-graph's internal nodes is the
     sub-graph's own business (its `with` clauses). Options (ii) named slots and
@@ -129,7 +129,7 @@ def _boundary_output(name: str, sub: ExecutionResult) -> object:
     at several terminals — or at terminals of differing type — is the multi-terminal
     *aggregation* question, which this runtime does not answer. Raising here keeps
     that boundary visible instead of silently picking a winner, which would make the
-    parent's declared output type a fiction (see Technical Note A, "Sub-graph output
+    parent's declared output type a fiction (see the research agenda, "Sub-graph output
     aggregation")."""
     if len(sub.terminals) != 1:
         reached = ", ".join(sorted(sub.terminals)) or "none"
@@ -137,7 +137,7 @@ def _boundary_output(name: str, sub: ExecutionResult) -> object:
             f"sub-graph {name!r} finished at {len(sub.terminals)} terminals ({reached}); "
             f"a sub-graph node requires exactly one boundary output. Collapsing several "
             f"terminals into one boundary value is multi-terminal aggregation, which the "
-            f"runtime does not implement (see Technical Note A)."
+            f"runtime does not implement (see the paper's research agenda)."
         )
     return next(iter(sub.terminals.values()))
 
@@ -168,7 +168,7 @@ def _run_subgraph(
     except ExecutionError as e:
         # Minimal comprehension aid: name the boundary the failure happened behind,
         # so a parent-level reader is not handed a bare node name from two altitudes
-        # down. The richer story (Technical Note A, "Graph-scale comprehension")
+        # down. The richer story (research agenda, "Graph-scale comprehension")
         # is deferred.
         raise ExecutionError(f"in sub-graph {node.name!r}: {e}") from e
     return _boundary_output(node.name, sub), sub

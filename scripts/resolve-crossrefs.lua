@@ -20,7 +20,31 @@ local function next_number(level)
   return table.concat(parts, ".")
 end
 
+-- Figure and table cross-references (@tab:x, @fig:x). Typst numbers these
+-- itself in the PDF; pandoc lowers the labels to empty anchor spans, so the
+-- reference has to be resolved here or citeproc treats "tab"/"fig" as an
+-- unresolved citation key and drops the reference entirely.
+local KINDS = { tab = "Table", fig = "Figure" }
+
+-- Number every tab:/fig: anchor in document order, matching typst's own scheme.
+local function number_anchors(doc)
+  local numbers, counts = {}, {}
+  pandoc.walk_block(pandoc.Div(doc.blocks), {
+    Span = function(el)
+      local id = el.identifier or ""
+      local prefix = id:match("^(%a+):")
+      if prefix and KINDS[prefix] and not numbers[id] then
+        counts[prefix] = (counts[prefix] or 0) + 1
+        numbers[id] = counts[prefix]
+      end
+    end
+  })
+  return numbers
+end
+
 function Pandoc(doc)
+  local anchor_numbers = number_anchors(doc)
+
   -- Pass 1: walk headings to build label → section number map
   local label_map = {}
   local c = {}
@@ -56,9 +80,9 @@ function Pandoc(doc)
     local i = 1
     while i <= #inlines do
       local el = inlines[i]
-      if el.t == "Cite"
-        and #el.citations == 1
-        and el.citations[1].id == "sec"
+      local kind = (el.t == "Cite" and #el.citations == 1) and el.citations[1].id or nil
+      if kind
+        and (kind == "sec" or KINDS[kind])
         and i + 1 <= #inlines
         and inlines[i + 1].t == "Str"
         and inlines[i + 1].text:match("^:")
@@ -68,12 +92,15 @@ function Pandoc(doc)
         local label_suffix, trailing = raw:match("^([%w%-]+)(.*)")
         label_suffix = label_suffix or raw
         trailing = trailing or ""
-        local full_label = "sec:" .. label_suffix
-        local num = label_map[full_label]
-        if num then
-          result:insert(pandoc.Str("§" .. num .. trailing))
+        local full_label = kind .. ":" .. label_suffix
+        if kind == "sec" then
+          local num = label_map[full_label]
+          result:insert(pandoc.Str("§" .. (num or label_suffix) .. trailing))
         else
-          result:insert(pandoc.Str("§" .. label_suffix .. trailing))
+          -- "Table 3" / "Figure 2", falling back to the bare label if unnumbered.
+          local num = anchor_numbers[full_label]
+          local text = num and (KINDS[kind] .. " " .. num) or (KINDS[kind] .. " " .. label_suffix)
+          result:insert(pandoc.Str(text .. trailing))
         end
         i = i + 2
       else
@@ -186,5 +213,11 @@ function Pandoc(doc)
   end
 
   doc.blocks = new_blocks
-  return doc
+  -- Final sweep over every inline list in the document. The per-block pass above
+  -- misses inlines pandoc does not expose to a block walk — table and figure
+  -- captions most notably — and an unresolved @sec: reference there reaches
+  -- citeproc, which drops it as an unknown citation key rather than warning
+  -- loudly. Resolution is idempotent: a reference already rewritten is a Str,
+  -- not a Cite, so a second visit does nothing.
+  return doc:walk({ Inlines = resolve_crossrefs })
 end

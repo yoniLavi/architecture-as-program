@@ -241,7 +241,7 @@ def assemble(
     the composition boundary. The `identities` argument here stays as an escape
     hatch and **overrides** the graph per `(node, capability type)`: the argument
     wins where both name an identity for one slot, the graph applies elsewhere.
-    This is the narrow half of Technical Note A's capability-routing item — naming
+    This is the narrow half of the research agenda's capability-routing item — naming
     identity — and the prerequisite a later revocation change needs to target a
     specific instance.
 

@@ -295,7 +295,7 @@ def _validate_edges(
             errors.append(
                 f"{path.name}: edge {fr!r}→{to!r}: target node {to!r} has multiple "
                 f"data inputs ({tgt_data}); multi-input disambiguation is a "
-                f"Phase 1 language-design question (see Technical Note A)"
+                f"Phase 1 language-design question (see the paper's research agenda)"
             )
             continue
 
