@@ -37,8 +37,9 @@
   #text(size: 11pt)[July 2026#footnote[
     This is the second paper of a longitudinal research program. The first
     @lavi_architecture_2026 set out the founding vision in June 2026, before an
-    executable demonstrator existed, and is preserved frozen and unedited as the
-    archived record of what was predicted. This paper reports what was
+    executable demonstrator existed; it has been editorially tidied for its
+    preprint but is substantively unchanged from that vision, and remains the
+    errata-only archived record of what was predicted. This paper reports what was
     subsequently built and what that artifact does and does not establish. Where
     the two disagree, the disagreement is the finding, and @sec:outcomes states
     it prediction by prediction.
@@ -102,9 +103,9 @@ What this claim does not say is as important as what it does. It does not say th
 
 == Relation to the founding vision <sec:relation>
 
-The two papers are deliberately different kinds of document, and the corpus keeps them apart rather than merging them. The vision paper @lavi_architecture_2026 is _frozen_: it reproduces the repository's state before the demonstrator existed and is corrected only by dated errata, so that what was predicted cannot be quietly revised once outcomes are known. This paper is _living_: it is rewritten as the artifact evolves, and builds its figures from the shared, current research artifact.
+The two papers are deliberately different kinds of document, and the corpus keeps them apart rather than merging them. The vision paper @lavi_architecture_2026 is _frozen_: it reproduces the repository's state before the demonstrator existed — editorially tidied for its preprint but with no claim altered — and its substance is corrected only by dated errata, so that what was predicted cannot be quietly revised once outcomes are known. This paper is _living_: it is rewritten as the artifact evolves, and builds its figures from the shared, current research artifact.
 
-That arrangement is what makes @sec:outcomes possible, and it is the reason this paper exists separately rather than as a revision. A vision paper edited in place to match its results is unfalsifiable by construction; the interesting content — which conditional claims survived contact with an implementation, which needed weakening, and which turned out to be harder than the hedge admitted — is available only if the original stands unaltered. @sec:outcomes states that accounting prediction by prediction.
+That arrangement is what makes @sec:outcomes possible, and it is the reason this paper exists separately rather than as a revision. A vision paper edited in place to match its results is unfalsifiable by construction; the interesting content — which conditional claims survived contact with an implementation, which needed weakening, and which turned out to be harder than the hedge admitted — is available only if the original's predictions are left as they were made. @sec:outcomes states that accounting prediction by prediction.
 
 The remainder of the paper is organised as follows. @sec:design presents the design, largely inherited from the vision and restated here to make the paper self-contained. @sec:implementation reports what was built. @sec:evaluation evaluates it. @sec:outcomes gives the predictions-and-outcomes accounting. @sec:related positions the work against prior art, @sec:agenda sets out the forward agenda including the problems that remain open, and @sec:threats states the limits of what has been shown.
 

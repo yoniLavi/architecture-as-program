@@ -31,6 +31,16 @@
   #block(width: 85%, stroke: 0.5pt + luma(180), inset: 1em, radius: 3pt)[
     #set text(size: 9pt)
     #set par(justify: true)
+    *Preprint note.* This is the first paper of a longitudinal research program on capability-injected, model-driven software development in the age of AI coding agents. It sets out the founding vision as it stood in June 2026, before any executable demonstrator existed, and was first circulated in that form; it has been editorially revised for this preprint — typography, phrasing, and this note — in July 2026, with no claim or prediction added, removed, strengthened, or weakened. A second paper, _Architecture as Program: A Capability-Injected Signal Graph and What Its Demonstrator Substantiates_ @lavi_demonstrator_2026, reports what was subsequently built and states, prediction by prediction, which of the claims below the artifact substantiated, revised, or complicated. The value of this paper lies in its predictions being preserved as they were made: it is a frozen record, corrected only by dated errata, so that what was foreseen before the outcomes were known cannot be quietly rewritten.
+  ]
+]
+
+#v(1em)
+
+#align(center)[
+  #block(width: 85%, stroke: 0.5pt + luma(180), inset: 1em, radius: 3pt)[
+    #set text(size: 9pt)
+    #set par(justify: true)
     *Note on process.* This proposal was developed collaboratively with Claude (Anthropic), which served as primary drafter under the author's direction. The architectural vision and synthesis are the author's; the literature survey, formal framing, and prose were produced by the AI and verified against primary sources. This transparent accounting reflects the proposal's own thesis: that the interesting artifact is the _intent_, not the implementation, and that honest attribution of AI contribution is preferable to ambiguity.
   ]
 ]

@@ -24,8 +24,15 @@ from pathlib import Path
 FREEZE_REF = "59898cc~1"
 
 # Frozen file in the corpus  ->  its path at the freeze commit.
+#
+# NOTE (July 2026, one-time preprint revision): proposal.typ is temporarily
+# absent from this map while it undergoes its single sanctioned editorial-and-
+# metadata revision for the arXiv preprint (see papers/01-vision/ERRATA.md and
+# the paper-corpus spec). Unfreezing exactly one file for exactly one revision is
+# what the relaxed freeze rule permits; the very next commit re-pins proposal.typ
+# at the published-preprint commit and moves FREEZE_REF to it. The graph and
+# diagram inputs are untouched by the revision and stay guarded throughout.
 FROZEN_FILES = {
-    "papers/01-vision/proposal.typ": "proposal.typ",
     "papers/01-vision/graphs/customer-support.json": "graphs/customer-support.json",
     "papers/01-vision/graphs/support-platform.json": "graphs/support-platform.json",
     "papers/01-vision/graphs/schema.json": "graphs/schema.json",

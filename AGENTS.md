@@ -25,7 +25,7 @@ A longitudinal research program arguing that AI coding agents + functional react
 
 It is structured as a **corpus of papers backed by a shared, evolving research artifact** (see `papers/README.md` and `METHODOLOGY.md`):
 
-- **Paper 1 — the founding vision** (`papers/01-vision/`) is **frozen**: it reproduces the repository's state at the freeze commit `59898cc~1` (dated *June 2026*, before the executable demonstrator `poc/` existed). It is self-contained (carries its own pinned graph/diagram inputs) and errata-only — do not edit it; `scripts/check-freeze.py` fails the build if it drifts.
+- **Paper 1 — the founding vision** (`papers/01-vision/`) is **frozen**: it reproduces the repository's state before the executable demonstrator `poc/` existed (dated *June 2026*). It was editorially tidied **once** for its arXiv preprint (July 2026 — typos, phrasing, and publication front matter, **no claim changed**; recorded in `ERRATA.md`) and then **re-frozen at the published-preprint commit**, which is where `scripts/check-freeze.py`'s `FREEZE_REF` now points. It is self-contained (carries its own pinned graph/diagram inputs) and errata-only again — do not edit it; the freeze guard fails the build if it drifts. A further one-time editorial-and-metadata revision for publication is permitted by the `paper-corpus` spec, but only that: no substantive claim may move.
 - **Paper 2 — the demonstrator paper** (`papers/02-demonstrator/`) is the **living** document: it builds from the shared root artifact and folds in what the demonstrator has since substantiated. This is the paper you normally edit.
 
 This is primarily a **writing project**: the papers are the outputs that matter. But they are backed by a real, tested toolchain (below), not vapourware.
