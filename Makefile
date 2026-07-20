@@ -68,7 +68,8 @@ $(DIST)/grammar.md: scripts/emit-grammar.py scripts/type_parser.py $(GRAPHS_SRC)
 # Evaluation artifact — the demonstrator's own evidence, run and consolidated:
 # the graph-mutation corpus (each case pinned to an expected verdict *and* the
 # reason class it must be caught by), the capability-boundary overhead against
-# @sec:performance's envelope, and the prompt-injection outcome on both tiers.
+# the stated envelope, and the prompt-injection outcome on both tiers. Emits both
+# evaluation.md (for a reader) and evaluation.json (what Paper 2 typesets from).
 # Generated like the grammar card so the paper's Evaluation section cannot drift
 # from the code: a divergence from a pin fails the build rather than quietly
 # rewriting the table.
