@@ -54,7 +54,7 @@ build: validate-graphs check-freeze grammar evaluation paper1 paper2 aliases
 	@echo "Build complete."
 
 grammar: $(DIST)/grammar.md
-evaluation: $(DIST)/evaluation.md
+evaluation: $(DIST)/evaluation.md $(DIST)/evaluation.json
 paper1: $(P1_DOCS)
 paper2: $(P2_DOCS)
 aliases: $(ALIASES)
@@ -76,6 +76,14 @@ POC_SRC  := $(wildcard poc/*.py) $(wildcard poc/sandbox/*.py)
 POC_WASM := $(wildcard poc/sandbox/wasm/*.wasm)
 $(DIST)/evaluation.md: $(POC_SRC) $(POC_WASM) $(GRAPHS_SRC) scripts/graph_validator.py scripts/type_parser.py | $(DIST)
 	$(PY_POC) -m poc.evaluate
+
+# One run, two serialisations: evaluation.md for a reader, evaluation.json for
+# Paper 2's Evaluation section, which loads it with typst's `json()` so its
+# tables are typeset from the run rather than transcribed from it. Both come out
+# of the single recipe above (this make is 3.81 — no grouped `&:` targets), so
+# this rule only has to establish the ordering and assert the file appeared.
+$(DIST)/evaluation.json: $(DIST)/evaluation.md
+	@test -f $@ || { echo "poc.evaluate did not write $@" >&2; exit 1; }
 
 # Validate the shared graph JSON files: structural, type-aware, cross-graph.
 # Depends on `test` so validator-logic changes are tested before use.
@@ -141,10 +149,10 @@ $(P1_OUT)/proposal.html: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(
 	cp scripts/proposal.css $(P1_OUT)/
 
 # ── Paper 2 (living): figures from the shared artifact ──────────────
-$(P2_OUT)/proposal.pdf: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) | $(P2_OUT)
+$(P2_OUT)/proposal.pdf: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json | $(P2_OUT)
 	typst compile $(P2_DIR)/proposal.typ $@ --root $(ROOT)
 
-$(P2_OUT)/proposal.md: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P2_OUT)
+$(P2_OUT)/proposal.md: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P2_OUT)
 	pandoc $(P2_DIR)/proposal.typ -f typst -t markdown --wrap=none \
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
@@ -154,7 +162,7 @@ $(P2_OUT)/proposal.md: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAP
 # HTML output is self-contained in its own dir: copy in the referenced SVGs and
 # the stylesheet so the page renders standalone (clean-html.py rewrites figure
 # paths to bare graphs/… and diagrams/… relative to the HTML).
-$(P2_OUT)/proposal.html: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css scripts/clean-html.py | $(P2_OUT)
+$(P2_OUT)/proposal.html: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css scripts/clean-html.py | $(P2_OUT)
 	pandoc $(P2_DIR)/proposal.typ -f typst -t html --standalone --wrap=none \
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \

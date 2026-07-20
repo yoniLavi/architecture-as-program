@@ -17,6 +17,7 @@ Covers the `evaluation` spec requirements added by `add-evaluation-harness`:
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 import pytest
@@ -31,7 +32,10 @@ from poc.evaluate import (
     check,
     generate,
     main,
+    render,
+    run,
     run_corpus,
+    serialise,
 )
 from poc.sandbox import available
 from poc.variants import UNSAFE_VARIANTS
@@ -146,16 +150,71 @@ def test_the_artifact_does_not_overclaim():
 
 
 @sandboxed
-def test_main_writes_the_artifact(tmp_path, monkeypatch, capsys):
+def test_main_writes_both_artifacts(tmp_path, monkeypatch, capsys):
     import poc.evaluate as evaluate
 
     out = tmp_path / "evaluation.md"
+    data = tmp_path / "evaluation.json"
     monkeypatch.setattr(evaluate, "ARTIFACT_PATH", out)
+    monkeypatch.setattr(evaluate, "DATA_PATH", data)
     monkeypatch.setattr(evaluate, "REPO_ROOT", tmp_path)
 
     assert evaluate.main() == 0
     assert "Demonstrator evaluation" in out.read_text()
+    json.loads(data.read_text())
     assert "Wrote" in capsys.readouterr().out
+
+
+# ── The data the paper reads ─────────────────────────────────────────
+#
+# Paper 2's Evaluation section typesets its tables from `dist/evaluation.json`
+# rather than restating the run's figures by hand. That only holds if the JSON
+# actually carries every figure the section needs, so the keys are asserted here:
+# a rename that silently emptied a paper table would otherwise still build.
+
+
+@sandboxed
+def test_the_data_carries_every_figure_the_paper_states():
+    payload = json.loads(serialise(run()))
+
+    assert set(payload) == {"environment", "corpus", "overhead", "injection", "tiers"}
+
+    corpus = payload["corpus"]
+    assert {c["name"] for c in corpus["cases"]} == {c.name for c in CORPUS}
+    assert corpus["canonical_accepted"] == corpus["canonical_total"]
+    assert corpus["mutation_rejected"] == corpus["mutation_total"]
+    assert all(c["ok"] for c in corpus["cases"])
+
+    overhead = payload["overhead"]
+    for key in ("crossing_us", "instantiation_ms", "compilation_ms", "projected_overhead"):
+        assert isinstance(overhead[key], float)
+    assert overhead["within_envelope"] is True
+
+    injection = payload["injection"]
+    assert injection["received_type"] == "ConversationContext"
+    assert injection["is_untrusted"] is False
+    assert injection["out_of_scope_call_refused"] is True
+    # The residual is carried in the data too, not softened out of the paper's reach.
+    assert injection["adversarial_text_present"] is True
+
+    tiers = payload["tiers"]
+    assert all(e["host_escapes"] for e in tiers["escapes"])
+    assert not any(e["sandbox_escapes"] for e in tiers["escapes"])
+    assert tiers["ambient_imports"] == 0
+
+
+@sandboxed
+def test_both_artifacts_come_from_one_run():
+    """The markdown artifact and the paper's data must not be able to disagree.
+
+    They are rendered from a single `Evaluation`, so the check that matters is
+    that neither is re-measured: the crossing figure the paper typesets is the
+    same one the artifact prints."""
+    ev = run()
+    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes)
+    payload = json.loads(serialise(ev))
+
+    assert f"{payload['overhead']['crossing_us']:.1f} µs" in artifact
 
 
 def test_main_is_importable_without_running():

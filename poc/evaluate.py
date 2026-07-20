@@ -30,6 +30,7 @@ Run:  uv run --group poc python -m poc.evaluate
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import socket
@@ -55,6 +56,14 @@ from .values import ConversationContext, CustomerRequest, Untrusted
 from .variants import UNSAFE_VARIANTS
 
 ARTIFACT_PATH = REPO_ROOT / "dist" / "evaluation.md"
+
+# The same run, serialised for a different reader. `evaluation.md` is for a human;
+# `evaluation.json` is what the demonstrator paper's Evaluation section loads (Typst
+# reads JSON natively), so its tables are typeset from the run rather than
+# transcribed from it. Both are rendered from one `Evaluation` bundle, which is the
+# point: a paper figure and the artifact behind it cannot drift apart if there is
+# only one measurement and one code path producing both.
+DATA_PATH = REPO_ROOT / "dist" / "evaluation.json"
 
 
 class EvaluationError(RuntimeError):
@@ -551,11 +560,25 @@ def render(
     return "\n".join(lines) + "\n"
 
 
-def generate(corpus: tuple[Case, ...] = CORPUS) -> str:
-    """Run the whole evaluation and render the artifact.
+@dataclass(frozen=True)
+class Evaluation:
+    """One complete run of the demonstrator's evidence.
 
-    Raises `EvaluationError` before rendering anything if the corpus diverges from
-    its pins — the artifact is never written to match a regression."""
+    Both artifacts are rendered from this, and the run happens once. Emitting the
+    paper's figures from a *second* run would leave two sets of timings that agree
+    only by luck; emitting them from a second implementation would be worse."""
+
+    outcomes: list[Outcome]
+    bench: BenchResult
+    injection: InjectionResult
+    escapes: list[Escape]
+
+
+def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
+    """Run the whole evaluation.
+
+    Raises `EvaluationError` before measuring anything if the corpus diverges from
+    its pins — no artifact is ever written to match a regression."""
     outcomes = run_corpus(corpus)
     problems = check(outcomes)
     if problems:
@@ -565,7 +588,88 @@ def generate(corpus: tuple[Case, ...] = CORPUS) -> str:
             + "\n\nThe artifact was not written. Either this is a regression, or the pin in "
             "poc/evaluate.py is now wrong and should be updated deliberately."
         )
-    return render(outcomes, measure(), run_injection(set(SANDBOXED_NODES)), probe_escapes())
+    return Evaluation(
+        outcomes=outcomes,
+        bench=measure(),
+        injection=run_injection(set(SANDBOXED_NODES)),
+        escapes=probe_escapes(),
+    )
+
+
+def generate(corpus: tuple[Case, ...] = CORPUS) -> str:
+    """Run the whole evaluation and render the human-readable artifact."""
+    ev = run(corpus)
+    return render(ev.outcomes, ev.bench, ev.injection, ev.escapes)
+
+
+def serialise(ev: Evaluation) -> str:
+    """The same run, as the data the paper's Evaluation section loads.
+
+    Every number the paper states about the demonstrator comes from here. The
+    prose around them is the paper's own; the figures are not retyped."""
+    canonical = [o for o in ev.outcomes if o.case.kind == "canonical"]
+    mutations = [o for o in ev.outcomes if o.case.kind == "mutation"]
+    b = ev.bench
+    inference_imports = capability_imports("node_parse_message")
+
+    data = {
+        "environment": dict(_environment()),
+        "corpus": {
+            "cases": [
+                {
+                    "name": o.case.name,
+                    "kind": o.case.kind,
+                    "expected": o.case.expected,
+                    "actual": o.actual,
+                    "reason": o.reason,
+                    "note": o.case.note,
+                    "ok": not o.diverged,
+                }
+                for o in ev.outcomes
+            ],
+            "canonical_total": len(canonical),
+            "canonical_accepted": sum(1 for o in canonical if o.actual == ACCEPTED),
+            "mutation_total": len(mutations),
+            "mutation_rejected": sum(1 for o in mutations if o.actual == REJECTED),
+        },
+        "overhead": {
+            "compilation_ms": b.compilation_ms,
+            "instantiation_ms": b.instantiation_ms,
+            "crossing_ms": b.crossing_ms,
+            "crossing_us": b.crossing_ms * 1000.0,
+            "parse_invocation_ms": b.parse_invocation_ms,
+            "generate_invocation_ms": b.generate_invocation_ms,
+            "parse_crossings": b.parse_crossings,
+            "generate_crossings": b.generate_crossings,
+            "within_envelope": b.within_envelope,
+            "projected_overhead": b.projected_overhead,
+            "envelope_crossing_ms": ENVELOPE_CROSSING_MS,
+            "envelope_node_work_ms": ENVELOPE_NODE_WORK_MS,
+            "envelope_max_overhead": ENVELOPE_MAX_OVERHEAD,
+        },
+        "injection": {
+            "path": list(ev.injection.path),
+            "tiers": dict(ev.injection.tiers),
+            "received_type": ev.injection.received_type,
+            "is_untrusted": ev.injection.is_untrusted,
+            "adversarial_text_present": ev.injection.adversarial_text_present,
+            "out_of_scope_call_refused": ev.injection.out_of_scope_call_refused,
+        },
+        "tiers": {
+            "escapes": [
+                {
+                    "probe": e.probe,
+                    "host_escapes": e.host_escapes,
+                    "sandbox_escapes": e.sandbox_escapes,
+                    "note": e.note,
+                }
+                for e in ev.escapes
+            ],
+            "inference_node_imports": list(inference_imports),
+            "ambient_imports": len(wasi_imports("node_parse_message")),
+        },
+    }
+    return json.dumps(data, indent=2, sort_keys=False) + "\n"
 
 
 def main() -> int:
@@ -578,10 +682,15 @@ def main() -> int:
         )
         return 1
 
-    artifact = generate()
+    ev = run()
+    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes)
+    data = serialise(ev)
+
     ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
     ARTIFACT_PATH.write_text(artifact)
+    DATA_PATH.write_text(data)
     print(f"Wrote {ARTIFACT_PATH.relative_to(REPO_ROOT)} ({len(artifact)} bytes).")
+    print(f"Wrote {DATA_PATH.relative_to(REPO_ROOT)} ({len(data)} bytes).")
     return 0
 
 
