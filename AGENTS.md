@@ -72,6 +72,7 @@ problems live in §7 going forward, honest limits in §8.
 - **Preserve the argument arc.** Each section builds on the previous. New content should slot into the existing structure, not break the flow.
 - **Concrete over abstract.** The proposal's weakest mode is unsupported generality. Prefer specific examples (like the `CustomerSupport` graph or the `Untrusted<UserMessage>` type error) over sweeping claims.
 - **Acknowledge limitations honestly.** §7 (research agenda) and §8 (threats to validity) exist for a reason. If a new claim has an open problem, name it in §7; if it has an honest limit on what the artifact shows, name it in §8.
+- **Keep it tight — say each thing once.** Paper 2 was aggressively tightened for its preprint; the working target is roughly the low-to-mid 30s of pages. Each load-bearing point has one primary home and is cross-referenced elsewhere, not restated (e.g. the free-text residual lives in §4.3, the trust-lattice mechanism in §3.2, the `unknown-unknown` ambient-authority argument in §3.4). When adding material, extend the primary statement or reference it; do not reintroduce a second full explanation. Length is a target, not a quota — never cut a stated limitation, a hedge, or the predictions-and-outcomes table to hit a page count.
 
 ## Tooling (present and tested)
 
