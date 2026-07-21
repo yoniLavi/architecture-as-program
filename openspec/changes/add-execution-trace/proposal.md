@@ -9,7 +9,7 @@ The runtime already knows, per run, everything a reader has to reconstruct from 
 - The runtime records a structured trace on every `execute`: per node — name, enforcement tier, input/output trust labels, capability crossings (WIT interface + instance name); sub-graph runs nest.
 - A committed JSON Schema pins the trace format; traces validate against it in tests.
 - Timings are carried as an optional field excluded from pinned comparisons, so trace structure is deterministic across runs.
-- The evaluation harness emits canonical traces of the prompt-injection scenario on both tiers into `dist/`, with structural properties pinned (the untrusted taint reaching the tool-capable node through the permitted field — the §4.3 free-text residual, now visible in data rather than only in prose).
+- The evaluation harness emits canonical traces of the prompt-injection scenario on both tiers into `dist/`, with structural properties pinned (the untrusted taint reaching the tool-capable node through the permitted field — the §4.3 free-text residual, now visible in data rather than only in prose). These are reference/regression artifacts for the paper, not the demo's data source: the inspector renders traces generated live by each user-triggered run, through the same recording code path — the pins guarantee the live traces' shape, they do not replace them.
 - Paper 2 §3 reports the trace artifact; no §5 verdict moves (replay stays untouched).
 
 ## Impact
