@@ -22,7 +22,7 @@ tool-capable node received as input.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 
 from .graph import (
@@ -148,13 +148,17 @@ def _run_subgraph(
     child: dict,
     value: object,
     resolve: GraphResolver,
+    sandbox: Mapping[str, Iterable[str]] | None,
     stack: tuple[str, ...],
 ) -> tuple[object, ExecutionResult]:
     """Execute a node whose body is another graph, and lift its output back.
 
     Note what is *not* passed: no backend, no stores. The child is assembled purely
     from the handles the parent routed, so it can exercise the parent's authority
-    and nothing besides."""
+    and nothing besides — which is why confinement across the boundary holds for
+    free, and holds *whichever tier* the child's nodes run on: `sandbox` names which
+    of the child's nodes run confined, but supplies no way to provision authority,
+    so a confined child node still gets exactly the handles the parent routed."""
     if node.name in stack:
         chain = " → ".join([*stack, node.name])
         raise ExecutionError(
@@ -162,9 +166,10 @@ def _run_subgraph(
             f"without bound"
         )
 
-    nested = assemble(child, handles=_route_handles(parent, node, child))
+    child_sandbox = sandbox.get(child["name"], ()) if sandbox else ()
+    nested = assemble(child, handles=_route_handles(parent, node, child), sandbox=child_sandbox)
     try:
-        sub = execute(nested, value, graphs=resolve, _stack=(*stack, node.name))
+        sub = execute(nested, value, graphs=resolve, sandbox=sandbox, _stack=(*stack, node.name))
     except ExecutionError as e:
         # Minimal comprehension aid: name the boundary the failure happened behind,
         # so a parent-level reader is not handed a bare node name from two altitudes
@@ -191,6 +196,7 @@ def execute(
     boundary_value: object,
     *,
     graphs: GraphResolver | Mapping[str, dict] | None = None,
+    sandbox: Mapping[str, Iterable[str]] | None = None,
     _stack: tuple[str, ...] = (),
 ) -> ExecutionResult:
     """Run the graph from its boundary input. Returns terminal outputs and a
@@ -200,9 +206,15 @@ def execute(
     A node whose name resolves to a graph is run as a sub-graph (nested assembly +
     run); every other node runs its registered host- or sandbox-tier
     implementation. `graphs` overrides how a reference resolves — a callable or a
-    name→graph mapping — and defaults to the canonical graphs on disk. `_stack`
-    carries the chain of sub-graphs currently being executed, which is what the
-    recursion guard checks."""
+    name→graph mapping — and defaults to the canonical graphs on disk.
+
+    `sandbox` makes composition tier-aware: it maps a (sub-)graph's name to the set
+    of *its* nodes that run on the confined tier, so a host-tier parent can nest a
+    child whose nodes resolve to their own tiers. The parent graph passed here was
+    assembled with its own tiers already fixed; this only reaches the children the
+    runtime assembles, and it carries no backend, so a confined child node is still
+    confined to the handles the parent routed. `_stack` carries the chain of
+    sub-graphs currently being executed, which is what the recursion guard checks."""
     resolve = _resolver(graphs)
     result = ExecutionResult()
     # Worklist of (node_name, input_value) pairs ready to run.
@@ -226,7 +238,7 @@ def execute(
         child = resolve(node_name)
         if child is not None:
             result.tiers[node_name] = TIER_GRAPH
-            output, sub = _run_subgraph(graph, node, child, value, resolve, _stack)
+            output, sub = _run_subgraph(graph, node, child, value, resolve, sandbox, _stack)
             result.subgraphs[node_name] = sub
         else:
             registry = SANDBOX_REGISTRY if node.tier == TIER_SANDBOX else REGISTRY

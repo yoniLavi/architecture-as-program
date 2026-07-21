@@ -446,6 +446,110 @@ def test_confined_identity_routing_lands_on_the_reply_channel():
     assert confirmation.delivered
 
 
+# ── Composition across enforcement tiers ───────────────────────────
+#
+# `add-subgraph-execution` composed a host-tier parent with a host-tier child, and
+# left cross-tier composition explicitly "not attempted". It works, and needs no new
+# mechanism: the sub-graph executor stays backend-free, and the child's nodes resolve
+# to their own tiers exactly as in a top-level run. A host-tier `SupportPlatform`
+# therefore runs `CustomerSupport` with confined nodes inside it, and confinement
+# across the boundary falls out of the same plumbing.
+
+_PLATFORM_STORES = {
+    "knowledge-base": {"billing_question": ["Duplicate charges clear in 3-5 days."]},
+    "billing": {},
+    "audit": {},
+}
+_RC = "ResponseChannel<user-session>"
+
+
+def _customer_traffic():
+    from poc.values import HTTPRoute
+
+    return HTTPRoute(
+        path="/customer/message",
+        session_id="user-session",
+        body="Why was I charged twice on my latest invoice?",
+    )
+
+
+def _assemble_platform(**kw):
+    from poc.graph import assemble
+    from poc.llm import StubLLM
+
+    return assemble(
+        load_graph_dict("support-platform"), backend=StubLLM(), stores=_PLATFORM_STORES, **kw
+    )
+
+
+def test_host_parent_runs_a_child_with_confined_nodes():
+    """Scenario: a host-tier parent runs a child whose nodes run confined. The platform
+    itself runs on the host tier (its own nodes were never ported); its `CustomerSupport`
+    sub-graph node resolves to a graph (tier `graph`); and inside that child, five nodes
+    run as WASM components while the pure narrowing stays host-side. The composition
+    completes end to end, and every node's tier is reported at its own altitude."""
+    from poc.runtime import execute
+    from poc.values import AuditConfirmation
+
+    platform = _assemble_platform()
+    result = execute(platform, _customer_traffic(), sandbox={"CustomerSupport": _MOST_CONFINED})
+
+    # The parent's own nodes on the host tier; the sub-graph node reports `graph`.
+    assert result.tiers["RouteRequest"] == "host"
+    assert result.tiers["CustomerSupport"] == "graph"
+    assert result.tiers["RecordAudit"] == "host"
+
+    # The child's nodes resolve to their own tiers, reported in the nested result.
+    child = result.subgraphs["CustomerSupport"]
+    assert {n for n in child.order if child.tiers[n] == "sandbox"} == _MOST_CONFINED
+    assert child.tiers["ReceiveMessage"] == "host"
+
+    # And it runs all the way to the platform's audit terminal.
+    assert isinstance(result.terminals["RecordAudit"], AuditConfirmation)
+
+
+def test_capability_instance_routes_into_the_confined_child():
+    """Identity routing survives both the composition boundary and the WIT boundary:
+    the platform declares a distinct `customer_session` instance for `CustomerSupport`,
+    and the *confined* reply node inside it sends on that instance, not the shared
+    default."""
+    from poc.handles import ResponseChannel
+    from poc.runtime import execute
+
+    platform = _assemble_platform()
+    routed = platform.handle_for(platform.nodes["CustomerSupport"], _RC)
+    shared = platform.handles[_RC]
+    assert routed is not shared
+
+    execute(platform, _customer_traffic(), sandbox={"CustomerSupport": _MOST_CONFINED})
+
+    assert isinstance(routed, ResponseChannel) and len(routed.sent) == 1
+    assert isinstance(shared, ResponseChannel) and shared.sent == []
+
+
+def test_confinement_holds_across_the_composed_boundary():
+    """Scenario: confinement holds across the composed boundary. A confined child node
+    reaches its capability only through the host closure over the handle the parent
+    routed — the child's executor holds no backend to provision one of its own. So when
+    the parent withdraws that authority, the confined `SendReply` crossing *inside the
+    child* fails, two altitudes down: confinement, and its revocation, cross the composed
+    boundary because nothing on the child side can re-mint the severed capability."""
+    from poc.handles import RevokedCapabilityError
+    from poc.runtime import execute
+
+    platform = _assemble_platform(revocable_instances=[(_RC, "customer_session")])
+    traffic = _customer_traffic()
+
+    # Before revocation the confined child completes.
+    before = execute(platform, traffic, sandbox={"CustomerSupport": _MOST_CONFINED})
+    assert before.subgraphs["CustomerSupport"].tiers["SendReply"] == "sandbox"
+
+    # Sever the routed instance; the confined crossing inside the child now fails.
+    platform.revoke(_RC, "customer_session")
+    with pytest.raises(RevokedCapabilityError):
+        execute(platform, traffic, sandbox={"CustomerSupport": _MOST_CONFINED})
+
+
 def test_confined_parse_message_still_discharges_trust():
     """The confined ParseMessage consumes `Untrusted[RawMessage]` and emits a plain
     `CustomerQuery`; downstream nodes see non-`Untrusted` values, exactly as on the
