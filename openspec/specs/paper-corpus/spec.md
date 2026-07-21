@@ -34,9 +34,16 @@ posting it as a preprint). That revision SHALL change no **prediction, hedge, or
 none added, removed, strengthened, or weakened — and SHALL be otherwise limited to typographic, grammatical,
 phrasing, formatting, and publication-metadata changes, correction of factually wrong details that would
 otherwise be errata, and removal of incidental material that is out of place for the paper's scope (such as an
-implementation-progress note). After such a revision the paper SHALL be re-frozen at the published commit and
-SHALL be errata-only thereafter. The revision SHALL be recorded (in the paper's errata record), and the paper
-SHALL NOT represent its revised text as byte-identical to the original freeze-point text where they differ.
+implementation-progress note).
+
+The single publication revision SHALL be considered concluded only when the paper is actually published.
+Publication-day changes that cannot exist before the publication venue's record exists — the DOI or identifier
+of the record the paper is published under, and its licence statement — together with rendering-legibility
+fixes to pinned figure sources, MAY be applied as the concluding step of that same single revision, even when
+preparation and conclusion land as separate commits (for example because the publication venue changed between
+them). Each step SHALL be recorded in the paper's errata record, the paper SHALL be re-frozen at the final
+published commit, and it SHALL be errata-only thereafter. The paper SHALL NOT represent its revised text as
+byte-identical to the original freeze-point text where they differ.
 
 #### Scenario: The frozen paper does not drift with the shared artifact
 - **WHEN** the shared artifact changes after the freeze (for example, a canonical graph gains new content)
@@ -54,6 +61,13 @@ SHALL NOT represent its revised text as byte-identical to the original freeze-po
 - **AND** the paper is re-frozen at the published commit and is errata-only thereafter
 - **AND** the revision is recorded, and the paper does not present its revised text as identical to the
   original freeze-point text where the two differ
+
+#### Scenario: The publication revision concludes at the actual publication event
+- **WHEN** the paper is published and its record's DOI exists only at publication time
+- **THEN** stamping that DOI and licence into the title block, and fixing a rendering-legibility defect in a
+  pinned figure source, are the concluding step of the same single publication revision, not a second revision
+- **AND** the concluding step changes no prediction, hedge, or argument, is recorded in the errata record, and
+  the paper is re-frozen at the published commit and errata-only thereafter
 
 ### Requirement: Citation hygiene accounts for the whole corpus
 The citation checks SHALL treat the corpus as a whole: a bibliography entry SHALL be considered used if any
