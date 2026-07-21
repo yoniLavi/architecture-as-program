@@ -31,22 +31,16 @@ import sys
 from pathlib import Path
 
 # The freeze point: the published-preprint commit of Paper 1 (the one-time
-# editorial revision of the June-2026 founding vision). Before the preprint this
-# was "59898cc~1", the last commit before poc/ existed.
-FREEZE_REF = "76a57ef3b153e7d970d3376888ebd7b1c7548ed7"
+# editorial revision of the June-2026 founding vision, edited to stand alone).
+# Before the preprint this was "59898cc~1", the last commit before poc/ existed.
+FREEZE_REF = "1a678d264a4fc0b6f68657dfd1ddec0bd5189432"
 
 # Frozen files in the corpus. At the published-preprint freeze commit the paper
 # already lives under papers/01-vision/, so a file's current path and its path at
 # the freeze commit are identical; FROZEN_FILES maps current -> frozen for the
 # comparison below, here an identity map over the frozen set.
-#
-# NOTE (July 2026): proposal.typ is temporarily absent from this set while it
-# completes its one sanctioned preprint revision — the standalone-vision edit that
-# drops the forward reference to the followup paper and the proof-of-concept
-# preview. The next commit re-pins it and moves FREEZE_REF to the final
-# published-preprint commit. The graph/diagram inputs are untouched and stay
-# guarded throughout.
 _FROZEN_PATHS = [
+    "papers/01-vision/proposal.typ",
     "papers/01-vision/graphs/customer-support.json",
     "papers/01-vision/graphs/support-platform.json",
     "papers/01-vision/graphs/schema.json",
