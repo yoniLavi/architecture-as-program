@@ -137,7 +137,7 @@ $(P1_OUT)/diagrams/%.svg: $(P1_DIR)/diagrams/%.typ | $(P1_OUT)/diagrams
 # Paper 1 documents. typst reads figures through the papers/01-vision/dist
 # symlink; --root keeps that (real) path inside the project root.
 $(P1_OUT)/proposal.pdf: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) | $(P1_OUT)
-	typst compile $(P1_DIR)/proposal.typ $@ --root $(ROOT)
+	typst compile $(P1_DIR)/proposal.typ $@ --root $(ROOT) --pdf-standard a-2b
 
 $(P1_PUB_PDF): $(P1_OUT)/proposal.pdf
 	cp $< $@
@@ -162,7 +162,7 @@ $(P1_OUT)/proposal.html: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(
 
 # ── Paper 2 (living): figures from the shared artifact ──────────────
 $(P2_OUT)/proposal.pdf: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json | $(P2_OUT)
-	typst compile $(P2_DIR)/proposal.typ $@ --root $(ROOT)
+	typst compile $(P2_DIR)/proposal.typ $@ --root $(ROOT) --pdf-standard a-2b
 
 $(P2_PUB_PDF): $(P2_OUT)/proposal.pdf
 	cp $< $@
