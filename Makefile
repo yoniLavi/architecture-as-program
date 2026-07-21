@@ -211,7 +211,8 @@ WASM_OUT    := $(ROOT)/poc/sandbox/wasm
 # WASI adapter leaves an import set containing only the node's capability
 # interfaces — which is the property the component tier exists to demonstrate.
 WASM_TARGET := wasm32-unknown-unknown
-WASM_MODULES := node_parse_message node_generate_response hostile_ambient hostile_ungranted
+WASM_MODULES := node_parse_message node_moderate_content node_fetch_context \
+                node_generate_response node_send_reply hostile_ambient hostile_ungranted
 
 # Build the component-tier WASM node artifacts and copy them into
 # poc/sandbox/wasm/ (which is committed).

@@ -52,6 +52,7 @@ from poc.graph import load_graph_dict
 from poc.sandbox import (
     INFERENCE_LLM,
     KB_READ,
+    RESPONSE_CHANNEL,
     TOOL_LLM,
     TYPES,
     Sandbox,
@@ -68,7 +69,10 @@ from poc.sandbox import (
 
 _ARTIFACTS = [
     "node_parse_message",
+    "node_moderate_content",
+    "node_fetch_context",
     "node_generate_response",
+    "node_send_reply",
     "hostile_ambient",
     "hostile_ungranted",
 ]
@@ -220,6 +224,36 @@ def test_generate_response_imports_only_its_two_interfaces():
     assert capability_imports("node_generate_response") == sorted([TOOL_LLM, KB_READ])
 
 
+def test_fetch_context_imports_only_the_read_db_interface():
+    """Scenario: the regenerated capability-holding node is confined to its declared
+    handles. `FetchContext` holds `DBHandle<'knowledge-base', read>` — its Rust
+    component imports exactly the `kb-read` interface and no other capability, so a
+    node regenerated in a second language exercises the typed DB boundary and is held
+    to it, not merely to a pure transformation."""
+    imports = capability_imports("node_fetch_context")
+    assert imports == [KB_READ]
+    # No writer, no LLM, no channel — the read handle is the whole of its authority.
+    assert TOOL_LLM not in imports
+    assert INFERENCE_LLM not in imports
+    assert RESPONSE_CHANNEL not in imports
+
+
+def test_send_reply_imports_only_the_response_channel_interface():
+    """`SendReply` holds `ResponseChannel<user-session>` — its component imports
+    exactly the write-only `response-channel` interface and nothing else. There is no
+    read interface in its world, so a node that can reply cannot read the channel."""
+    assert capability_imports("node_send_reply") == [RESPONSE_CHANNEL]
+
+
+def test_moderate_content_imports_only_the_inference_interface():
+    """`ModerateContent` holds `LLMClient<inference>` — inference only, exactly like
+    ParseMessage: its component imports the inference interface and no tool interface,
+    so it can be influenced by the query it classifies but cannot act on it."""
+    imports = capability_imports("node_moderate_content")
+    assert imports == [INFERENCE_LLM]
+    assert TOOL_LLM not in imports
+
+
 def test_inference_only_node_has_no_tool_interface_at_all():
     """Scenario: an inference-only node has no tool import at all. Stronger than the
     host tier's missing *method*: the tool-calling capability is absent from the
@@ -232,7 +266,13 @@ def test_inference_only_node_has_no_tool_interface_at_all():
 
 @pytest.mark.parametrize(
     ("component", "node"),
-    [("node_parse_message", "ParseMessage"), ("node_generate_response", "GenerateResponse")],
+    [
+        ("node_parse_message", "ParseMessage"),
+        ("node_moderate_content", "ModerateContent"),
+        ("node_fetch_context", "FetchContext"),
+        ("node_generate_response", "GenerateResponse"),
+        ("node_send_reply", "SendReply"),
+    ],
 )
 def test_component_imports_match_the_graph_signature(component, node):
     """Scenario: the boundary cannot drift from the node signature.
@@ -355,6 +395,55 @@ def test_component_and_host_tiers_produce_the_same_outcome():
     mixed = _run(BENIGN, sandbox=_SANDBOXED)
     assert host.order == mixed.order
     assert all(t == "host" for t in host.tiers.values())
+
+
+# The most-confined configuration: every node with a component port runs confined,
+# leaving only the pure `ReceiveMessage` narrowing on the host tier.
+_MOST_CONFINED = {
+    "ParseMessage",
+    "ModerateContent",
+    "FetchContext",
+    "GenerateResponse",
+    "SendReply",
+}
+
+
+def test_majority_of_the_customer_path_runs_confined():
+    """Scenario: majority-confined execution succeeds. In its most-confined
+    configuration the customer path runs five of its six nodes as WASM components, the
+    run completes with the same outcome as the host-tier run, and the per-node tier
+    report names each node's tier. The claim 'a node cannot exceed its declared
+    capabilities' now holds for most of the demonstrated graph, not for two nodes."""
+    from poc.demo import BENIGN
+    from poc.values import DeliveryConfirmation
+
+    confined = _run(BENIGN, sandbox=_MOST_CONFINED)
+    host = _run(BENIGN, sandbox=())
+
+    # Same terminal, same path, regardless of tier — the contracts are what match.
+    assert confined.order == host.order
+    assert isinstance(confined.terminals["SendReply"], DeliveryConfirmation)
+    assert confined.terminals["SendReply"] == host.terminals["SendReply"]
+
+    # Every node's tier is reported, and a strict majority of the taken path is confined.
+    assert set(confined.tiers) == set(confined.order)
+    sandboxed = [n for n in confined.order if confined.tiers[n] == "sandbox"]
+    assert set(sandboxed) == _MOST_CONFINED
+    assert 2 * len(sandboxed) > len(confined.order)  # 5 of 6
+    # Only the pure narrowing node stays host-side.
+    assert confined.tiers["ReceiveMessage"] == "host"
+
+
+def test_confined_identity_routing_lands_on_the_reply_channel():
+    """The confined `SendReply` reports the session it delivered to — the channel's
+    identity, which the guest never held as data, crosses back on the confirmation.
+    So identity routing is observable across the WIT boundary, not only at assembly."""
+    from poc.demo import BENIGN
+
+    result = _run(BENIGN, sandbox=_MOST_CONFINED)
+    confirmation = result.terminals["SendReply"]
+    assert confirmation.session_id == "user-session"
+    assert confirmation.delivered
 
 
 def test_confined_parse_message_still_discharges_trust():

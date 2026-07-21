@@ -26,20 +26,24 @@ shorter because the boundary got smarter.
 
 from __future__ import annotations
 
-from ..handles import InferenceLLM, ReadDBHandle, ToolLLM
+from ..handles import InferenceLLM, ReadDBHandle, ResponseChannel, ToolLLM
 from ..llm import LLMRequest
 from ..values import (
     AgentResponse,
     ConversationContext,
     CustomerQuery,
+    DeliveryConfirmation,
+    EscalationRequest,
     Intent,
     LLMError,
+    ModeratedQuery,
+    PolicyViolation,
     RawMessage,
     Untrusted,
     Variant,
 )
 from .host import Sandbox, record
-from .interfaces import INFERENCE_LLM, KB_READ, TOOL_LLM
+from .interfaces import INFERENCE_LLM, KB_READ, RESPONSE_CHANNEL, TOOL_LLM
 
 
 # WIT idents are kebab-case; the domain `Intent` enum's values are snake_case.
@@ -55,6 +59,24 @@ def _to_intent(wit_intent: str) -> Intent:
 def _from_intent(intent: Intent) -> str:
     """Lower a domain `Intent` into its WIT enum case."""
     return intent.value.replace("_", "-")
+
+
+def _query_record(cq: CustomerQuery):
+    """Lower a domain `CustomerQuery` into the WIT `customer-query` record."""
+    return record(
+        intent=_from_intent(cq.intent),
+        entities=list(cq.entities),
+        question=cq.question,
+    )
+
+
+def _to_query(wit) -> CustomerQuery:
+    """Lift a WIT `customer-query` record back into the domain `CustomerQuery`."""
+    return CustomerQuery(
+        intent=_to_intent(wit.intent),
+        entities=tuple(wit.entities),
+        question=wit.question,
+    )
 
 
 def parse_message_sandbox(data: Untrusted[RawMessage], llm: InferenceLLM) -> CustomerQuery:
@@ -135,10 +157,83 @@ def generate_response_sandbox(ctx: ConversationContext, llm: ToolLLM, db: ReadDB
     return Variant("error", LLMError(message=out.payload.message))
 
 
+def moderate_content_sandbox(query: CustomerQuery, llm: InferenceLLM) -> Variant:
+    """`ModerateContent` on the component tier.
+
+    Its world imports exactly `aap:caps/inference-llm@0.1.0` — inference only, like
+    ParseMessage. The three-way verdict comes back as a WIT `variant` whose case
+    labels (`ok` / `violation` / `escalation`) are the same ports the graph's
+    variant edges route on, so the runtime routes on the case directly.
+    """
+
+    def infer(system: str, prompt: str, task: str) -> str:
+        return llm.infer(system=system, prompt=prompt, task=task)
+
+    sandbox = Sandbox("node_moderate_content", {INFERENCE_LLM: {"infer": infer}})
+    out = sandbox.call("run", _query_record(query))
+
+    if out.tag == "ok":
+        return Variant("ok", ModeratedQuery(query=_to_query(out.payload.query)))
+    if out.tag == "violation":
+        return Variant("violation", PolicyViolation(reason=out.payload.reason))
+    return Variant(
+        "escalation",
+        EscalationRequest(query=_to_query(out.payload.query), reason=out.payload.reason),
+    )
+
+
+def fetch_context_sandbox(mq: ModeratedQuery, db: ReadDBHandle) -> ConversationContext:
+    """`FetchContext` on the component tier — a capability-holding node in Rust.
+
+    Its world imports exactly `aap:caps/kb-read@0.1.0`, the read-only knowledge
+    base. The `list<string>` the lookup returns crosses as a list; there is no
+    writer in the interface, so the confined node cannot mutate the store.
+    """
+
+    def lookup(query: str) -> list[str]:
+        return db.read(query)
+
+    sandbox = Sandbox("node_fetch_context", {KB_READ: {"lookup": lookup}})
+    out = sandbox.call("run", record(query=_query_record(mq.query)))
+
+    return ConversationContext(
+        intent=_to_intent(out.intent),
+        question=out.question,
+        knowledge=tuple(out.knowledge),
+    )
+
+
+def send_reply_sandbox(resp: AgentResponse, channel: ResponseChannel) -> DeliveryConfirmation:
+    """`SendReply` on the component tier — the identity-routing case.
+
+    Its world imports exactly `aap:caps/response-channel@0.1.0`, a write-only sink.
+    The host satisfies the single `send` crossing with a closure over *this* channel
+    instance — whichever one the parent routed — and stamps that instance's session
+    identity onto the confirmation. So which named instance a confined reply lands on
+    is observable across the WIT boundary, not merely at assembly time.
+    """
+
+    def send(text: str):
+        conf = channel.send(text)
+        # The WIT boundary record names the field `session`; the domain type spells
+        # it `session_id`. This adapter is the one place the two vocabularies meet.
+        return record(session=conf.session_id, delivered=conf.delivered)
+
+    sandbox = Sandbox("node_send_reply", {RESPONSE_CHANNEL: {"send": send}})
+    out = sandbox.call("run", record(text=resp.text))
+
+    return DeliveryConfirmation(session_id=out.session, delivered=out.delivered)
+
+
 # Component-tier implementations, keyed by graph node name — the sandbox analogue
 # of `poc.nodes.REGISTRY`. A node not listed here has no component port yet and
-# runs on the host tier.
+# runs on the host tier. Five of the six nodes on the demonstrated customer path
+# are ported (only the pure `ReceiveMessage` narrowing stays host-side), so a
+# majority of that path can run confined.
 SANDBOX_REGISTRY = {
     "ParseMessage": parse_message_sandbox,
+    "ModerateContent": moderate_content_sandbox,
+    "FetchContext": fetch_context_sandbox,
     "GenerateResponse": generate_response_sandbox,
+    "SendReply": send_reply_sandbox,
 }

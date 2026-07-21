@@ -526,6 +526,12 @@ def render(
     lines.append(f"- path: {' → '.join(f'`{n}`' for n in injection.path)}")
     tiers = ", ".join(f"`{n}`[{t}]" for n, t in injection.tiers.items())
     lines.append(f"- tiers: {tiers}")
+    confined = sum(1 for t in injection.tiers.values() if t == "sandbox")
+    lines.append(
+        f"- confined coverage: **{confined} of {len(injection.path)}** nodes on this path "
+        f"run as WASM components (only the pure narrowing node stays host-side); the "
+        f"per-node tier is reported above."
+    )
     lines.append("")
     lines.append("| property | result | |")
     lines.append("|---|---|---|")
@@ -695,6 +701,10 @@ def serialise(ev: Evaluation) -> str:
             "is_untrusted": ev.injection.is_untrusted,
             "adversarial_text_present": ev.injection.adversarial_text_present,
             "out_of_scope_call_refused": ev.injection.out_of_scope_call_refused,
+            # Confined-tier coverage of the taken path, so the paper can state it
+            # without hand-typing: how many nodes ran as WASM components, of how many.
+            "confined_count": sum(1 for t in ev.injection.tiers.values() if t == "sandbox"),
+            "path_length": len(ev.injection.path),
         },
         "tiers": {
             "escapes": [
@@ -727,6 +737,8 @@ def serialise(ev: Evaluation) -> str:
             "envelope_node_work_ms": f"{ENVELOPE_NODE_WORK_MS:.0f}",
             "envelope_max_overhead": f"{ENVELOPE_MAX_OVERHEAD:.0%}",
             "mutations_caught_pct": f"{caught / len(mutations):.0%}" if mutations else "n/a",
+            "confined_count": str(sum(1 for t in ev.injection.tiers.values() if t == "sandbox")),
+            "path_length": str(len(ev.injection.path)),
         },
     }
     return json.dumps(data, indent=2, sort_keys=False) + "\n"

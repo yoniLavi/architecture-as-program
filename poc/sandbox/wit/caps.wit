@@ -52,6 +52,34 @@ interface types {
         question: string,
     }
 
+    /// ModeratedQuery — a CustomerQuery that has passed content moderation. The
+    /// distinct type records, at the type level, that moderation has occurred;
+    /// FetchContext accepts only this, so a wiring that skips moderation is
+    /// ill-typed. The wrapper carries the query and nothing more.
+    record moderated-query {
+        query: customer-query,
+    }
+
+    /// PolicyViolation — ModerateContent's `violation` branch.
+    record policy-violation {
+        reason: string,
+    }
+
+    /// EscalationRequest — ModerateContent's `escalation` branch.
+    record escalation-request {
+        query: customer-query,
+        reason: string,
+    }
+
+    /// The three-way sum ModerateContent emits, with the same role labels the
+    /// graph's variant edges route on (`ok`, `violation`, `escalation`). As with
+    /// `response-result`, the case names are the routing ports by construction.
+    variant moderation-result {
+        ok(moderated-query),
+        violation(policy-violation),
+        escalation(escalation-request),
+    }
+
     /// ConversationContext — what the tool-capable node receives. Note what is
     /// absent: no raw message, no untrusted text field beyond the bounded
     /// question. The type is the attenuation.
@@ -67,6 +95,17 @@ interface types {
 
     record llm-error {
         message: string,
+    }
+
+    /// DeliveryConfirmation — what a reply node returns once the response channel
+    /// has accepted a message. The `session-id` is the channel's identity, known to
+    /// the host that provisioned the handle, not to the guest: the confined reply
+    /// node receives it back across the boundary rather than fabricating it, which
+    /// is how identity routing survives the WIT crossing (the send lands on exactly
+    /// the instance the parent routed).
+    record delivery-confirmation {
+        session: string,
+        delivered: bool,
     }
 
     /// The sum type `ok: AgentResponse | error: LLMError` from the graph, with
@@ -130,11 +169,16 @@ interface kb-read {
 }
 
 /// `ResponseChannel<user-session>` — write-only sink for replies to one session.
-/// Defined for completeness of the five capability kinds; the nodes that hold it
-/// (SendReply, HandleLLMError, NotifyUser) have not been ported to the component
-/// tier and run on the host tier.
+///
+/// `send` returns a `delivery-confirmation` rather than a bare bool: the host
+/// channel knows its own session identity and stamps it on the confirmation, so a
+/// confined reply node reports *which* session it delivered to without ever holding
+/// that identity as data. There is no `read`/`history` function — the channel is
+/// write-only, as the graph type says.
 interface response-channel {
-    send: func(text: string) -> bool;
+    use types.{delivery-confirmation};
+
+    send: func(text: string) -> delivery-confirmation;
 }
 
 /// `EventEmitter<'support-queue'>` — write-only sink for one topic. As above:
@@ -175,6 +219,44 @@ world generate-response {
     import kb-read;
 
     export run: func(ctx: conversation-context) -> response-result;
+}
+
+/// ModerateContent — holds `LLMClient<inference>`, and nothing else. Inference-only,
+/// exactly like ParseMessage: it can be *influenced* by the query it classifies but
+/// has no tool interface to *act* on it. Emits the three-way moderation sum.
+world moderate-content {
+    use types.{customer-query, moderation-result};
+
+    import inference-llm;
+
+    export run: func(query: customer-query) -> moderation-result;
+}
+
+/// FetchContext — holds `DBHandle<'knowledge-base', read>`, and nothing else. The
+/// read-only knowledge base is its whole authority: `kb-read` has no writer, so the
+/// node that assembles context cannot mutate the store. A capability-holding node
+/// regenerated in a second language, exercising the typed DB boundary rather than a
+/// pure transformation.
+world fetch-context {
+    use types.{moderated-query, conversation-context};
+
+    import kb-read;
+
+    export run: func(query: moderated-query) -> conversation-context;
+}
+
+/// SendReply — holds `ResponseChannel<user-session>`, and nothing else. The
+/// identity-routing case: its one crossing is `response-channel.send`, which the
+/// host satisfies with a closure over the *specific* channel instance the parent
+/// routed (the platform's `customer_session`, not its sibling's). The confirmation
+/// that returns carries that instance's session identity, so routing is observable
+/// across the WIT boundary.
+world send-reply {
+    use types.{agent-response, delivery-confirmation};
+
+    import response-channel;
+
+    export run: func(reply: agent-response) -> delivery-confirmation;
 }
 
 /// A hostile node body that reaches for ambient authority: filesystem, network,

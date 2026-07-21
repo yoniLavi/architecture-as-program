@@ -22,9 +22,17 @@ from .sandbox.host import Sandbox, capability_imports, wasi_imports
 from .values import ConversationContext, CustomerQuery, CustomerRequest, Untrusted
 from .variants import UNSAFE_VARIANTS
 
-# Nodes ported to the confined WASM tier. Used when the sandbox toolchain is
-# present; otherwise the demo runs them on the host tier and says so.
-SANDBOXED_NODES = {"ParseMessage", "GenerateResponse"}
+# Nodes ported to the confined WASM tier — five of the six on the customer path,
+# leaving only the pure `ReceiveMessage` narrowing on the host tier. Used when the
+# sandbox toolchain is present; otherwise the demo runs them on the host tier and
+# says so.
+SANDBOXED_NODES = {
+    "ParseMessage",
+    "ModerateContent",
+    "FetchContext",
+    "GenerateResponse",
+    "SendReply",
+}
 
 BENIGN = "Why was I charged twice on my latest invoice?"
 
@@ -232,18 +240,19 @@ def main() -> int:
 
     rule("Enforcement fidelity (read this)")
     if use_sandbox:
-        print("  The two ported nodes ran on the SANDBOX tier: a WASM module under an")
-        print("  empty WASI context, whose only imports are its declared capabilities.")
+        print("  The ported nodes ran on the SANDBOX tier: WASM components with no WASI")
+        print("  adapter, whose only imports are their declared capability interfaces.")
         print("  For those nodes 'no ambient authority' is enforced, not merely modelled —")
-        print("  the hostile-node section above shows the escapes it denies. The remaining")
-        print("  nodes ran on the HOST tier, which demonstrates the *shape* of confinement")
-        print("  but cannot stop a malicious node from `import os`. The two tiers composing")
-        print("  in one graph is the proposal's incremental-migration path.")
+        print("  the hostile-node section above shows the escapes it denies. A majority of")
+        print("  the customer path runs confined; the remaining nodes ran on the HOST tier,")
+        print("  which demonstrates the *shape* of confinement but cannot stop a malicious")
+        print("  node from `import os`. The two tiers composing in one graph is the")
+        print("  proposal's incremental-migration path.")
     else:
         print("  Every node ran on the HOST tier: it gets only its declared handles, but")
         print("  nothing stops a malicious node from `import os`. That is the *shape* of")
         print("  confinement, not enforcement. Install the sandbox (`uv sync --group poc`)")
-        print("  to run the two ported nodes with unforgeable WASM/WASI confinement.")
+        print("  to run the ported nodes with unforgeable WASM confinement.")
     print("  Memory-level unforgeability (CHERI) remains out of scope for this PoC.\n")
     return 0
 
