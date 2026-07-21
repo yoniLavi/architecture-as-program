@@ -1,5 +1,7 @@
 # Architecture as Program
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21473361.svg)](https://doi.org/10.5281/zenodo.21473361)
+
 A longitudinal research program on capability-injected, model-driven software
 development in the age of AI agents — organised as a **corpus of papers** backed
 by a single shared, tested research artifact.
@@ -14,7 +16,9 @@ Papers live under [`papers/`](papers/README.md), one directory per paper:
 
 - **Paper 1 — The founding vision** (`papers/01-vision/`): the original proposal,
   **frozen** and dated *June 2026*, reproducing the repository's state before the
-  executable demonstrator existed. Errata-only.
+  executable demonstrator existed. Errata-only. Published as a preprint:
+  [doi:10.5281/zenodo.21473361](https://doi.org/10.5281/zenodo.21473361)
+  (CC BY 4.0).
 - **Paper 2 — The demonstrator paper** (`papers/02-demonstrator/`): the living
   document, which folds in what the tested demonstrator (`poc/`, the validator,
   the two enforcement tiers) has since substantiated.

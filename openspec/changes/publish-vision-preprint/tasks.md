@@ -15,8 +15,8 @@
 - [x] 1.6 Full gate green: `make build` (freeze guard, citations, tests) at the new freeze point
 
 ## 2. Publication and recording
-- [ ] 2.1 Publish on Zenodo (human): metadata per the session's checklist (Publication → Preprint, CC BY 4.0,
+- [x] 2.1 Publish on Zenodo (human): metadata per the session's checklist (Publication → Preprint, CC BY 4.0,
       abstract as description, keywords), using the final built `dist/papers/01-vision/proposal.pdf`
-- [ ] 2.2 Record the published DOI in `README.md` (badge/link) and mark the publication revision as spent in
+- [x] 2.2 Record the published DOI in `README.md` (badge/link) and mark the publication revision as spent in
       `AGENTS.md`'s freeze note
-- [ ] 2.3 `openspec validate publish-vision-preprint --strict`; archive this change once published
+- [x] 2.3 `openspec validate publish-vision-preprint --strict`; archive this change once published
