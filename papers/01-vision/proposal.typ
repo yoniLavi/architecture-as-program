@@ -25,6 +25,12 @@
   #text(size: 11pt)[June 2026]
 ]
 
+#align(center)[
+  #text(size: 9pt)[
+    Preprint · #link("https://doi.org/10.5281/zenodo.21473361")[doi:10.5281/zenodo.21473361] · CC BY 4.0
+  ]
+]
+
 #v(1em)
 
 #align(center)[

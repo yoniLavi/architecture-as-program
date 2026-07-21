@@ -21,6 +21,20 @@ The title page dates the paper June 2026, when the vision was formed and
 circulated; the July copyedit is recorded here rather than in the paper, so the
 paper stands on its own as a published artifact.
 
+**Concluding step of that revision (21 July 2026).** The preprint was published
+on Zenodo rather than arXiv: arXiv's October 2025 moderation practice for its CS
+categories requires prior peer review for position papers, which a vision paper
+is. Per the `paper-corpus` spec, the single publication revision concludes at
+the actual publication event, and the concluding step is limited to
+publication-day changes: the record's DOI
+([10.5281/zenodo.21473361](https://doi.org/10.5281/zenodo.21473361)) and the
+CC BY 4.0 licence line stamped onto the title block, plus one
+rendering-legibility fix (the Figure 1 edge label overlapped its node boxes; it
+now breaks across two lines with wider column spacing — content identical). No
+prediction, hedge, or argument changed. The paper was then re-frozen at the
+published commit (`FREEZE_REF` in `scripts/check-freeze.py` names it) and is
+errata-only thereafter.
+
 Apart from that one sanctioned revision, the text is **never rewritten in
 place**. Corrections are recorded here instead, each dated, so the original
 claims and any later corrections both remain legible. If you need to know what

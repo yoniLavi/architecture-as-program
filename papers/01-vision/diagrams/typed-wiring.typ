@@ -8,7 +8,7 @@
 #set text(font: "New Computer Modern", size: 9pt)
 
 #diagram(
-  spacing: (34mm, 8mm),
+  spacing: (46mm, 8mm),
   node-stroke: 0.6pt,
   node-inset: 8pt,
   edge-stroke: 0.6pt,
@@ -28,9 +28,10 @@
   edge(
     (0, 0), (1, 0), "->",
     stroke: 1pt + rgb("#b33"),
-    label: text(size: 7pt, fill: rgb("#b33"))[
-      ill-typed: Untrusted\<UserMessage\> ≠ SanitisedPrompt
-    ],
+    label: align(center, text(size: 7pt, fill: rgb("#b33"))[
+      ill-typed: Untrusted\<UserMessage\> \
+      ≠ SanitisedPrompt
+    ]),
     label-side: left, label-sep: 4pt,
   ),
 )
