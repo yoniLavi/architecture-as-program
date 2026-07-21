@@ -4,8 +4,13 @@
 - [x] 1.2 Editorially tidy `papers/01-vision/proposal.typ` — typos, phrasing, formatting, and factually wrong
       details only; **diff every hunk against `59898cc~1` and reject any that changes a claim's meaning**
       (diff verified purely additive: the preprint-note front-matter block only; no existing line touched)
-- [x] 1.3 Add preprint front matter: author affiliation, a preface situating it as Paper 1 and pointing to
-      Paper 2, and honest dating ("First circulated June 2026; editorially revised for the preprint")
+- [x] 1.3 Add preprint front matter: author affiliation (Codeliance, already present), a **standalone**
+      preprint note, and honest dating ("first circulated June 2026; editorially revised July 2026"). Per
+      maintainer decision the vision paper stands alone and does **not** reference the followup; the earlier
+      forward-pointing note was replaced, its `lavi_demonstrator_2026` bib entry removed, and one
+      implementation-preview passage (the §7.1 proof-of-concept validator paragraph) was removed as out of
+      place for a vision paper. Net diff vs the June 2026 freeze: standalone note added, that passage removed;
+      no prediction, hedge, or argument changed (spec MODIFIED accordingly)
 - [x] 1.4 Re-freeze: move `FREEZE_REF` in `scripts/check-freeze.py` to the published commit (76a57ef); update
       `papers/01-vision/ERRATA.md` preamble to record the one-time revision and the new freeze point
       (probe path updated too, so the guard actively checks rather than silently skipping; drift-catch verified)
