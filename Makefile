@@ -37,6 +37,13 @@ P1_GRAPH_SVG  := $(patsubst $(P1_DIR)/graphs/%.json,$(P1_OUT)/graphs/%.svg,$(P1_
 P1_DIAG_SVG   := $(patsubst $(P1_DIR)/diagrams/%.typ,$(P1_OUT)/diagrams/%.svg,$(wildcard $(P1_DIR)/diagrams/*.typ))
 P1_DOCS := $(P1_OUT)/proposal.pdf $(P1_OUT)/proposal.md $(P1_OUT)/proposal.html
 
+# Publication-named PDF alias. Convention: a paper that has been published gets
+# a citable, self-identifying copy of its PDF, named lavi-<year>-<slug>.pdf with
+# the year fixed at publication (Paper 1: Zenodo, doi:10.5281/zenodo.21473361).
+# Internal build names stay proposal.* — the alias exists only at the
+# publication boundary; unpublished papers do not get one.
+P1_PUB_PDF := $(P1_OUT)/lavi-2026-architecture-as-program.pdf
+
 # Paper 2 (living) builds from the shared top-level artifact.
 P2_DIR := papers/02-demonstrator
 P2_OUT := $(DIST)/papers/02-demonstrator
@@ -55,7 +62,7 @@ build: validate-graphs check-freeze grammar evaluation paper1 paper2 aliases
 
 grammar: $(DIST)/grammar.md
 evaluation: $(DIST)/evaluation.md $(DIST)/evaluation.json
-paper1: $(P1_DOCS)
+paper1: $(P1_DOCS) $(P1_PUB_PDF)
 paper2: $(P2_DOCS)
 aliases: $(ALIASES)
 
@@ -130,6 +137,9 @@ $(P1_OUT)/diagrams/%.svg: $(P1_DIR)/diagrams/%.typ | $(P1_OUT)/diagrams
 # symlink; --root keeps that (real) path inside the project root.
 $(P1_OUT)/proposal.pdf: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) | $(P1_OUT)
 	typst compile $(P1_DIR)/proposal.typ $@ --root $(ROOT)
+
+$(P1_PUB_PDF): $(P1_OUT)/proposal.pdf
+	cp $< $@
 
 # pandoc for Paper 1 runs from the paper directory so its relative `dist/...`
 # figure paths resolve through the symlink; project files are reached via ../../.
