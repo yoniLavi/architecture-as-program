@@ -43,7 +43,43 @@ def launder_trust(graph: dict) -> dict:
     return g
 
 
+def mislabel_subgraph_output(platform: dict) -> dict:
+    """Make a sub-graph node lie about what it emits at its boundary.
+
+    Operates on `support-platform`, not `customer-support`: the mistake this catches
+    lives at a *composition* boundary. `CustomerSupport` terminates at
+    `DeliveryConfirmation` (its reply paths) or `EscalationTicket` (its escalation
+    path), so its honest boundary output is the union of the two. Here every service
+    node — and the `RecordAudit` input that consumes them — is relabelled to claim
+    only `DeliveryConfirmation`, hiding the escalation path. Every *edge* still
+    type-checks (the relabelling is internally consistent), so the blunt edge check
+    sees nothing wrong. It is caught only by the cross-graph *output-side* check,
+    which relates a sub-graph node's declared output to the union of the referenced
+    graph's terminal types — the check that closed the `ServiceOutcome` gap. Must be
+    validated together with `customer-support`, since the cross-graph analysis needs
+    the referenced graph present."""
+    g = copy.deepcopy(platform)
+    for node in g["nodes"]:
+        if node["name"] in ("CustomerSupport", "AgentDashboard", "BillingService"):
+            node["output"] = "DeliveryConfirmation"
+        if node["name"] == "RecordAudit":
+            node["inputs"] = [
+                "DeliveryConfirmation" if i == "DeliveryConfirmation | EscalationTicket" else i
+                for i in node["inputs"]
+            ]
+    return g
+
+
 UNSAFE_VARIANTS = {
     "bypass_pipeline": bypass_pipeline,
     "launder_trust": launder_trust,
+    "mislabel_subgraph_output": mislabel_subgraph_output,
 }
+
+# Variants whose fault is only visible with a *second* graph in the validation
+# batch (a sub-graph reference to another graph). They rewrite `support-platform`,
+# not `customer-support`, and must be validated together with the referenced graph
+# — so a single-graph rejection test does not apply to them. The evaluation corpus
+# (`poc/evaluate.py`) and `tests/test_poc_subgraph.py` cover them with the child
+# graph present.
+CROSS_GRAPH_VARIANTS = frozenset({"mislabel_subgraph_output"})

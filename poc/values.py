@@ -188,10 +188,15 @@ class AuditConfirmation:
 #
 # It is an alias rather than a wrapper deliberately: no aggregation node exists in
 # the graph, and inventing a runtime wrapper here would encode a design decision
-# (option iii) the proposal has not made. The cost is that nothing checks the
-# alias — the graph language has no alias mechanism, so `ServiceOutcome` is a name
-# the JSON asserts and the tooling cannot relate to the terminals it abbreviates.
-# That gap is real and remains open in the research agenda.
+# (option iii) the proposal has not made. The graph language still has no alias
+# *mechanism*: rather than assert an unresolvable name, the canonical graph now
+# spells the union structurally (`DeliveryConfirmation | EscalationTicket`) at each
+# service sub-graph node's boundary, and the cross-graph validator checks that
+# spelling against the union of the child graph's terminal output types (see
+# `graph_validator._validate_subgraph_output`). So the output side of composition
+# is now checked — structurally, not by name — closing the gap this alias once
+# left open. This Python alias is the same union, kept for the isinstance-based
+# `RecordAudit` handling and the tests that read it.
 ServiceOutcome = DeliveryConfirmation | EscalationTicket
 
 

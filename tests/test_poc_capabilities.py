@@ -30,7 +30,7 @@ from poc.handles import (
     rotatable,
 )
 from poc.llm import LLMRequest, LLMResponse, StubLLM, ToolCall
-from poc.variants import UNSAFE_VARIANTS
+from poc.variants import CROSS_GRAPH_VARIANTS, UNSAFE_VARIANTS
 
 STORES = {"knowledge-base": {"billing_question": ["Invoices are issued monthly."]}}
 
@@ -775,9 +775,12 @@ def test_no_rotatable_declaration_leaves_provisioning_unchanged(graph):
     assert g.rotators == {}
 
 
-@pytest.mark.parametrize("variant", sorted(UNSAFE_VARIANTS))
+@pytest.mark.parametrize("variant", sorted(set(UNSAFE_VARIANTS) - CROSS_GRAPH_VARIANTS))
 def test_unsafe_variants_are_rejected_at_assembly(graph, variant):
-    """Neither unsafe rewiring can be assembled — the runtime refuses to run it."""
+    """Every intra-graph unsafe rewiring is refused when assembled alone. (Cross-graph
+    variants rewrite the platform and need the referenced graph present; they are
+    covered where that batch is available — see `test_poc_subgraph` and the evaluation
+    corpus.)"""
     unsafe = UNSAFE_VARIANTS[variant](graph)
     assert validate_graph_dict(unsafe), "variant should not validate"
     with pytest.raises(AssemblyError):

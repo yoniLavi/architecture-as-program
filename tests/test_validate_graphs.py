@@ -423,6 +423,98 @@ class TestCrossGraphCheck(unittest.TestCase):
             self.assertEqual(validate_files(paths), [])
 
 
+class TestCrossGraphOutputCheck(unittest.TestCase):
+    """The output half of the sub-graph signature check. A sub-graph node's declared
+    boundary output must equal the union of the referenced graph's terminal output
+    types — the check that closes the `ServiceOutcome` gap. Structural, not nominal:
+    the graph spells the union, and the check compares member sets."""
+
+    def _multi_terminal_child(self) -> dict:
+        """A child whose two exclusive branches terminate at different types, so its
+        honest boundary output is the union `Delivered | Escalated`."""
+        return {
+            "name": "Service",
+            "parameters": ["Request", "DBHandle<'x', read>"],
+            "capabilities": ["DBHandle<'x', read>"],
+            "nodes": [
+                {
+                    "name": "Route",
+                    "inputs": ["Request", "DBHandle<'x', read>"],
+                    "output": "reply: Answer | escalate: Answer",
+                },
+                {"name": "Reply", "inputs": ["Answer"], "output": "Delivered"},
+                {"name": "Escalate", "inputs": ["Answer"], "output": "Escalated"},
+            ],
+            "data_edges": [
+                {"from": "Route.reply", "to": "Reply"},
+                {"from": "Route.escalate", "to": "Escalate"},
+            ],
+        }
+
+    def _parent(self, declared_output: str) -> dict:
+        return {
+            "name": "Platform",
+            "parameters": ["Request", "DBHandle<'x', read>", "DBHandle<'log', append>"],
+            "capabilities": ["DBHandle<'x', read>", "DBHandle<'log', append>"],
+            "nodes": [
+                {
+                    "name": "Service",
+                    "inputs": ["Request", "DBHandle<'x', read>"],
+                    "output": declared_output,
+                },
+                {
+                    "name": "Record",
+                    "inputs": [declared_output, "DBHandle<'log', append>"],
+                    "output": "Logged",
+                },
+            ],
+            "data_edges": [{"from": "Service", "to": "Record"}],
+        }
+
+    def _run(self, child: dict, parent: dict) -> list[str]:
+        with tempfile.TemporaryDirectory() as td:
+            paths = _write({"child.json": child, "parent.json": parent}, Path(td))
+            return validate_files(paths)
+
+    def test_honest_union_output_passes(self):
+        """Scenario: the canonical graphs still validate. The sub-graph node declares
+        the union of the child's terminals, so nothing objects."""
+        errors = self._run(self._multi_terminal_child(), self._parent("Delivered | Escalated"))
+        self.assertEqual(errors, [], msg=f"unexpected errors: {errors}")
+
+    def test_union_output_is_order_insensitive(self):
+        """Structural, not textual: the members are compared as a set, so reversing
+        the union still validates."""
+        errors = self._run(self._multi_terminal_child(), self._parent("Escalated | Delivered"))
+        self.assertEqual(errors, [], msg=f"unexpected errors: {errors}")
+
+    def test_narrowed_output_rejected_without_edge_mismatch(self):
+        """Scenario: a mismatched declared output is rejected at assembly time. The
+        node claims only `Delivered`, hiding the escalation terminal. Every edge still
+        type-checks (the `Record` input is narrowed in lockstep), so the rejection is
+        the output-side cross-graph check, not an edge type mismatch."""
+        errors = self._run(self._multi_terminal_child(), self._parent("Delivered"))
+        self.assertTrue(
+            any("declared output" in e and "terminal output types" in e for e in errors),
+            msg=f"expected output-side cross-graph rejection; got: {errors}",
+        )
+        self.assertFalse(
+            any("type mismatch" in e for e in errors),
+            msg=f"should not be caught as an edge type mismatch; got: {errors}",
+        )
+
+    def test_widened_output_rejected(self):
+        """An output claiming *more* than the terminals emit is equally a lie: the
+        member sets differ, so the union with a spurious extra member is rejected."""
+        errors = self._run(
+            self._multi_terminal_child(), self._parent("Delivered | Escalated | Extra")
+        )
+        self.assertTrue(
+            any("declared output" in e and "terminal output types" in e for e in errors),
+            msg=f"expected output-side rejection of the widened union; got: {errors}",
+        )
+
+
 class TestCapabilityIdentities(unittest.TestCase):
     """Graph-source capability identity: a node may name a distinct instance of a
     capability it holds. The validator's sole semantic rule mirrors the runtime's

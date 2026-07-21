@@ -39,7 +39,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .demo import ADVERSARIAL, SANDBOXED_NODES, STORES
-from .graph import REPO_ROOT, AssemblyError, assemble, load_graph_dict, validate_graph_dict
+from .graph import (
+    REPO_ROOT,
+    AssemblyError,
+    assemble,
+    load_graph_dict,
+    validate_graph_dict,
+    validate_graph_dicts,
+)
 from .handles import CapabilityError, ToolLLM
 from .llm import LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
@@ -86,14 +93,17 @@ REJECTED = "rejected"
 
 REASON_EDGE_TYPE = "edge type-compatibility"
 REASON_TRUST_LATTICE = "trust lattice"
+REASON_CROSS_GRAPH = "cross-graph signature"
 
 # A reason class is identified by substrings that must all appear in the
-# validator's errors. The two classes are disjoint on the current corpus — a
-# laundering rejection carries no "type mismatch" — and `classify` treats a case
-# matching both (or neither) as a divergence rather than guessing.
+# validator's errors. The classes are disjoint on the current corpus — a
+# laundering rejection carries no "type mismatch", and an output-side composition
+# fault carries neither — and `classify` treats a case matching more than one (or
+# none) as a divergence rather than guessing.
 REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     REASON_EDGE_TYPE: ("type mismatch",),
     REASON_TRUST_LATTICE: ("upward coercion", "laundering", "discharges_trust"),
+    REASON_CROSS_GRAPH: ("declared output", "terminal output types"),
 }
 
 
@@ -106,6 +116,13 @@ class Case:
     expected: str
     reason: str | None  # the reason class an unsafe case must be caught by
     note: str
+    # The canonical graph a mutation rewrites (mutations only); canonical cases load
+    # `name`. Defaults to the customer-support graph the original corpus mutated.
+    base: str = "customer-support"
+    # Other canonical graphs to validate *alongside* this case, so cross-graph
+    # checks fire. A composition fault is invisible unless the referenced graph is
+    # in the batch, so an output-side case names the child graph here.
+    with_graphs: tuple[str, ...] = ()
 
 
 CORPUS: tuple[Case, ...] = (
@@ -122,7 +139,10 @@ CORPUS: tuple[Case, ...] = (
         "canonical",
         ACCEPTED,
         None,
-        "The composition graph assembles, including its cross-graph capability narrowing.",
+        "The composition graph assembles, including its cross-graph capability narrowing "
+        "and the output-side check that each service sub-graph's declared boundary type is "
+        "the union of the referenced graph's terminal outputs.",
+        with_graphs=("customer-support",),
     ),
     Case(
         "bypass_pipeline",
@@ -140,6 +160,20 @@ CORPUS: tuple[Case, ...] = (
         "The subtle mistake: widen the tool-capable node's input so the edge *does* "
         "type-check. Caught instead as upward coercion — trust cannot be laundered by "
         "relabelling the consumer.",
+    ),
+    Case(
+        "mislabel_subgraph_output",
+        "mutation",
+        REJECTED,
+        REASON_CROSS_GRAPH,
+        "The composition mistake, now caught: a service sub-graph node claims a boundary "
+        "output (`DeliveryConfirmation`) narrower than the union its terminals actually "
+        "emit (`DeliveryConfirmation | EscalationTicket`), hiding the escalation path. "
+        "Every edge still type-checks, so this is invisible to the edge analysis; the "
+        "output-side cross-graph check catches it — the check that closed the "
+        "`ServiceOutcome` gap.",
+        base="support-platform",
+        with_graphs=("customer-support",),
     ),
 )
 
@@ -178,15 +212,21 @@ def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
             f"verdict — an unpinned one would be counted as caught without being checked."
         )
 
-    base = load_graph_dict("customer-support")
     outcomes: list[Outcome] = []
     for case in corpus:
         if case.kind == "canonical":
             graph = load_graph_dict(case.name)
         else:
-            graph = UNSAFE_VARIANTS[case.name](base)
+            graph = UNSAFE_VARIANTS[case.name](load_graph_dict(case.base))
 
-        errors = validate_graph_dict(graph)
+        # A composition case names the child graph in `with_graphs`, so the
+        # cross-graph analysis has it in the batch; an intra-graph case validates
+        # alone, exactly as before.
+        if case.with_graphs:
+            others = [load_graph_dict(g) for g in case.with_graphs]
+            errors = validate_graph_dicts([graph, *others])
+        else:
+            errors = validate_graph_dict(graph)
         if errors:
             outcomes.append(Outcome(case, REJECTED, classify(errors), " ".join(errors[0].split())))
             continue

@@ -153,6 +153,23 @@ def validate_graph_dict(graph: dict) -> list[str]:
         return validate_files([p])
 
 
+def validate_graph_dicts(graphs: list[dict]) -> list[str]:
+    """Validate several in-memory graphs *together*, so the cross-graph checks
+    (a sub-graph node's inputs and output against the referenced graph) fire.
+
+    `validate_graph_dict` validates one graph in isolation, where a sub-graph
+    reference resolves to nothing and the cross-graph layer is silent. A composition
+    mistake — a sub-graph node misdescribing its boundary output — is only visible
+    when the referenced graph is in the same batch, which is what this provides."""
+    with tempfile.TemporaryDirectory() as td:
+        paths = []
+        for g in graphs:
+            p = Path(td) / f"{g.get('name', 'graph')}.json"
+            p.write_text(json.dumps(g))
+            paths.append(p)
+        return validate_files(paths)
+
+
 def load_graph_dict(name_or_path: str | Path) -> dict:
     """Load a graph JSON by canonical name (e.g. 'customer-support') or path."""
     path = Path(name_or_path)

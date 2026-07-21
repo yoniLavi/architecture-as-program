@@ -31,6 +31,7 @@ from pathlib import Path
 from type_parser import (
     ParseError,
     Trust,
+    TSum,
     Type,
     is_assignable,
     parse_type,
@@ -423,6 +424,80 @@ def _validate_layout(
 # ── Cross-graph check ──────────────────────────────────────────────
 
 
+def _type_members(ast: Type) -> set[str]:
+    """The set of data shapes a type denotes, trust stripped. A sum contributes
+    one member per variant; any other type contributes itself. Used to compare a
+    sub-graph node's declared output against the child graph's terminal types
+    *structurally*, so `DeliveryConfirmation | EscalationTicket` is the same claim
+    however its variants are ordered or labelled."""
+    if isinstance(ast, TSum):
+        return {unparse(strip_trust(v.inner)) for v in ast.variants}
+    return {unparse(strip_trust(ast))}
+
+
+def _terminal_output_members(graph: dict) -> set[str]:
+    """The union of the data shapes a graph can emit at its boundary: the output
+    types of its terminal nodes (those with no outgoing edge), trust stripped.
+
+    This is what a sub-graph's declared boundary output must honestly describe.
+    Exactly one terminal is reached per run, so the boundary value is always a
+    member of this set; the declared output type is the set's name."""
+    sources = set()
+    for e in graph.get("data_edges", []):
+        if isinstance(e, dict) and isinstance(e.get("from"), str):
+            sources.add(e["from"].rsplit(".", 1)[0] if "." in e["from"] else e["from"])
+    members: set[str] = set()
+    for node in graph["nodes"]:
+        if not isinstance(node, dict) or node.get("name") in sources:
+            continue
+        out = node.get("output")
+        if not isinstance(out, str):
+            continue
+        try:
+            members |= _type_members(parse_type(out))
+        except ParseError:
+            continue  # a malformed terminal output is already flagged per-graph
+    return members
+
+
+def _validate_subgraph_output(
+    path: Path,
+    ref: str,
+    node: dict,
+    target: dict,
+    errors: list[str],
+) -> None:
+    """The output half of the sub-graph signature check, dual to the input half.
+
+    The vision left this unchecked: a sub-graph node could declare any boundary
+    output and no analysis would object, so the union-alias convention
+    (`ServiceOutcome = DeliveryConfirmation | EscalationTicket`) was asserted in the
+    JSON and verified by nothing. The check is *structural, not nominal* — the
+    graph spells the union rather than naming an alias the language cannot resolve,
+    and here the declared output's member set must equal the union of the referenced
+    graph's terminal output types. A mismatch means the boundary type misdescribes
+    what the sub-graph emits."""
+    declared = node.get("output")
+    if not isinstance(declared, str):
+        return  # already flagged by the per-graph node check
+    try:
+        declared_members = _type_members(parse_type(declared))
+    except ParseError:
+        return  # malformed output already flagged per-graph
+    terminal_members = _terminal_output_members(target)
+    if not terminal_members:
+        return  # a graph with no discernible terminals is a separate structural fault
+    if declared_members != terminal_members:
+        errors.append(
+            f"{path.name}: node {ref!r} is used as a sub-graph but its declared "
+            f"output does not match the union of {ref!r}'s terminal output types.\n"
+            f"      declared output:  {declared}  (members: {sorted(declared_members)})\n"
+            f"      terminal outputs: {sorted(terminal_members)}\n"
+            f"      A sub-graph's boundary output must honestly describe what its "
+            f"terminals emit; spell the union so the analysis can check it."
+        )
+
+
 def _validate_cross_graph(
     graphs: dict[str, dict],
     graphs_path: dict[str, Path],
@@ -432,7 +507,9 @@ def _validate_cross_graph(
     reference. Its input list must satisfy that graph's parameter list
     position-by-position: data inputs must match by equality; capability
     inputs may be provided with at least the authority the sub-graph
-    declares (capability narrowing — see `type_parser.is_assignable`)."""
+    declares (capability narrowing — see `type_parser.is_assignable`).
+    Its declared *output* must, dually, equal the union of the referenced
+    graph's terminal output types (`_validate_subgraph_output`)."""
     for gname, g in graphs.items():
         path = graphs_path[gname]
         for n in g["nodes"]:
@@ -443,6 +520,8 @@ def _validate_cross_graph(
             provided = n["inputs"]
             expected = target["parameters"]
             target_caps = set(target["capabilities"])
+
+            _validate_subgraph_output(path, ref, n, target, errors)
 
             if len(provided) != len(expected):
                 errors.append(

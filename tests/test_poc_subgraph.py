@@ -12,18 +12,17 @@ mechanism (routing, identity, isolation, the guards) without dragging the whole
 support platform through every assertion; the shipped `SupportPlatform` then
 exercises the same machinery end-to-end, which is the claim that matters.
 
-A note on `ServiceOutcome`, since it looks like a hole and is not one.
+A note on `ServiceOutcome`, since it used to be a hole and is now closed.
 `CustomerSupport` ends at four terminals emitting two types
-(`DeliveryConfirmation`, `EscalationTicket`), while `SupportPlatform` declares its
-`CustomerSupport` node outputs `ServiceOutcome`. That name is the *union alias* of
-those terminal types — option (i) of the research agenda's sub-graph output
-aggregation, which the proposal names as the working convention of the composition
-example. Exactly one terminal is reached per run (the branches are exclusive), so
-the value handed back is always a member of the union. What is genuinely open is
-that nothing *checks* the alias: the graph language has no alias mechanism, so the
-runtime lifts the reached terminal and the relation between `ServiceOutcome` and
-the terminals it abbreviates is asserted by the JSON rather than verified. A test
-below pins the shape of that gap so it cannot be forgotten.
+(`DeliveryConfirmation`, `EscalationTicket`). The `SupportPlatform` node that runs
+it declares that union as its boundary output — spelled structurally, because the
+graph language has no alias *mechanism* to resolve a bare `ServiceOutcome` name.
+Exactly one terminal is reached per run (the branches are exclusive), so the value
+handed back is always a member of the union. The cross-graph analysis now checks
+the output side too: a sub-graph node's declared boundary type must equal the union
+of the referenced graph's terminal outputs, so a node can no longer misdescribe
+what it emits. A test below pins that the check accepts the honest spelling and
+rejects a narrowed one.
 
 What the runtime does refuse is a sub-graph run reaching *several* terminals at
 once: there is then no single boundary value, and picking one would be a guess.
@@ -39,7 +38,7 @@ import copy
 
 import pytest
 
-from poc.graph import TIER_GRAPH, assemble, load_graph_dict
+from poc.graph import TIER_GRAPH, assemble, load_graph_dict, validate_graph_dicts
 from poc.handles import AppendDBHandle, ResponseChannel
 from poc.llm import StubLLM
 from poc.nodes import REGISTRY
@@ -421,14 +420,13 @@ def test_the_untaken_service_branches_need_no_implementations(platform):
         execute(platform, HTTPRoute(path="/agent/queue", session_id="s", body="hi"))
 
 
-def test_nothing_checks_the_service_outcome_alias():
-    """The genuine open gap, recorded as a fact about the tooling rather than a
-    claim in prose. `ServiceOutcome` abbreviates the union of `CustomerSupport`'s
-    terminal types, but the graph language has no alias mechanism and the
-    cross-graph validator only relates a sub-graph node's *inputs* to the child's
-    parameters — it never looks at the output side. So the alias is asserted by the
-    JSON and verified by nothing (research agenda, "Sub-graph output
-    aggregation")."""
+def test_the_output_side_of_composition_is_checked():
+    """The gap, now closed. `CustomerSupport`'s terminals emit
+    `DeliveryConfirmation | EscalationTicket`, and `SupportPlatform` declares exactly
+    that union as the sub-graph node's boundary output. The cross-graph analysis now
+    relates the two: the honest spelling validates, and a narrowed declaration —
+    claiming only `DeliveryConfirmation`, hiding the escalation path — is rejected
+    with a reason that names the output side, not an edge type mismatch."""
     child = load_graph_dict("customer-support")
     sources = {e["from"].split(".")[0] for e in child["data_edges"]}
     terminals = {n["output"] for n in child["nodes"] if n["name"] not in sources}
@@ -436,9 +434,22 @@ def test_nothing_checks_the_service_outcome_alias():
 
     parent = load_graph_dict("support-platform")
     node = next(n for n in parent["nodes"] if n["name"] == "CustomerSupport")
-    assert node["output"] == "ServiceOutcome"
+    # The boundary output is spelled as the structural union, not a bare alias name
+    # the language cannot resolve.
+    assert node["output"] == "DeliveryConfirmation | EscalationTicket"
 
-    # The name the parent declares appears nowhere in the child: the relation
-    # between the alias and what it abbreviates lives only in the prose.
-    assert node["output"] not in terminals
-    assert not any("ServiceOutcome" in n.get("output", "") for n in child["nodes"])
+    # Honest spelling: the canonical pair validates.
+    assert validate_graph_dicts([parent, child]) == []
+
+    # Narrow the declaration (and its consumers, so every *edge* still type-checks):
+    # the mistake is now invisible to the edge analysis and visible only to the
+    # output-side check.
+    narrowed = copy.deepcopy(parent)
+    for n in narrowed["nodes"]:
+        if n["name"] in ("CustomerSupport", "AgentDashboard", "BillingService"):
+            n["output"] = "DeliveryConfirmation"
+        if n["name"] == "RecordAudit":
+            n["inputs"][0] = "DeliveryConfirmation"
+    errors = validate_graph_dicts([narrowed, child])
+    assert any("declared output" in e and "terminal output types" in e for e in errors)
+    assert not any("type mismatch" in e for e in errors)
