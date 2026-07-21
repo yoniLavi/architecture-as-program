@@ -49,11 +49,13 @@ figure tree:
 under `dist/papers/<id>/` — `proposal.{pdf,md,html}` plus the figures each paper
 references.
 
-A **published** paper's PDF is additionally emitted under a citable,
-self-identifying name: `lavi-<year>-<slug>.pdf`, with the year fixed at
-publication. That copy is the file to upload to venues; internal build names
-stay `proposal.*` (stable paths, no link churn), and unpublished papers do not
-get one. Paper 1's is `lavi-2026-architecture-as-program.pdf` (Zenodo,
-[doi:10.5281/zenodo.21473361](https://doi.org/10.5281/zenodo.21473361)). For one transition, `dist/proposal.{pdf,md,html}` are also emitted as
+Each paper's PDF is additionally emitted under a citable, self-identifying
+name: `lavi-<year>-<slug>.pdf`. That copy is the file to upload to venues;
+internal build names stay `proposal.*` (stable paths, no link churn). The year
+is finalised at publication: Paper 1's is `lavi-2026-architecture-as-program.pdf`
+(published — Zenodo,
+[doi:10.5281/zenodo.21473361](https://doi.org/10.5281/zenodo.21473361));
+Paper 2's is `lavi-2026-signal-graph-demonstrator.pdf` (provisional until it
+publishes; rename if the year slips). For one transition, `dist/proposal.{pdf,md,html}` are also emitted as
 deprecated aliases to Paper 2, so existing inbound links keep working; they will
 be removed once those links point at `dist/papers/02-demonstrator/`.

@@ -37,17 +37,18 @@ P1_GRAPH_SVG  := $(patsubst $(P1_DIR)/graphs/%.json,$(P1_OUT)/graphs/%.svg,$(P1_
 P1_DIAG_SVG   := $(patsubst $(P1_DIR)/diagrams/%.typ,$(P1_OUT)/diagrams/%.svg,$(wildcard $(P1_DIR)/diagrams/*.typ))
 P1_DOCS := $(P1_OUT)/proposal.pdf $(P1_OUT)/proposal.md $(P1_OUT)/proposal.html
 
-# Publication-named PDF alias. Convention: a paper that has been published gets
-# a citable, self-identifying copy of its PDF, named lavi-<year>-<slug>.pdf with
-# the year fixed at publication (Paper 1: Zenodo, doi:10.5281/zenodo.21473361).
-# Internal build names stay proposal.* — the alias exists only at the
-# publication boundary; unpublished papers do not get one.
+# Publication-named PDF alias. Convention: each paper's PDF is also emitted as
+# a citable, self-identifying copy named lavi-<year>-<slug>.pdf — the file to
+# upload to venues. Internal build names stay proposal.*. The year is finalised
+# at publication (Paper 1: 2026, Zenodo, doi:10.5281/zenodo.21473361; Paper 2:
+# provisional until published — rename if the year slips).
 P1_PUB_PDF := $(P1_OUT)/lavi-2026-architecture-as-program.pdf
 
 # Paper 2 (living) builds from the shared top-level artifact.
 P2_DIR := papers/02-demonstrator
 P2_OUT := $(DIST)/papers/02-demonstrator
 P2_DOCS := $(P2_OUT)/proposal.pdf $(P2_OUT)/proposal.md $(P2_OUT)/proposal.html
+P2_PUB_PDF := $(P2_OUT)/lavi-2026-signal-graph-demonstrator.pdf
 
 # Deprecated compatibility aliases: dist/proposal.{pdf,md,html} are copies of
 # Paper 2's outputs, kept for one transition so existing inbound links and the
@@ -63,7 +64,7 @@ build: validate-graphs check-freeze grammar evaluation paper1 paper2 aliases
 grammar: $(DIST)/grammar.md
 evaluation: $(DIST)/evaluation.md $(DIST)/evaluation.json
 paper1: $(P1_DOCS) $(P1_PUB_PDF)
-paper2: $(P2_DOCS)
+paper2: $(P2_DOCS) $(P2_PUB_PDF)
 aliases: $(ALIASES)
 
 # Grammar card — built from scripts/type_parser.py and the canonical
@@ -162,6 +163,9 @@ $(P1_OUT)/proposal.html: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(
 # ── Paper 2 (living): figures from the shared artifact ──────────────
 $(P2_OUT)/proposal.pdf: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json | $(P2_OUT)
 	typst compile $(P2_DIR)/proposal.typ $@ --root $(ROOT)
+
+$(P2_PUB_PDF): $(P2_OUT)/proposal.pdf
+	cp $< $@
 
 $(P2_OUT)/proposal.md: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P2_OUT)
 	pandoc $(P2_DIR)/proposal.typ -f typst -t markdown --wrap=none \
