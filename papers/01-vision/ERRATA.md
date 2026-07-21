@@ -8,17 +8,17 @@ vision genuinely existed in that form. A build check
 (`scripts/check-freeze.py`) guards the sources against silent edits.
 
 **One-time preprint revision (July 2026).** For posting as an arXiv preprint,
-`proposal.typ` underwent a single editorial-and-metadata revision: typographic
-and phrasing tidies plus publication front matter (a preprint note, honest
-dating). **No claim or prediction was added, removed, strengthened, or
-weakened** — the revision was diffed hunk-by-hunk against the June 2026 freeze
-commit to keep it so, because Paper 2's predictions-and-outcomes accounting is
-only honest if the vision's claims are exactly as first made. After that
-revision the paper was **re-frozen at the published-preprint commit** (the
-freeze reference in `scripts/check-freeze.py` moved to it), and it is errata-only
-again thereafter. The revised text is *not* byte-identical to the June 2026
-freeze point; it is substantively identical, and the front matter says so
-plainly rather than pretending otherwise.
+`proposal.typ` underwent a single editorial revision: typographic and phrasing
+tidies, a publication preprint note with honest dating, and the removal of one
+short passage that previewed an early proof-of-concept implementation (out of
+place in a vision paper, and covered separately). **No prediction or argument of
+the vision was added, removed, strengthened, or weakened** — the revision was
+diffed against the June 2026 freeze commit to keep it so. After that revision
+the paper was **re-frozen at the published-preprint commit** (the `FREEZE_REF`
+in `scripts/check-freeze.py` moved to it), and it is errata-only again
+thereafter. The revised text is *not* byte-identical to the June 2026 freeze
+point; it is substantively the same vision, and the front matter says so plainly
+rather than pretending otherwise.
 
 Apart from that one sanctioned revision, the text is **never rewritten in
 place**. Corrections are recorded here instead, each dated, so the original
