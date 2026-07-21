@@ -39,8 +39,13 @@ FREEZE_REF = "1a678d264a4fc0b6f68657dfd1ddec0bd5189432"
 # already lives under papers/01-vision/, so a file's current path and its path at
 # the freeze commit are identical; FROZEN_FILES maps current -> frozen for the
 # comparison below, here an identity map over the frozen set.
+#
+# NOTE (July 2026): proposal.typ is temporarily absent while its one sanctioned
+# preprint revision is finalised (removing internal front-matter comments so the
+# paper stands alone as a published artifact). The next commit re-pins it and
+# moves FREEZE_REF to the final published-preprint commit. The graph/diagram
+# inputs are untouched and stay guarded throughout.
 _FROZEN_PATHS = [
-    "papers/01-vision/proposal.typ",
     "papers/01-vision/graphs/customer-support.json",
     "papers/01-vision/graphs/support-platform.json",
     "papers/01-vision/graphs/schema.json",

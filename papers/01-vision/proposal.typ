@@ -31,16 +31,6 @@
   #block(width: 85%, stroke: 0.5pt + luma(180), inset: 1em, radius: 3pt)[
     #set text(size: 9pt)
     #set par(justify: true)
-    *Preprint note.* This paper presents a founding vision for capability-injected, model-driven software development in the age of AI coding agents. It was first circulated in June 2026 and has been editorially revised for this preprint in July 2026 — typography and phrasing — with its predictions and arguments unchanged.
-  ]
-]
-
-#v(1em)
-
-#align(center)[
-  #block(width: 85%, stroke: 0.5pt + luma(180), inset: 1em, radius: 3pt)[
-    #set text(size: 9pt)
-    #set par(justify: true)
     *Note on process.* This proposal was developed collaboratively with Claude (Anthropic), which served as primary drafter under the author's direction. The architectural vision and synthesis are the author's; the literature survey, formal framing, and prose were produced by the AI and verified against primary sources. This transparent accounting reflects the proposal's own thesis: that the interesting artifact is the _intent_, not the implementation, and that honest attribution of AI contribution is preferable to ambiguity.
   ]
 ]
