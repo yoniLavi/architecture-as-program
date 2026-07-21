@@ -7,14 +7,16 @@ repository's state before the executable demonstrator (poc/) existed, dated June
 if its sources are not quietly rewritten. This check compares each frozen file
 against its content at the freeze commit and fails if any has drifted.
 
-The freeze reference moved once. The paper was originally frozen at 59898cc~1
-(the last pre-poc commit). In July 2026 it received a single sanctioned
-editorial-and-metadata revision for its arXiv preprint — typos, phrasing, and
-publication front matter, with no substantive claim changed — after which it was
-re-frozen at the published-preprint commit named below. That commit is where the
-paper lives under papers/01-vision/, so the frozen paths and the freeze ref are
-now the same on both sides of the comparison. See papers/01-vision/ERRATA.md and
-the paper-corpus spec for the rule that permits one such revision.
+The freeze reference moved with the paper's single sanctioned publication
+revision. The paper was originally frozen at 59898cc~1 (the last pre-poc
+commit). In July 2026 it received the revision's preparation step (typos,
+phrasing, and publication front matter, with no substantive claim changed) and
+was re-frozen; on 21 July 2026 the revision concluded at the actual publication
+event — the Zenodo DOI and licence stamped onto the title block, plus a
+Figure 1 legibility fix — and the paper was re-frozen at the published commit
+named below. The frozen paths and the freeze ref are the same on both sides of
+the comparison. See papers/01-vision/ERRATA.md and the paper-corpus spec for
+the rule that permits one such revision and its concluding step.
 
 Corrections to a frozen paper are otherwise recorded in its ERRATA.md, never by
 editing the frozen text — so any diff here is a mistake, and the build should
@@ -30,11 +32,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-# The freeze point: the published-preprint commit of Paper 1 (the one-time
-# editorial revision of the June-2026 founding vision, edited to stand alone as a
-# self-contained preprint). Before the preprint this was "59898cc~1", the last
-# commit before poc/ existed.
-FREEZE_REF = "0137aea197604c32bf7c6bfb538cfb1bed3c3d86"
+# The freeze point: the published commit of Paper 1 — the concluding step of its
+# one-time publication revision (Zenodo DOI + licence stamp, Figure 1 legibility
+# fix). Previously 0137aea (the preprint preparation step); originally
+# "59898cc~1", the last commit before poc/ existed.
+FREEZE_REF = "c4ae487c4dc232ca763333fb0bbe79f34c621c0a"
 
 # Frozen files in the corpus. At the published-preprint freeze commit the paper
 # already lives under papers/01-vision/, so a file's current path and its path at
