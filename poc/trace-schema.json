@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codeliance/architecture-as-program/poc/trace-schema.json",
+  "title": "Signal graph execution trace",
+  "description": "A machine-readable trace of one signal-graph run: per node, in execution order, the enforcement tier that ran it, the trust labels of its input and output, and the distinct capability crossings it made (WIT interface + instance name). Sub-graph runs nest. Structure is deterministic across runs of the same graph and input; timing, when present, is an optional field excluded from structural comparison.",
+  "$ref": "#/$defs/graphTrace",
+  "$defs": {
+    "graphTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph", "nodes"],
+      "properties": {
+        "graph": {
+          "description": "The name of the graph that ran.",
+          "type": "string",
+          "minLength": 1
+        },
+        "nodes": {
+          "description": "The nodes that ran, in execution order along the taken path.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeTrace" }
+        }
+      }
+    },
+    "nodeTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node", "tier", "input_trust", "output_trust", "crossings"],
+      "properties": {
+        "node": {
+          "description": "The node name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "description": "The enforcement tier that ran the node. 'graph' is not an enforcement tier: it marks a sub-graph node, whose body is another graph and whose internal nodes report their own tiers in the nested trace.",
+          "type": "string",
+          "enum": ["host", "sandbox", "graph"]
+        },
+        "input_trust": {
+          "description": "The trust label of the value the node received.",
+          "type": "string",
+          "enum": ["trusted", "untrusted"]
+        },
+        "output_trust": {
+          "description": "The trust label of the value the node produced. A node with untrusted input and trusted output has raised trust — a discharge, which the graph requires the node to declare.",
+          "type": "string",
+          "enum": ["trusted", "untrusted"]
+        },
+        "crossings": {
+          "description": "The distinct capability crossings the node made, deduplicated by (interface, instance) and emitted sorted. Multiplicity is not recorded: it is a timing fact, and differs between the host and confined tiers for the same node.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/crossing" }
+        },
+        "subgraph": {
+          "description": "Present only on a sub-graph node: the nested run of the referenced graph, carrying its own nodes' tiers, trust labels, and crossings.",
+          "$ref": "#/$defs/graphTrace"
+        },
+        "timing_us": {
+          "description": "Optional wall-clock duration of the node's run, in microseconds. Excluded from structural comparison and never populated on the paths the evaluation pins compare, so trace structure stays deterministic.",
+          "type": ["number", "null"]
+        }
+      }
+    },
+    "crossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interface", "instance"],
+      "properties": {
+        "interface": {
+          "description": "The capability interface crossed — the WIT interface name where the capability is realised on the confined tier (e.g. aap:caps/tool-llm@0.1.0), or the capability type string for a host-only capability with no WIT interface.",
+          "type": "string",
+          "minLength": 1
+        },
+        "instance": {
+          "description": "The capability instance the crossing landed on: the graph-declared identity label where one exists (making identity routing observable), otherwise the capability's scope.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -22,8 +22,11 @@ tool-capable node received as input.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+
+from type_parser import TApp, TList, TName, TString, parse_type
 
 from .graph import (
     TIER_GRAPH,
@@ -34,7 +37,9 @@ from .graph import (
     graphs_by_name,
 )
 from .nodes import REGISTRY
+from .sandbox.interfaces import UnmappedCapability, interface_for
 from .sandbox.nodes import SANDBOX_REGISTRY
+from .trace import GraphTrace, NodeTrace, RecordingHandle, TraceCollector, trust_label
 from .values import Variant
 
 # How a sub-graph reference resolves to a graph. Defaults to the canonical graphs
@@ -53,10 +58,81 @@ class ExecutionResult:
     # sub-graph node name → the nested run's own result, so a composed execution
     # can be inspected at both altitudes.
     subgraphs: dict[str, ExecutionResult] = field(default_factory=dict)
+    # The structured, schema-pinned trace of this run: nodes in execution order,
+    # their tiers, trust labels, and capability crossings, with sub-graph runs
+    # nested. The machine-readable form of what the fields above expose piecemeal.
+    # `execute` always replaces this; the empty default keeps it non-optional for
+    # readers (a bare `ExecutionResult()` has an empty, well-formed trace).
+    trace: GraphTrace = field(default_factory=lambda: GraphTrace(graph=""))
 
 
 class ExecutionError(RuntimeError):
     pass
+
+
+# ── Crossing attribution: interface and instance name for the trace ──────────
+
+
+def _crossing_interface(cap_type: str) -> str:
+    """The interface name a crossing of `cap_type` records.
+
+    The WIT interface where the capability is realised on the confined tier — so a
+    host-tier and a confined-tier crossing of the same capability name the *same*
+    interface — falling back to the capability type string for a host-only
+    capability (append/read-write `DBHandle`) that this tier does not model as WIT."""
+    try:
+        return interface_for(cap_type)
+    except UnmappedCapability:
+        return cap_type
+
+
+def _scope_of(cap_type: str) -> str:
+    """The scope baked into a capability type, used to name an instance that carries
+    no declared identity: `ResponseChannel<user-session>` → `user-session`,
+    `DBHandle<'knowledge-base', read>` → `knowledge-base`, `LLMClient<inference>` →
+    `inference`, `LLMClient<[lookup]>` → `lookup`."""
+    ast = parse_type(cap_type)
+    if isinstance(ast, TApp) and ast.args:
+        arg = ast.args[0]
+        if isinstance(arg, TString):
+            return arg.value
+        if isinstance(arg, TName):
+            return arg.name
+        if isinstance(arg, TList):
+            names = sorted(i.name for i in arg.items if isinstance(i, TName))
+            if names:
+                return "+".join(names)
+    return cap_type
+
+
+def _instance_name(graph: AssembledGraph, node: Node, cap_type: str) -> str:
+    """The name a crossing of `cap_type` by `node` records: the graph-declared
+    identity label where the node declares one (so identity routing is visible in
+    the trace), otherwise the capability's scope."""
+    return graph.identities.get(node.name, {}).get(cap_type) or _scope_of(cap_type)
+
+
+def _wrap(
+    handle: object,
+    cap_type: str,
+    graph: AssembledGraph,
+    node: Node,
+    collector: TraceCollector,
+) -> object:
+    """Wrap a handle so its use records a crossing — unless it is already wrapped.
+
+    A handle routed in from a parent graph arrives already wrapped, carrying the
+    parent's declared instance label (`customer_session`). Re-wrapping it here would
+    re-name that crossing by the child's scope and lose the routing, so an
+    already-wrapped handle is passed through untouched."""
+    if isinstance(handle, RecordingHandle):
+        return handle
+    return RecordingHandle(
+        handle,
+        _crossing_interface(cap_type),
+        _instance_name(graph, node, cap_type),
+        collector,
+    )
 
 
 def _resolver(graphs: GraphResolver | Mapping[str, dict] | None) -> GraphResolver:
@@ -74,16 +150,25 @@ def _resolver(graphs: GraphResolver | Mapping[str, dict] | None) -> GraphResolve
     return graphs.get
 
 
-def _capability_handles(graph: AssembledGraph, node: Node) -> list[object]:
-    """The node's capability handles, in the order they appear in its inputs.
+def _capability_handles(
+    graph: AssembledGraph, node: Node, collector: TraceCollector
+) -> list[object]:
+    """The node's capability handles, in the order they appear in its inputs, each
+    wrapped so its use records a crossing against the running node.
 
     Resolved through `handle_for`, so a node that declared a distinct capability
     identity at assembly time receives its own instance rather than the
     shared-by-type default."""
-    return [graph.handle_for(node, inp) for inp in node.inputs if inp in graph.handles]
+    return [
+        _wrap(graph.handle_for(node, inp), inp, graph, node, collector)
+        for inp in node.inputs
+        if inp in graph.handles
+    ]
 
 
-def _route_handles(parent: AssembledGraph, node: Node, child: dict) -> dict[str, object]:
+def _route_handles(
+    parent: AssembledGraph, node: Node, child: dict, collector: TraceCollector
+) -> dict[str, object]:
     """Bind the handles the parent provisioned for `node` to the child's capability
     parameters, position by position.
 
@@ -118,7 +203,12 @@ def _route_handles(parent: AssembledGraph, node: Node, child: dict) -> dict[str,
                 f"{expected!r} parameter of {child['name']!r}, but its {provided!r} "
                 f"input is not a capability of the parent graph"
             )
-        routed[expected] = parent.handle_for(node, provided)
+        # Wrap at the routing point, keyed by the *parent's* input and node, so the
+        # crossing this handle records inside the child carries the parent's declared
+        # instance label (e.g. `customer_session`). The child receives it already
+        # wrapped and passes it through, so the label survives the boundary.
+        handle = parent.handle_for(node, provided)
+        routed[expected] = _wrap(handle, provided, parent, node, collector)
     return routed
 
 
@@ -150,6 +240,7 @@ def _run_subgraph(
     resolve: GraphResolver,
     sandbox: Mapping[str, Iterable[str]] | None,
     stack: tuple[str, ...],
+    collector: TraceCollector,
 ) -> tuple[object, ExecutionResult]:
     """Execute a node whose body is another graph, and lift its output back.
 
@@ -167,9 +258,21 @@ def _run_subgraph(
         )
 
     child_sandbox = sandbox.get(child["name"], ()) if sandbox else ()
-    nested = assemble(child, handles=_route_handles(parent, node, child), sandbox=child_sandbox)
+    nested = assemble(
+        child, handles=_route_handles(parent, node, child, collector), sandbox=child_sandbox
+    )
     try:
-        sub = execute(nested, value, graphs=resolve, sandbox=sandbox, _stack=(*stack, node.name))
+        # Share the collector: the child sets its own current node as it runs, so a
+        # crossing inside the child attaches to the child's node, and the routed
+        # handles (wrapped above) record into the child's trace, not the parent's.
+        sub = execute(
+            nested,
+            value,
+            graphs=resolve,
+            sandbox=sandbox,
+            _stack=(*stack, node.name),
+            _collector=collector,
+        )
     except ExecutionError as e:
         # Minimal comprehension aid: name the boundary the failure happened behind,
         # so a parent-level reader is not handed a bare node name from two altitudes
@@ -197,11 +300,17 @@ def execute(
     *,
     graphs: GraphResolver | Mapping[str, dict] | None = None,
     sandbox: Mapping[str, Iterable[str]] | None = None,
+    record_timing: bool = False,
     _stack: tuple[str, ...] = (),
+    _collector: TraceCollector | None = None,
 ) -> ExecutionResult:
     """Run the graph from its boundary input. Returns terminal outputs and a
-    trace. Branching is handled by following only edges whose port matches the
-    variant a node actually emitted.
+    structured trace (`result.trace`). Branching is handled by following only edges
+    whose port matches the variant a node actually emitted.
+
+    `record_timing` populates each node's optional `timing_us`; it is off by
+    default so trace structure stays deterministic (timing is excluded from every
+    structural comparison and from the schema's required fields).
 
     A node whose name resolves to a graph is run as a sub-graph (nested assembly +
     run); every other node runs its registered host- or sandbox-tier
@@ -216,7 +325,12 @@ def execute(
     confined to the handles the parent routed. `_stack` carries the chain of
     sub-graphs currently being executed, which is what the recursion guard checks."""
     resolve = _resolver(graphs)
+    # One collector is shared across a whole nested execution; a top-level run mints
+    # it, a sub-graph run inherits the parent's so crossings land in the right node.
+    collector = _collector if _collector is not None else TraceCollector()
     result = ExecutionResult()
+    trace = GraphTrace(graph=graph.name)
+    result.trace = trace
     # Worklist of (node_name, input_value) pairs ready to run.
     pending: list[tuple[str, object]] = [(_entry_node(graph).name, boundary_value)]
 
@@ -232,14 +346,24 @@ def execute(
         result.received[node_name] = value
         result.order.append(node_name)
 
+        # Open this node's trace entry and make it the collector's current node, so
+        # any capability crossing during its run is attributed here.
+        entry = NodeTrace(node=node_name, tier="", input_trust=trust_label(value))
+        trace.nodes.append(entry)
+        collector.current = entry
+        started = time.perf_counter() if record_timing else 0.0
+
         # A node whose name resolves to a graph *is* that graph; it needs no
         # registered implementation. Resolution is checked first so composition is
         # decided by the graph, not by whatever happens to be in the registry.
         child = resolve(node_name)
         if child is not None:
-            result.tiers[node_name] = TIER_GRAPH
-            output, sub = _run_subgraph(graph, node, child, value, resolve, sandbox, _stack)
+            entry.tier = result.tiers[node_name] = TIER_GRAPH
+            output, sub = _run_subgraph(
+                graph, node, child, value, resolve, sandbox, _stack, collector
+            )
             result.subgraphs[node_name] = sub
+            entry.subgraph = sub.trace
         else:
             registry = SANDBOX_REGISTRY if node.tier == TIER_SANDBOX else REGISTRY
             impl = registry.get(node_name)
@@ -247,8 +371,12 @@ def execute(
                 raise ExecutionError(
                     f"no {node.tier}-tier implementation registered for node {node_name!r}"
                 )
-            result.tiers[node_name] = node.tier
-            output = impl(value, *_capability_handles(graph, node))
+            entry.tier = result.tiers[node_name] = node.tier
+            output = impl(value, *_capability_handles(graph, node, collector))
+
+        entry.output_trust = trust_label(output)
+        if record_timing:
+            entry.timing_us = (time.perf_counter() - started) * 1_000_000.0
 
         edges = out_edges[node_name]
         if not edges:

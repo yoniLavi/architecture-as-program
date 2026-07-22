@@ -22,6 +22,7 @@ from dataclasses import replace
 
 import pytest
 
+from poc.demo import SANDBOXED_NODES
 from poc.evaluate import (
     ACCEPTED,
     CORPUS,
@@ -30,14 +31,17 @@ from poc.evaluate import (
     REJECTED,
     EvaluationError,
     check,
+    check_traces,
     generate,
     main,
     render,
     run,
     run_corpus,
+    run_injection,
     serialise,
 )
 from poc.sandbox import available
+from poc.trace import validate_document
 from poc.variants import UNSAFE_VARIANTS
 
 
@@ -157,6 +161,8 @@ def test_main_writes_both_artifacts(tmp_path, monkeypatch, capsys):
     data = tmp_path / "evaluation.json"
     monkeypatch.setattr(evaluate, "ARTIFACT_PATH", out)
     monkeypatch.setattr(evaluate, "DATA_PATH", data)
+    monkeypatch.setattr(evaluate, "TRACE_HOST_PATH", tmp_path / "trace-injection-host.json")
+    monkeypatch.setattr(evaluate, "TRACE_CONFINED_PATH", tmp_path / "trace-injection-confined.json")
     monkeypatch.setattr(evaluate, "REPO_ROOT", tmp_path)
 
     assert evaluate.main() == 0
@@ -177,7 +183,15 @@ def test_main_writes_both_artifacts(tmp_path, monkeypatch, capsys):
 def test_the_data_carries_every_figure_the_paper_states():
     payload = json.loads(serialise(run()))
 
-    assert set(payload) == {"environment", "corpus", "overhead", "injection", "tiers", "display"}
+    assert set(payload) == {
+        "environment",
+        "corpus",
+        "overhead",
+        "injection",
+        "tiers",
+        "trace",
+        "display",
+    }
 
     # The paper prints `display` verbatim rather than rounding numbers itself, so
     # these must be strings: typst and pandoc's typst reader format the same float
@@ -209,6 +223,19 @@ def test_the_data_carries_every_figure_the_paper_states():
     assert not any(e["sandbox_escapes"] for e in tiers["escapes"])
     assert tiers["ambient_imports"] == 0
 
+    trace = payload["trace"]
+    # Trust is raised only at the declared discharge node, on both tiers.
+    assert trace["trust_raisers_host"] == [trace["discharge_node"]] == ["ParseMessage"]
+    assert trace["trust_raisers_confined"] == ["ParseMessage"]
+    # The residual, in data: the confined tool-capable node received a trusted-
+    # labelled value that still carries adversarial text.
+    assert trace["tool_capable_node"] == "GenerateResponse"
+    assert trace["tool_capable_tier"] == "sandbox"
+    assert trace["tool_capable_input_trust"] == "trusted"
+    assert trace["residual_reaches_tool_node"] is True
+    # Both tiers record the same crossings for the same graph.
+    assert trace["crossings_identical_across_tiers"] is True
+
 
 @sandboxed
 def test_both_artifacts_come_from_one_run():
@@ -222,6 +249,50 @@ def test_both_artifacts_come_from_one_run():
     payload = json.loads(serialise(ev))
 
     assert f"{payload['overhead']['crossing_us']:.1f} µs" in artifact
+
+
+# ── The injection traces and their pins ──────────────────────────────
+
+
+@sandboxed
+def test_the_canonical_injection_traces_hold_their_pins():
+    """Both tiers' traces are schema-valid and satisfy their structural pins: trust
+    raised only at the discharge node, and the residual reaching the confined
+    tool-capable node through a permitted field."""
+    host = run_injection(set())
+    confined = run_injection(set(SANDBOXED_NODES))
+    assert check_traces(host, confined) == []
+    assert validate_document(host.trace.to_dict()) == []
+    assert validate_document(confined.trace.to_dict()) == []
+
+
+@sandboxed
+def test_the_trace_guard_fires_if_the_residual_vanishes():
+    """The pin that keeps stronger enforcement from being misread as a stronger
+    claim. If adversarial text stopped reaching the confined tool-capable node
+    through the permitted field, the build must fail rather than quietly re-pin."""
+    host = run_injection(set())
+    confined = run_injection(set(SANDBOXED_NODES))
+    softened = replace(confined, adversarial_text_present=False)
+    problems = check_traces(host, softened)
+    assert any("residual" in p for p in problems)
+
+
+@sandboxed
+def test_main_writes_the_injection_traces(tmp_path, monkeypatch):
+    import poc.evaluate as evaluate
+
+    monkeypatch.setattr(evaluate, "ARTIFACT_PATH", tmp_path / "evaluation.md")
+    monkeypatch.setattr(evaluate, "DATA_PATH", tmp_path / "evaluation.json")
+    host = tmp_path / "trace-injection-host.json"
+    confined = tmp_path / "trace-injection-confined.json"
+    monkeypatch.setattr(evaluate, "TRACE_HOST_PATH", host)
+    monkeypatch.setattr(evaluate, "TRACE_CONFINED_PATH", confined)
+    monkeypatch.setattr(evaluate, "REPO_ROOT", tmp_path)
+
+    assert evaluate.main() == 0
+    for path in (host, confined):
+        assert validate_document(json.loads(path.read_text())) == []
 
 
 def test_main_is_importable_without_running():

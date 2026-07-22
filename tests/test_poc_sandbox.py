@@ -434,6 +434,39 @@ def test_majority_of_the_customer_path_runs_confined():
     assert confined.tiers["ReceiveMessage"] == "host"
 
 
+def _crossing_structure(trace):
+    """Each node's crossing structure, with the *tier* excluded: node name, trust
+    labels, and the sorted set of (interface, instance) crossings. This is the form
+    that must agree across tiers — the tier field is exactly what differs."""
+    return [
+        (
+            n.node,
+            n.input_trust,
+            n.output_trust,
+            sorted((c.interface, c.instance) for c in n.crossings),
+        )
+        for n in trace.nodes
+    ]
+
+
+def test_both_tiers_record_the_same_crossings_for_the_same_graph():
+    """The design's own risk, pinned: 'two tiers recording identically is a claim,
+    not a given'. The host tier records at the injected handle wrappers; the confined
+    tier records where the guest calls back through those same handles across the WIT
+    boundary. Run the customer path host-only and most-confined, and the per-node
+    crossing structure — interfaces and instances, trust labels — is identical. Only
+    the tier field differs, which is the whole point of having tiers."""
+    from poc.demo import BENIGN
+
+    host = _run(BENIGN, sandbox=()).trace
+    confined = _run(BENIGN, sandbox=_MOST_CONFINED).trace
+
+    # The tiers genuinely differ — otherwise this test would be vacuous.
+    assert [n.tier for n in host.nodes] != [n.tier for n in confined.nodes]
+    # But the crossing structure does not.
+    assert _crossing_structure(host) == _crossing_structure(confined)
+
+
 def test_confined_identity_routing_lands_on_the_reply_channel():
     """The confined `SendReply` reports the session it delivered to — the channel's
     identity, which the guest never held as data, crosses back on the confirmation.

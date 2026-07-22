@@ -85,6 +85,12 @@ class AssembledGraph:
     # rotatable; host-held like `revokers`, and granted independently of it (an
     # instance may be revocable, rotatable, both, or neither).
     rotators: dict[tuple[str, str], Rotator] = field(default_factory=dict)
+    # node name → {capability type → declared identity label}. The merged identity
+    # map (graph JSON plus any `identities=` override), kept so the execution trace
+    # can name a crossing by the identity the graph declared (`customer_session`)
+    # rather than only by the capability's scope. A node/capability absent here has
+    # no declared identity and is named by scope.
+    identities: dict[str, dict[str, str]] = field(default_factory=dict)
 
     def revoke(self, cap_type: str, identity: str) -> None:
         """Sever the named revocable capability instance. Afterwards every node
@@ -429,4 +435,5 @@ def assemble(
         instances=instances,
         revokers=revokers,
         rotators=rotators,
+        identities={n: dict(caps) for n, caps in identities.items()},
     )
