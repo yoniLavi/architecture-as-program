@@ -26,7 +26,10 @@ A longitudinal research program arguing that AI coding agents + functional react
 It is structured as a **corpus of papers backed by a shared, evolving research artifact** (see `papers/README.md` and `METHODOLOGY.md`):
 
 - **Paper 1 — the founding vision** (`papers/01-vision/`) is **frozen** and stands alone as a self-contained vision paper (dated *June 2026*, before the executable demonstrator `poc/` existed; it does **not** reference Paper 2). It is **published** as a Zenodo preprint ([doi:10.5281/zenodo.21473361](https://doi.org/10.5281/zenodo.21473361), CC BY 4.0, 21 July 2026). Its single sanctioned publication revision is **spent**: a July 2026 preparation step (typos, phrasing, removal of one proof-of-concept-preview passage so it stands alone; **no prediction or argument changed**) and a 21 July concluding step at the publication event (DOI + licence stamped on the title block, one Figure 1 legibility fix), both recorded in `ERRATA.md`, after which it was **re-frozen at the published commit** — where `scripts/check-freeze.py`'s `FREEZE_REF` now points. It carries its own pinned graph/diagram inputs and is **permanently errata-only** — do not edit it; the freeze guard fails the build if it drifts.
-- **Paper 2 — the demonstrator paper** (`papers/02-demonstrator/`) is the **living** document: it builds from the shared root artifact and folds in what the demonstrator has since substantiated. This is the paper you normally edit.
+- **Paper 2 — *Confinement by Construction*** (`papers/02-demonstrator/`) is a **living** systems paper: it builds from the shared root artifact and reports what that artifact establishes. Its lead claim is that a node's `with` clause *determines* its compiled component's import surface, derived from the graph and checked against the binary. **Edit this when the change is evidence.**
+- **Paper 3 — *Predicting Before Building*** (`papers/03-method/`) is a **living** method paper: the corpus's pre-registration protocol and the prediction-by-prediction accounting of Paper 1 against the artifact. **Edit this when the change is accounting** — a verdict moving, a new correction the artifact forced, an agenda item closing.
+
+  The split has one hard rule: **Paper 3 interpolates no evaluation data.** It cites Paper 2 for every figure and measurement, so exactly one document is the source of any number. The predictions-and-outcomes table lives in Paper 3 *only*; Paper 2 states its own limits in its "What this establishes" section, which must not grow into a second accounting.
 
 This is primarily a **writing project**: the papers are the outputs that matter. But they are backed by a real, tested toolchain (below), not vapourware.
 
@@ -34,7 +37,9 @@ This is primarily a **writing project**: the papers are the outputs that matter.
 
 | File | Role |
 |---|---|
-| `papers/02-demonstrator/proposal.typ` | The living paper's source (Typst). **This is the document you normally edit.** |
+| `papers/02-demonstrator/proposal.typ` | Paper 2, *Confinement by Construction* (Typst) — the living **systems** paper. Edit for evidence. |
+| `papers/03-method/proposal.typ` | Paper 3, *Predicting Before Building* (Typst) — the living **method** paper. Edit for accounting. Interpolates no data. |
+| `ROADMAP.md` | The plan for the next artifact: a feed-triage "useful toy" and the agent-generated-node-body experiment. |
 | `papers/01-vision/proposal.typ` | The frozen founding-vision paper. **Do not edit** (errata-only; guarded by `scripts/check-freeze.py`). |
 | `papers/README.md` | How the corpus is organised; living vs frozen; the two `01-vision/` symlinks. |
 | `METHODOLOGY.md` | The research process: human-directed, AI-executed, spec-driven; the evidence trail. |
@@ -47,33 +52,34 @@ This is primarily a **writing project**: the papers are the outputs that matter.
 | `.pre-commit-config.yaml` | Pre-commit hooks (ruff, graph validation, pytest, `make build`, citation check, freeze guard). Install once per clone with `uv run pre-commit install`. |
 | `scripts/` | Build support: graph generator, pandoc cross-ref filter, markdown/html cleanup, citation checker, freeze guard. |
 
-## Paper 2 structure
+## The two living papers' structure
 
-Paper 2 is in **paper form** — it reports a built artifact, it does not propose one. The arc:
+**Paper 2 — *Confinement by Construction*** is in **paper form**: it reports a built artifact, it does not propose one. The arc:
 
-1. **Introduction** (§1) — The window (agents removed the human objection to graph representations), the **central claim** stated to be falsifiable by the artifact, contributions, and the relation to the frozen vision
-2. **Design** (§2) — Signal graph, FRP foundations, the concrete graph, workflow, intended runtime, security properties. Largely inherited from Paper 1 and restated for self-containment; **this is the section where hedging is most at risk**, because it describes intent, not the artifact
-3. **Implementation** (§3) — What was actually built: canonical graphs, the six validator analyses, the two enforcement tiers, capability identity/revocation/rotation, sub-graph execution
+1. **Introduction** (§1) — The window (agents removed the human objection to graph representations), the **central claim** — led by capability-surface derivation, with the trust lattice second — contributions, and the relation to the rest of the corpus
+2. **Design** (§2) — Signal graph, FRP foundations, the concrete graph, security properties. Inherited from Paper 1, cut to what §3–§4 depend on; **this is where hedging is most at risk**, because it describes intent, not artifact
+3. **Implementation** (§3) — Canonical graphs, the six validator analyses, the two enforcement tiers (§3.3.2 is the paper's lead result), identity/revocation/rotation, sub-graph execution, the execution trace — which also carries the inspector's one-paragraph mention
 4. **Evaluation** (§4) — Corpus verdicts, boundary overhead, prompt-injection attenuation, host vs confined tier. **Every figure is interpolated from `dist/evaluation.json`** — never hand-type a number here
-5. **Predictions and outcomes** (§5) — The spine, and what earns Paper 2 separate-paper status: each vision claim marked substantiated / partial / conditional / not attempted, plus what building it *corrected*
-6. **Related work** (§6) — C4, Haskell/Idris, Effekt/capture checking, Unison, Hazel, BEAM, ocap security, CHERI, WASM Component Model, SDD frameworks, Cedar, Roc, Darklang
-7. **Research agenda** (§7) — Three phases; absorbed the forward half of the old Technical Note A
-8. **Threats to validity** (§8) — Construct, internal, external, security-argument, and method threats; absorbed the limits half of the old Technical Note A
-9. **Conclusion** (§9), then **Annex A** — Areas for collaboration
+5. **What this establishes, and what it does not** (§5) — Paper 2's own bounded statement. **Not an accounting** — it must never grow into a second copy of Paper 3's table
+6. **Related work** (§6) — §6.1 is LLM-agent security (CaMeL, Greshake, AgentDojo, the pattern catalogue) and is load-bearing: any prompt-injection claim must position against it
+7. **Limitations and open problems** (§7) — Construct, internal, external, and security-argument limits, then §7.5, the open problems that bound *these* results
 
-Technical Note A and Annex B no longer exist in Paper 2 (Paper 1 still has both — it is frozen). Open
-problems live in §7 going forward, honest limits in §8.
+**Paper 3 — *Predicting Before Building*** is the method paper: the protocol (§2) and its mechanisation, the accounting instance (§3) with `tab:outcomes`, what building it revealed (§4), the three-phase forward agenda (§5), threats including single-instance generalisation and the method (§6), conclusion, Annex A.
+
+Technical Note A and Annex B no longer exist in Paper 2 (Paper 1 still has both — it is frozen).
 
 ## When editing the proposal
 
-"The proposal" below means **Paper 2** (`papers/02-demonstrator/proposal.typ`), the living document. Paper 1 is frozen — never edit it; corrections go in `papers/01-vision/ERRATA.md`.
+"The proposal" below means **Paper 2** (`papers/02-demonstrator/proposal.typ`), unless the change is accounting, in which case it means Paper 3. Paper 1 is frozen — never edit it; corrections go in `papers/01-vision/ERRATA.md`.
+
+**Demos get a mention, never a section.** Visual demos (the `ui/` inspector, and successors) are built to the repo's usual evidence discipline and are worth building — they bring attention to the programme. But in the papers they are one to three sentences plus at most one figure, folded into the section covering the underlying artifact, absent from the contributions list, and they never move a verdict in Paper 3's accounting: a verdict follows the underlying capability, not the demo that partly exercises it.
 
 - **Maintain hedging on unproven claims.** The type system does not exist yet. Claims about properties it would provide use conditional language ("would be inexpressible", "in a well-typed realisation", "in a sound realisation of the type system"). Do not strengthen these to present tense without an implementation to back them. Two traps specific to Paper 2's form: (a) it reports a built artifact, so the surrounding prose is in the present tense and an unproven claim reads as substantiated unless its mood is *deliberately* kept conditional — §2 (Design) is where this fails; (b) a property that holds only on the **confined tier** must say so, or it reads as universal when the host tier demonstrably escapes.
 - **Never hand-type an evaluation figure.** §4's numbers come from `dist/evaluation.json` via `#ev`/`#d` interpolation. If a figure needs a new form, add it to `serialise()` in `poc/evaluate.py` (`display` holds pre-formatted strings, because typst and pandoc format the same float differently).
 - **Keep citations accurate.** Every factual claim about prior work should be traceable to a citation. If adding a new claim, add the citation. Run `make build` to catch broken references (typst will error) and `scripts/check-citations.py` to catch orphaned bib entries.
 - **Preserve the argument arc.** Each section builds on the previous. New content should slot into the existing structure, not break the flow.
 - **Concrete over abstract.** The proposal's weakest mode is unsupported generality. Prefer specific examples (like the `CustomerSupport` graph or the `Untrusted<UserMessage>` type error) over sweeping claims.
-- **Acknowledge limitations honestly.** §7 (research agenda) and §8 (threats to validity) exist for a reason. If a new claim has an open problem, name it in §7; if it has an honest limit on what the artifact shows, name it in §8.
+- **Acknowledge limitations honestly.** Paper 2 §7 exists for a reason. If a new claim has an honest limit on what the artifact shows, name it there; if it has an open problem that bounds the claim, name it in §7.5; if it belongs to the forward programme rather than to this result, it goes in Paper 3's agenda instead.
 - **Keep it tight — say each thing once.** Paper 2 was aggressively tightened for its preprint; the working target is roughly the low-to-mid 30s of pages. Each load-bearing point has one primary home and is cross-referenced elsewhere, not restated (e.g. the free-text residual lives in §4.3, the trust-lattice mechanism in §3.2, the `unknown-unknown` ambient-authority argument in §3.4). When adding material, extend the primary statement or reference it; do not reintroduce a second full explanation. Length is a target, not a quota — never cut a stated limitation, a hedge, or the predictions-and-outcomes table to hit a page count.
 
 ## Tooling (present and tested)

@@ -19,9 +19,16 @@ Papers live under [`papers/`](papers/README.md), one directory per paper:
   executable demonstrator existed. Errata-only. Published as a preprint:
   [doi:10.5281/zenodo.21473361](https://doi.org/10.5281/zenodo.21473361)
   (CC BY 4.0).
-- **Paper 2 — The demonstrator paper** (`papers/02-demonstrator/`): the living
-  document, which folds in what the tested demonstrator (`poc/`, the validator,
-  the two enforcement tiers) has since substantiated.
+- **Paper 2 — *Confinement by Construction*** (`papers/02-demonstrator/`): the
+  living systems paper. A node's declared capabilities determine the import
+  surface of its compiled WASM component, derived from the graph and checked
+  against the built binary; alongside it, a trust lattice that catches laundering
+  which type-checks on every edge. Reports the artifact and its evaluation.
+- **Paper 3 — *Predicting Before Building*** (`papers/03-method/`): the living
+  method paper. The corpus's pre-registration protocol — freeze the vision,
+  publish it under a DOI, guard it in the build, report outcomes without revising
+  predictions — and the prediction-by-prediction accounting of Paper 1 against
+  the artifact, including the four design corrections building it forced.
 
 All papers share one research artifact at the repository root (`graphs/`,
 `scripts/`, `poc/`, `tests/`, `citations.bib`). See
@@ -32,10 +39,14 @@ All papers share one research artifact at the repository root (`graphs/`,
 Built automatically from source on every push to `main` and published to GitHub
 Pages:
 
-- Paper 2 (demonstrator):
+- Paper 2 (*Confinement by Construction*):
   [PDF](https://yonilavi.github.io/architecture-as-program/papers/02-demonstrator/proposal.pdf) ·
   [HTML](https://yonilavi.github.io/architecture-as-program/papers/02-demonstrator/proposal.html) ·
   [Markdown](https://yonilavi.github.io/architecture-as-program/papers/02-demonstrator/proposal.md)
+- Paper 3 (*Predicting Before Building*):
+  [PDF](https://yonilavi.github.io/architecture-as-program/papers/03-method/proposal.pdf) ·
+  [HTML](https://yonilavi.github.io/architecture-as-program/papers/03-method/proposal.html) ·
+  [Markdown](https://yonilavi.github.io/architecture-as-program/papers/03-method/proposal.md)
 - Paper 1 (frozen vision):
   [PDF](https://yonilavi.github.io/architecture-as-program/papers/01-vision/proposal.pdf) ·
   [HTML](https://yonilavi.github.io/architecture-as-program/papers/01-vision/proposal.html)

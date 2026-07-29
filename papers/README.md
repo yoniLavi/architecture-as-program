@@ -13,7 +13,19 @@ one bibliography.
 | Paper | Directory | Status | Builds from |
 |---|---|---|---|
 | 1. The founding vision | `01-vision/` | **Frozen** (errata-only) | Its own pinned inputs |
-| 2. The demonstrator paper | `02-demonstrator/` | Living | The shared root artifact |
+| 2. *Confinement by Construction* | `02-demonstrator/` | Living | The shared root artifact |
+| 3. *Predicting Before Building* | `03-method/` | Living | `citations.bib` only |
+
+Papers 2 and 3 split one document. Paper 2 reports **what the artifact
+establishes**; Paper 3 reports **what predicting-then-building taught**, and owns
+the predictions-and-outcomes accounting. The division is enforced by a rule worth
+stating: Paper 3 interpolates no evaluation data and cites Paper 2 for every
+figure, so exactly one document in the corpus is the source of any given number.
+Two documents able to state a number are two documents able to disagree.
+
+The directory name `02-demonstrator/` is kept for its published GitHub Pages
+URLs; per the convention below, a directory label carries sequence and a rough
+content hint, not the title.
 
 ## Living vs frozen papers
 

@@ -33,6 +33,16 @@ establishes what the artifact *does* stays in Paper 2.
 Paper 2 keeps a two-paragraph §5-shaped summary ("what this does and does not substantiate") so it stands
 alone without the accounting; Paper 3 restates no evidence, citing P2 for every figure.
 
+**Refinement found while mapping cross-references.** §2–§4, §6 and §8 make 55 references to sections that
+move to Paper 3 — mostly of the form "this is a Phase 1 design obligation (@sec:phase1)". Redirecting all of
+them to a citation of Paper 3 would be both noisy and wrong: a systems paper must state the open problems
+that *bound its own claims* without sending the reader to another document. So Paper 2's §8 is retitled
+**"Limitations and open problems"** and absorbs the handful that bound its results (soundness, contract
+language, user-level authorisation, graph-scale comprehension, CHERI); the *three-phase agenda with its
+dependency ordering* — a planning artifact, not a limitation statement — moves whole to Paper 3. The two are
+different objects, so this is not the restatement the single-owner rule forbids, and it lets most redirected
+references land inside Paper 2 instead of pointing out of it.
+
 ## Decisions
 
 - **Titles** (the decision most worth confirming before the rewrite):
