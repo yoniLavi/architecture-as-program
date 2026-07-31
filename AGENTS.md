@@ -39,7 +39,8 @@ This is primarily a **writing project**: the papers are the outputs that matter.
 |---|---|
 | `papers/02-demonstrator/proposal.typ` | Paper 2, *Confinement by Construction* (Typst) — the living **systems** paper. Edit for evidence. |
 | `papers/03-method/proposal.typ` | Paper 3, *Predicting Before Building* (Typst) — the living **method** paper. Edit for accounting. Interpolates no data. |
-| `ROADMAP.md` | The plan for the next artifact: a feed-triage "useful toy" and the agent-generated-node-body experiment. |
+| `docs/ROADMAP.md` | The plan for the next artifact: a feed-triage "useful toy" and the agent-generated-node-body experiment. |
+| `docs/PRIOR-ART.md` | Standing record of the community-of-practice survey: what was taken, what was refused, and open verification debts. |
 | `papers/01-vision/proposal.typ` | The frozen founding-vision paper. **Do not edit** (errata-only; guarded by `scripts/check-freeze.py`). |
 | `papers/README.md` | How the corpus is organised; living vs frozen; the two `01-vision/` symlinks. |
 | `METHODOLOGY.md` | The research process: human-directed, AI-executed, spec-driven; the evidence trail. |

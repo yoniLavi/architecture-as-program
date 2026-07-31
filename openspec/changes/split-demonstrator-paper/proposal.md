@@ -54,7 +54,7 @@ Two further defects are fixed in the same pass, because both are cheap now and e
   outward-facing act and stays a separate, explicitly-approved human step — this change makes the papers
   ready, it does not post them.
 - Not in scope: any artifact or evaluation change; editing Paper 1; the act of publishing; the "useful toy"
-  programme in `ROADMAP.md`, which is later work under its own proposals.
+  programme in `docs/ROADMAP.md`, which is later work under its own proposals.
 
 ## Impact
 
