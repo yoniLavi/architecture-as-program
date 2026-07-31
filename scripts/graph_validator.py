@@ -132,7 +132,24 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
         if "discharges_trust" in n and not isinstance(n["discharges_trust"], bool):
             errors.append(f"{path.name}: node {nname!r} `discharges_trust` must be boolean")
             continue
+        if "binds_principal" in n and not isinstance(n["binds_principal"], bool):
+            errors.append(f"{path.name}: node {nname!r} `binds_principal` must be boolean")
+            continue
         node_map[nname] = n
+
+    # A principal binder must hold authority to scope. Declaring the acting-on-
+    # behalf-of hop on a node that holds no capability is a marker with nothing to
+    # bind — the same class of error as declaring a trust discharge on a node with
+    # no untrusted input, and caught here for the same reason: a declaration that
+    # cannot mean anything is a graph mistake, not a runtime surprise.
+    for nname, n in node_map.items():
+        if not n.get("binds_principal", False):
+            continue
+        if not any(inp in caps for inp in n["inputs"]):
+            errors.append(
+                f"{path.name}: node {nname!r} declares `binds_principal: true` but holds no "
+                f"capability; a principal binder with no authority to scope binds nothing"
+            )
 
     # Every declared capability must be used by at least one node.
     used_caps: set[str] = set()

@@ -901,3 +901,112 @@ def test_assembling_without_a_scope_is_unchanged(graph):
     )
     handle = g.handle_for(g.nodes["SendReply"], RC)
     assert handle.send("no scope, no sever").delivered
+
+
+# ── Principal binding ────────────────────────────────────────────────────────
+#
+# The confused-deputy argument depends on capabilities being bound to the calling
+# user and propagated downstream. These pin what the runtime now records, so the
+# claim is checkable rather than asserted in prose. Shape follows RFC 8693: the
+# principal is who the work is for, `acting_as` is the chain acting on their behalf.
+
+
+def _principal_graph():
+    """The canonical graph with its trust-discharging node also declared a
+    principal binder — it holds an LLM capability, so it has authority to scope."""
+    import copy
+
+    from poc.graph import load_graph_dict
+
+    g = copy.deepcopy(load_graph_dict("customer-support"))
+    for n in g["nodes"]:
+        if n["name"] == "ParseMessage":
+            n["binds_principal"] = True
+    return g
+
+
+def _customer_request(body: str):
+    from poc.values import CustomerRequest
+
+    return CustomerRequest(session_id="user-session", body=body)
+
+
+def test_a_run_without_a_principal_records_none(graph):
+    """The feature is opt-in: a graph assembled without a principal behaves and
+    serialises exactly as before."""
+    from poc.demo import BENIGN
+    from poc.runtime import execute
+
+    g = assemble(graph, backend=StubLLM(), stores=STORES)
+    trace = execute(g, _customer_request(BENIGN)).trace
+    assert all(n.principal is None for n in trace.walk())
+    assert all("principal" not in d for d in trace.to_dict()["nodes"])
+
+
+def test_every_crossing_runs_on_the_bound_principal():
+    """Spec: no node anywhere in a run acts outside the principal bound at entry."""
+    from poc.demo import BENIGN
+    from poc.runtime import execute
+
+    g = assemble(_principal_graph(), backend=StubLLM(), stores=STORES, principal="alice")
+    trace = execute(g, _customer_request(BENIGN)).trace
+    seen = [n for n in trace.walk()]
+    assert seen, "the run executed nodes"
+    assert all(n.principal == "alice" for n in seen)
+
+
+def test_only_a_declared_binder_extends_the_delegation_chain():
+    """Spec: the acting-on-behalf-of hop happens where the graph says it does.
+    Nodes before the binder carry an empty chain; nodes downstream carry it."""
+    from poc.demo import BENIGN
+    from poc.runtime import execute
+
+    g = assemble(_principal_graph(), backend=StubLLM(), stores=STORES, principal="alice")
+    trace = execute(g, _customer_request(BENIGN)).trace
+    by_name = {n.node: n for n in trace.walk()}
+
+    assert by_name["ReceiveMessage"].acting_as == [], "upstream of the binder"
+    assert by_name["ParseMessage"].acting_as == [], "the binder itself acts as the principal"
+    downstream = by_name.get("ModerateContent") or by_name.get("FetchContext")
+    assert downstream is not None
+    assert downstream.acting_as == ["ParseMessage"], "the binder delegates downstream"
+
+
+def test_the_principal_crosses_the_composition_boundary():
+    """Spec: a sub-graph acts on behalf of whoever the parent acts for, at every
+    altitude — the child cannot provision a principal of its own."""
+    from poc.demo import BENIGN
+    from poc.runtime import execute
+    from poc.values import HTTPRoute
+
+    platform_stores = {
+        "knowledge-base": {"billing_question": ["Duplicate charges clear in 3-5 days."]},
+        "billing": {},
+        "audit": {},
+    }
+    platform = assemble(
+        load_graph_dict("support-platform"),
+        backend=StubLLM(),
+        stores=platform_stores,
+        principal="alice",
+    )
+    traffic = HTTPRoute(path="/customer/message", session_id="user-session", body=BENIGN)
+    trace = execute(platform, traffic).trace
+    nested = [n for n in trace.walk() if n.subgraph is None]
+    assert any(n.principal == "alice" for n in nested)
+    assert all(n.principal == "alice" for n in trace.walk())
+
+
+def test_a_binder_holding_no_capability_is_rejected(graph):
+    """Spec: a binder with no authority to scope binds nothing, so the validator
+    rejects it — the same class of error as a discharge with no untrusted input."""
+    import copy
+
+    g = copy.deepcopy(graph)
+    for n in g["nodes"]:
+        if n["name"] == "ReceiveMessage":  # pure node, holds no capability
+            n["binds_principal"] = True
+    with pytest.raises(AssemblyError) as excinfo:
+        assemble(g, backend=StubLLM(), stores=STORES)
+    assert "binds_principal" in str(excinfo.value)
+    assert "no authority to scope" in str(excinfo.value) or "binds nothing" in str(excinfo.value)

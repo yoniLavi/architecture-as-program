@@ -142,6 +142,13 @@ class NodeTrace:
     input_trust: str
     output_trust: str | None = None
     calls: list[Call] = field(default_factory=list)
+    # The principal on whose authority this node ran, and the chain of parties
+    # acting on that principal's behalf — the shape of RFC 8693's `act` claim,
+    # which distinguishes delegation ("B acting for A") from impersonation (B
+    # indistinguishable from A). Both are absent when a run binds no principal, so
+    # graphs that do not use the feature serialise exactly as before.
+    principal: str | None = None
+    acting_as: list[str] = field(default_factory=list)
     subgraph: GraphTrace | None = None
     # Excluded from every structural comparison and from the schema's required
     # fields. Present only when a run is asked to time itself; never populated on
@@ -187,6 +194,9 @@ class NodeTrace:
             "output_trust": self.output_trust,
             "crossings": [c.to_dict() for c in ordered],
         }
+        if self.principal is not None:
+            out["principal"] = self.principal
+            out["acting_as"] = list(self.acting_as)
         # The per-call journal is emitted in encounter order and omitted from the
         # structural form, for the same reason timing is: the two tiers legitimately
         # differ here, so including it in a comparison would make the tier-equality

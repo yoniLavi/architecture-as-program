@@ -241,6 +241,7 @@ def _run_subgraph(
     sandbox: Mapping[str, Iterable[str]] | None,
     stack: tuple[str, ...],
     collector: TraceCollector,
+    acting_as: tuple[str, ...] = (),
 ) -> tuple[object, ExecutionResult]:
     """Execute a node whose body is another graph, and lift its output back.
 
@@ -258,8 +259,15 @@ def _run_subgraph(
         )
 
     child_sandbox = sandbox.get(child["name"], ()) if sandbox else ()
+    # The principal crosses the composition boundary with the routed handles: a
+    # sub-graph acts on behalf of whoever the parent is acting for, and — like the
+    # handles themselves — cannot widen it, because the child is assembled with the
+    # parent's principal rather than provisioning one of its own.
     nested = assemble(
-        child, handles=_route_handles(parent, node, child, collector), sandbox=child_sandbox
+        child,
+        handles=_route_handles(parent, node, child, collector),
+        sandbox=child_sandbox,
+        principal=parent.principal,
     )
     try:
         # Share the collector: the child sets its own current node as it runs, so a
@@ -272,6 +280,7 @@ def _run_subgraph(
             sandbox=sandbox,
             _stack=(*stack, node.name),
             _collector=collector,
+            _acting_as=acting_as,
         )
     except ExecutionError as e:
         # Minimal comprehension aid: name the boundary the failure happened behind,
@@ -303,6 +312,7 @@ def execute(
     record_timing: bool = False,
     _stack: tuple[str, ...] = (),
     _collector: TraceCollector | None = None,
+    _acting_as: tuple[str, ...] = (),
 ) -> ExecutionResult:
     """Run the graph from its boundary input. Returns terminal outputs and a
     structured trace (`result.trace`). Branching is handled by following only edges
@@ -332,7 +342,13 @@ def execute(
     trace = GraphTrace(graph=graph.name)
     result.trace = trace
     # Worklist of (node_name, input_value) pairs ready to run.
-    pending: list[tuple[str, object]] = [(_entry_node(graph).name, boundary_value)]
+    # Each item carries the delegation chain in force for that node: a binder
+    # extends the chain for everything downstream of itself, and the chain travels
+    # with the value rather than being a single cursor, so two branches descending
+    # from different binders cannot pick up each other's delegates.
+    pending: list[tuple[str, object, tuple[str, ...]]] = [
+        (_entry_node(graph).name, boundary_value, tuple(_acting_as))
+    ]
 
     # Precompute outgoing edges per source node.
     out_edges: dict[str, list] = {n: [] for n in graph.nodes}
@@ -340,7 +356,7 @@ def execute(
         out_edges[e.src_node].append(e)
 
     while pending:
-        node_name, value = pending.pop(0)
+        node_name, value, acting_as = pending.pop(0)
         node = graph.nodes[node_name]
 
         result.received[node_name] = value
@@ -348,7 +364,18 @@ def execute(
 
         # Open this node's trace entry and make it the collector's current node, so
         # any capability crossing during its run is attributed here.
-        entry = NodeTrace(node=node_name, tier="", input_trust=trust_label(value))
+        # The principal this node acts on behalf of, and the chain of delegates
+        # acting for it. The principal is bound once at assembly and never widened
+        # here; only a node declaring `binds_principal` extends the chain, and it
+        # extends it for the work *downstream* of itself, which is what makes the
+        # hop auditable rather than ambient.
+        entry = NodeTrace(
+            node=node_name,
+            tier="",
+            input_trust=trust_label(value),
+            principal=graph.principal,
+            acting_as=list(acting_as),
+        )
         trace.nodes.append(entry)
         collector.current = entry
         started = time.perf_counter() if record_timing else 0.0
@@ -360,7 +387,7 @@ def execute(
         if child is not None:
             entry.tier = result.tiers[node_name] = TIER_GRAPH
             output, sub = _run_subgraph(
-                graph, node, child, value, resolve, sandbox, _stack, collector
+                graph, node, child, value, resolve, sandbox, _stack, collector, acting_as
             )
             result.subgraphs[node_name] = sub
             entry.subgraph = sub.trace
@@ -385,12 +412,15 @@ def execute(
 
         # Route. For a Variant output, follow only the matching-port edge(s);
         # for a plain output, follow the unported edge(s).
+        # A binder is a delegate for everything downstream of it: it acts on the
+        # principal's behalf, and says so in the graph rather than in its body.
+        downstream = (*acting_as, node_name) if node.binds_principal else acting_as
         for e in edges:
             if isinstance(output, Variant):
                 if e.src_port == output.role:
-                    pending.append((e.dst_node, output.value))
+                    pending.append((e.dst_node, output.value, downstream))
             else:
                 if e.src_port is None:
-                    pending.append((e.dst_node, output))
+                    pending.append((e.dst_node, output, downstream))
 
     return result

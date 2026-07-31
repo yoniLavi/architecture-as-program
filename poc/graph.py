@@ -52,6 +52,11 @@ class Node:
     output: str
     discharges_trust: bool
     tier: str = field(default=TIER_HOST)
+    # Licensed to bind or rebind the principal downstream work runs on behalf of —
+    # the acting-on-behalf-of hop. Mirrors `discharges_trust`: the sole marker that
+    # lets a node change a propagating annotation, declared in the graph source so
+    # delegation is reviewable rather than buried in a node body.
+    binds_principal: bool = False
 
 
 @dataclass
@@ -91,6 +96,11 @@ class AssembledGraph:
     # rather than only by the capability's scope. A node/capability absent here has
     # no declared identity and is named by scope.
     identities: dict[str, dict[str, str]] = field(default_factory=dict)
+    # The authenticated party this run acts on behalf of, bound once at assembly and
+    # never widened. `None` means the run binds no principal, in which case nothing
+    # about principals is recorded and behaviour is exactly as before the feature
+    # existed — the feature is opt-in at the call site, like the assembly scope.
+    principal: str | None = None
 
     def revoke(self, cap_type: str, identity: str) -> None:
         """Sever the named revocable capability instance. Afterwards every node
@@ -268,6 +278,7 @@ def assemble(
     stores: Mapping[str, Mapping[str, list[str]]] | None = None,
     sandbox: Iterable[str] = (),
     identities: Mapping[str, Mapping[str, str]] | None = None,
+    principal: str | None = None,
     revocable_instances: Iterable[tuple[str, str]] = (),
     rotatable_instances: Iterable[tuple[str, str]] = (),
     handles: Mapping[str, object] | None = None,
@@ -332,6 +343,7 @@ def assemble(
             inputs=list(n["inputs"]),
             output=n["output"],
             discharges_trust=bool(n.get("discharges_trust", False)),
+            binds_principal=bool(n.get("binds_principal", False)),
             tier=TIER_SANDBOX if n["name"] in sandbox_nodes else TIER_HOST,
         )
         for n in graph["nodes"]
@@ -465,4 +477,5 @@ def assemble(
         revokers=revokers,
         rotators=rotators,
         identities={n: dict(caps) for n, caps in identities.items()},
+        principal=principal,
     )
