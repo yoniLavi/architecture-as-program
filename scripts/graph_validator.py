@@ -135,6 +135,15 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
         if "binds_principal" in n and not isinstance(n["binds_principal"], bool):
             errors.append(f"{path.name}: node {nname!r} `binds_principal` must be boolean")
             continue
+        # Contracts are checked for *parseability* here and for resolvable field
+        # paths at assembly. The split is forced by what each layer can know: this
+        # validator is dependency-free and holds no field schema for a declared type
+        # name, so it can tell a malformed predicate from a well-formed one but not
+        # a real field from an imagined one.
+        contract_error = _contract_syntax_error(n)
+        if contract_error is not None:
+            errors.append(f"{path.name}: node {nname!r} {contract_error}")
+            continue
         node_map[nname] = n
 
     # A principal binder must hold authority to scope. Declaring the acting-on-
@@ -584,6 +593,37 @@ def _validate_cross_graph(
 
 
 # ── Public entry point ─────────────────────────────────────────────
+
+
+_CONTRACT_FORMS = (
+    re.compile(r"^len\(\s*[A-Za-z_][\w.]*\s*\)\s*(==|!=|>=|<=|>|<)\s*-?\d+$"),
+    re.compile(r"^[A-Za-z_][\w.]*\s+in\s+\[.*\]$"),
+    re.compile(r"^present\(\s*[A-Za-z_][\w.]*\s*\)$"),
+    re.compile(r"^[A-Za-z_][\w.]*\s*(==|!=|>=|<=|>|<)\s*.+$"),
+)
+
+
+def _contract_syntax_error(node: dict) -> str | None:
+    """A node's `requires`/`ensures` must be lists of predicates in the closed
+    vocabulary. Mirrors poc/contracts.py's grammar deliberately: the runtime parses
+    for real, this only rejects what could never parse, so an unevaluatable contract
+    fails at validation rather than part-way through a run."""
+    for key in ("requires", "ensures"):
+        if key not in node:
+            continue
+        clauses = node[key]
+        if not isinstance(clauses, list) or not all(
+            isinstance(c, str) and c.strip() for c in clauses
+        ):
+            return f"`{key}` must be a list of non-empty predicate strings"
+        for clause in clauses:
+            if not any(form.match(clause.strip()) for form in _CONTRACT_FORMS):
+                return (
+                    f"`{key}` predicate {clause!r} is outside the contract vocabulary "
+                    f"(permitted: `path <op> literal`, `path in [a, b]`, `present(path)`, "
+                    f"`len(path) <op> integer`)"
+                )
+    return None
 
 
 def validate_files(files: Iterable[Path]) -> list[str]:

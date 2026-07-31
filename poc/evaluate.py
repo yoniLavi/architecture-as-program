@@ -103,6 +103,7 @@ REJECTED = "rejected"
 REASON_EDGE_TYPE = "edge type-compatibility"
 REASON_TRUST_LATTICE = "trust lattice"
 REASON_CROSS_GRAPH = "cross-graph signature"
+REASON_CONTRACT = "contract"
 
 # A reason class is identified by substrings that must all appear in the
 # validator's errors. The classes are disjoint on the current corpus — a
@@ -113,6 +114,11 @@ REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     REASON_EDGE_TYPE: ("type mismatch",),
     REASON_TRUST_LATTICE: ("upward coercion", "laundering", "discharges_trust"),
     REASON_CROSS_GRAPH: ("declared output", "terminal output types"),
+    # A contract outside the closed vocabulary is caught before anything runs, and
+    # is pinned to its own class so it cannot silently start being caught as a
+    # different fault — the same reason laundering is pinned to the trust lattice
+    # rather than to "rejected".
+    REASON_CONTRACT: ("contract vocabulary",),
 }
 
 
@@ -183,6 +189,17 @@ CORPUS: tuple[Case, ...] = (
         "`ServiceOutcome` gap.",
         base="support-platform",
         with_graphs=("customer-support",),
+    ),
+    Case(
+        "unevaluatable_contract",
+        "mutation",
+        REJECTED,
+        REASON_CONTRACT,
+        "A different kind of fault from the three above: not an unsafe wiring but an "
+        "unevaluatable specification. A node declares a precondition outside the closed "
+        "contract vocabulary. It is pinned because the contract layer's value depends "
+        "on the ceiling being real — a predicate that silently evaluated to false "
+        "rather than being rejected would make every satisfied contract ambiguous.",
     ),
 )
 

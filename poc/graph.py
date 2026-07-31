@@ -17,6 +17,7 @@ from pathlib import Path
 
 from graph_validator import validate_files
 
+from .contracts import ContractError, Predicate, parse_all
 from .handles import Revoker, Rotator, manage, provision
 from .llm import LLMBackend
 
@@ -45,6 +46,15 @@ TIER_SANDBOX = "sandbox"
 TIER_GRAPH = "graph"
 
 
+def _contract(node: dict, key: str) -> tuple[Predicate, ...]:
+    """Parse a node's contract, re-raising as an assembly error so a malformed
+    contract fails the same gate an unsafe wiring does rather than mid-run."""
+    try:
+        return parse_all(node.get(key), what=key)
+    except ContractError as exc:
+        raise AssemblyError([f"node {node.get('name')!r}: {exc}"]) from exc
+
+
 @dataclass
 class Node:
     name: str
@@ -57,6 +67,10 @@ class Node:
     # lets a node change a propagating annotation, declared in the graph source so
     # delegation is reviewable rather than buried in a node body.
     binds_principal: bool = False
+    # Parsed pre/postconditions. Empty tuples for a node declaring none, so a graph
+    # without contracts costs nothing at run time beyond two empty loops.
+    requires: tuple[Predicate, ...] = ()
+    ensures: tuple[Predicate, ...] = ()
 
 
 @dataclass
@@ -344,6 +358,8 @@ def assemble(
             output=n["output"],
             discharges_trust=bool(n.get("discharges_trust", False)),
             binds_principal=bool(n.get("binds_principal", False)),
+            requires=_contract(n, "requires"),
+            ensures=_contract(n, "ensures"),
             tier=TIER_SANDBOX if n["name"] in sandbox_nodes else TIER_HOST,
         )
         for n in graph["nodes"]

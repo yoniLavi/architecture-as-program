@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 
 from type_parser import TApp, TList, TName, TString, parse_type
 
+from . import contracts
 from .graph import (
     TIER_GRAPH,
     TIER_SANDBOX,
@@ -399,7 +400,21 @@ def execute(
                     f"no {node.tier}-tier implementation registered for node {node_name!r}"
                 )
             entry.tier = result.tiers[node_name] = node.tier
+            # Contracts bracket the body: preconditions before, postconditions
+            # after, each carrying blame so a violation names the side that broke
+            # the agreement rather than only the fact of breakage.
+            contracts.check(node.requires, value, node=node_name, kind="requires")
             output = impl(value, *_capability_handles(graph, node, collector))
+
+        # Postconditions see the value the node actually emitted. A Variant is
+        # checked on its payload, so a contract talks about the value that flows
+        # rather than about the routing wrapper around it.
+        contracts.check(
+            node.ensures,
+            output.value if isinstance(output, Variant) else output,
+            node=node_name,
+            kind="ensures",
+        )
 
         entry.output_trust = trust_label(output)
         if record_timing:

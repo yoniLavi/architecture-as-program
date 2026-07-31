@@ -11,8 +11,11 @@ The runtime SHALL evaluate preconditions before invoking a node body and postcon
 violation SHALL carry **blame**: a failed precondition attributes fault to the upstream wiring, a
 failed postcondition to the node body.
 
-The validator SHALL reject a contract referencing a field absent from the node's declared types, so an
-unevaluatable contract fails at assembly rather than at run time.
+A malformed contract SHALL be rejected by the graph validator, and a contract referencing a field the
+node's value type does not carry SHALL be rejected at assembly, so an unevaluatable contract fails
+before execution rather than during it. The split reflects what each layer can know: the validator is
+dependency-free and has no field schema for a declared type name, so it checks that a predicate parses;
+assembly, which holds the value classes, checks that the paths resolve.
 
 #### Scenario: A precondition violation blames upstream
 - **WHEN** a node receives an input violating its declared precondition
@@ -22,6 +25,10 @@ unevaluatable contract fails at assembly rather than at run time.
 - **WHEN** a node body emits an output violating its declared postcondition
 - **THEN** the run fails with a contract violation attributing fault to that node's implementation
 
-#### Scenario: An unevaluatable contract is rejected at assembly
-- **WHEN** a contract references a field the node's declared types do not contain
-- **THEN** validation rejects the graph rather than deferring the error to execution
+#### Scenario: A malformed contract is rejected by the validator
+- **WHEN** a node declares a predicate outside the closed vocabulary
+- **THEN** graph validation rejects it rather than deferring the error to execution
+
+#### Scenario: An unresolvable field is rejected at assembly
+- **WHEN** a contract references a field the node's value type does not carry
+- **THEN** assembly fails rather than the run failing part-way through

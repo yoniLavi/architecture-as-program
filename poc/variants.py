@@ -70,10 +70,26 @@ def mislabel_subgraph_output(platform: dict) -> dict:
     return g
 
 
+def unevaluatable_contract(graph: dict) -> dict:
+    """Attach a contract the closed vocabulary cannot express.
+
+    A different *kind* of fault from the other three: not an unsafe wiring but an
+    unevaluatable specification. It is in the corpus because the contract layer's
+    whole claim rests on the vocabulary having a ceiling — a predicate that quietly
+    evaluated to false instead of being rejected would make every contract's
+    silence ambiguous, which is worse than having no contracts at all."""
+    g = copy.deepcopy(graph)
+    for node in g["nodes"]:
+        if node["name"] == "ParseMessage":
+            node["requires"] = ["forall x. x > 0"]
+    return g
+
+
 UNSAFE_VARIANTS = {
     "bypass_pipeline": bypass_pipeline,
     "launder_trust": launder_trust,
     "mislabel_subgraph_output": mislabel_subgraph_output,
+    "unevaluatable_contract": unevaluatable_contract,
 }
 
 # Variants whose fault is only visible with a *second* graph in the validation
