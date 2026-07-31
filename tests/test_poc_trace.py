@@ -202,3 +202,53 @@ def test_a_host_only_capability_names_itself_when_it_has_no_wit_interface():
     assert [(c.interface, c.instance) for c in audit.crossings] == [
         ("DBHandle<'audit', append>", "audit")
     ]
+
+
+# ── The per-call layer, and the projection that derives the coarse view ──────
+#
+# Taken from the durable-execution systems (Golem journals per-call at a
+# component's WIT boundary). The point of the split is that the two layers answer
+# different questions: what authority did this node exercise, versus what happened
+# on this run.
+
+
+def test_calls_are_ordered_and_undeduplicated():
+    """A node that uses one capability instance several times records one call per
+    use, in order, with the operation it reached for."""
+    gen = _node(run(BENIGN).trace, "GenerateResponse")
+    assert len(gen.calls) >= 2, "GenerateResponse crosses more than once"
+    assert [c.index for c in gen.calls] == list(range(len(gen.calls)))
+    assert all(c.operation for c in gen.calls), "every call names its operation"
+
+
+def test_crossings_are_the_projection_of_calls():
+    """Spec: the deduplicated view is *derived*, not recorded beside the calls —
+    which is what stops the two layers from disagreeing."""
+    for node in run(BENIGN).trace.walk():
+        expected = []
+        for call in node.calls:
+            pair = (call.interface, call.instance)
+            if pair not in expected:
+                expected.append(pair)
+        assert [(c.interface, c.instance) for c in node.crossings] == expected
+
+
+def test_the_structural_form_excludes_the_call_journal():
+    """The call layer is where the tiers legitimately differ, so it must not reach
+    the form the tier-equality comparison and the determinism pin are taken over."""
+    trace = run(BENIGN).trace
+    structural = trace.structural()
+    assert any(n.calls for n in trace.walk()), "the run did record calls"
+    for node in structural["nodes"]:
+        assert "calls" not in node
+
+    full = trace.to_dict()
+    assert any("calls" in n for n in full["nodes"]), "the full form keeps them"
+
+
+def test_a_trace_carrying_calls_still_validates():
+    """The schema admits the new layer, and the full form (not just the structural
+    one) is schema-valid — otherwise the emitted artifact would not be."""
+    from poc.trace import validate_document
+
+    assert validate_document(run(BENIGN).trace.to_dict()) == []

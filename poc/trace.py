@@ -9,14 +9,27 @@ builds, and rendered (later) by the graph inspector without re-deriving anything
 
 Three design commitments, each load-bearing:
 
-* **A crossing is (interface, instance), deduplicated per node.** Not a per-call
-  log. The host tier calls a capability method once; the confined tier's component
-  runs its own internal loop and crosses the *same* interface a different number of
-  times, under a different function name (`respond` vs `generate`). Recording the
-  *set* of typed interfaces a node crossed — and the capability instance each
-  landed on — is the one representation both tiers produce identically, which is
-  the property `tests/test_poc_sandbox.py` asserts. Multiplicity is a timing fact,
-  not a structural one, and lives nowhere in the trace.
+* **Two layers, one of them derived.** A `Call` is a per-use record — interface,
+  instance, operation, sequence position — in encounter order and undeduplicated.
+  A `Crossing` is `(interface, instance)`, deduplicated, and is *computed from* the
+  calls rather than recorded beside them. The two answer different questions for
+  different readers: an auditor asks what authority a node exercised, a debugger
+  asks what happened on one run.
+
+  The projection is what makes the tiers comparable. The host tier calls a
+  capability method once; the confined tier's component runs its own internal loop
+  and crosses the *same* interface a different number of times, under a different
+  function name (`respond` vs `generate`). Forgetting operation and sequence is
+  exactly what erases that legitimate difference, so the structural equality
+  `tests/test_poc_sandbox.py` asserts is now a property of the projection rather
+  than a coincidence between two hand-maintained views. The call layer is
+  correspondingly excluded from structural comparison — the tiers *should* differ
+  there.
+
+  What the call layer is not: sufficient for replay. Durable-execution systems that
+  replay (Golem journals precisely this at a component's WIT boundary) also record
+  argument and return *values*, which nothing here captures. This layer is the
+  ordering and multiplicity replay would need, not the data.
 
 * **Determinism by construction.** No wall-clock timestamps, no randomness in any
   structural field. Crossings are emitted in a sorted order, so two runs of the
@@ -85,36 +98,83 @@ class Crossing:
         return {"interface": self.interface, "instance": self.instance}
 
 
+@dataclass(frozen=True)
+class Call:
+    """One *use* of a capability, in encounter order and undeduplicated: the
+    interface crossed, the instance it landed on, the operation reached for, and
+    the position in this node's call sequence.
+
+    This is the layer the durable-execution systems record (Golem journals exactly
+    this at a component's WIT boundary) and the layer replay would need. It is
+    deliberately *not* tier-comparable: the host tier calls a capability once where
+    a confined component loops internally, under different operation names, and
+    that difference is real rather than noise to be suppressed. `Crossing` above is
+    its projection, and that is the tier-comparable view.
+
+    Honesty constraint: on the host tier this record is exactly as circumventable
+    as every other host-tier guarantee — a node that declines to play by the object
+    model can drive the wrapper however it likes. Confined-tier-authoritative,
+    host-tier-advisory; a more detailed artifact is not a stronger one."""
+
+    interface: str
+    instance: str
+    operation: str
+    index: int
+
+    def to_dict(self) -> dict:
+        return {
+            "interface": self.interface,
+            "instance": self.instance,
+            "operation": self.operation,
+            "index": self.index,
+        }
+
+
 @dataclass
 class NodeTrace:
     """One node's run: which tier ran it, the trust it received and produced, the
-    distinct capability crossings it made, and — for a sub-graph node — the nested
-    run of its body."""
+    capability uses it made — as an ordered per-call journal and as the
+    deduplicated projection of it — and, for a sub-graph node, the nested run of
+    its body."""
 
     node: str
     tier: str
     input_trust: str
     output_trust: str | None = None
-    crossings: list[Crossing] = field(default_factory=list)
+    calls: list[Call] = field(default_factory=list)
     subgraph: GraphTrace | None = None
     # Excluded from every structural comparison and from the schema's required
     # fields. Present only when a run is asked to time itself; never populated on
     # the paths the pins compare, so structure stays deterministic.
     timing_us: float | None = None
 
-    def add_crossing(self, interface: str, instance: str) -> None:
-        """Record a crossing, deduplicated. A node that touches one capability
-        instance many times crosses it *once*, structurally."""
-        crossing = Crossing(interface, instance)
-        if crossing not in self.crossings:
-            self.crossings.append(crossing)
+    @property
+    def crossings(self) -> list[Crossing]:
+        """The distinct capability crossings, *derived* from `calls` by forgetting
+        operation and sequence and deduplicating.
+
+        Deriving rather than recording separately is what keeps the two layers from
+        disagreeing: the structural equality of the two tiers' traces is now a
+        property of this projection rather than a coincidence between two
+        independently maintained views. First-encounter order is preserved;
+        serialisation sorts."""
+        seen: list[Crossing] = []
+        for call in self.calls:
+            crossing = Crossing(call.interface, call.instance)
+            if crossing not in seen:
+                seen.append(crossing)
+        return seen
+
+    def record_call(self, interface: str, instance: str, operation: str) -> None:
+        """Record one capability use. The deduplicated crossing follows from it."""
+        self.calls.append(Call(interface, instance, operation, len(self.calls)))
 
     def raises_trust(self) -> bool:
         """True iff this node consumed untrusted input and emitted trusted output —
         the observable signature of a trust discharge."""
         return self.input_trust == UNTRUSTED and self.output_trust == TRUSTED
 
-    def to_dict(self, *, include_timing: bool = True) -> dict:
+    def to_dict(self, *, include_timing: bool = True, include_calls: bool = True) -> dict:
         # Crossings are sorted, not emitted in encounter order: encounter order is a
         # per-tier artefact (the host and confined tiers touch handles in different
         # orders), and sorting is what makes the two tiers' traces structurally
@@ -127,8 +187,16 @@ class NodeTrace:
             "output_trust": self.output_trust,
             "crossings": [c.to_dict() for c in ordered],
         }
+        # The per-call journal is emitted in encounter order and omitted from the
+        # structural form, for the same reason timing is: the two tiers legitimately
+        # differ here, so including it in a comparison would make the tier-equality
+        # property fail for a difference that is not a defect.
+        if include_calls and self.calls:
+            out["calls"] = [c.to_dict() for c in self.calls]
         if self.subgraph is not None:
-            out["subgraph"] = self.subgraph.to_dict(include_timing=include_timing)
+            out["subgraph"] = self.subgraph.to_dict(
+                include_timing=include_timing, include_calls=include_calls
+            )
         if include_timing and self.timing_us is not None:
             out["timing_us"] = self.timing_us
         return out
@@ -142,16 +210,20 @@ class GraphTrace:
     graph: str
     nodes: list[NodeTrace] = field(default_factory=list)
 
-    def to_dict(self, *, include_timing: bool = True) -> dict:
+    def to_dict(self, *, include_timing: bool = True, include_calls: bool = True) -> dict:
         return {
             "graph": self.graph,
-            "nodes": [n.to_dict(include_timing=include_timing) for n in self.nodes],
+            "nodes": [
+                n.to_dict(include_timing=include_timing, include_calls=include_calls)
+                for n in self.nodes
+            ],
         }
 
     def structural(self) -> dict:
-        """The trace with timing excluded — the form the determinism test compares
-        and the schema pins."""
-        return self.to_dict(include_timing=False)
+        """The trace with timing and the per-call journal excluded — the form the
+        determinism test compares, the schema pins, and the two tiers must agree on.
+        What remains is the projection: interface identity and instance, deduplicated."""
+        return self.to_dict(include_timing=False, include_calls=False)
 
     def walk(self):
         """Yield every `NodeTrace` in the run, descending into sub-graphs. Lets a
@@ -175,9 +247,9 @@ class TraceCollector:
     def __init__(self) -> None:
         self.current: NodeTrace | None = None
 
-    def record(self, interface: str, instance: str) -> None:
+    def record(self, interface: str, instance: str, operation: str) -> None:
         if self.current is not None:
-            self.current.add_crossing(interface, instance)
+            self.current.record_call(interface, instance, operation)
 
 
 class RecordingHandle:
@@ -215,6 +287,7 @@ class RecordingHandle:
         collector.record(
             object.__getattribute__(self, "_interface"),
             object.__getattribute__(self, "_instance"),
+            name,
         )
         return getattr(object.__getattribute__(self, "_target"), name)
 
