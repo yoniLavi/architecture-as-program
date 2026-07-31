@@ -83,6 +83,8 @@ Three numbers come out, and the third is the one worth having:
 - iterations to green;
 - **how often the import-set check catches a generated body reaching for authority it was not granted.**
 
+**Design it against TACIT, which is the standard to beat.** Odersky et al. evaluated the closest comparable system on established agent benchmarks across several model families and reported no task-performance loss; an anecdote from one model on one graph will not stand next to that. Three separate axes, not one aggregate: the catch rate, reported *by which interface was over-imported* rather than as pass/fail, in the reason-class discipline the evaluation harness already uses; the task-performance delta against an unconstrained baseline with the same model and prompt; and the catch rate under an **adversarial generation prompt** that actively nudges the model toward authority it was not granted. Two controls: the same signatures with no import-set check at all, to show the check is doing work rather than the model being well-behaved anyway; and hand-written bodies, which should produce roughly zero violations and confirm the check is not simply flaky. Run at least two model families, or the result is a fact about one model's training rather than about the mechanism. And distinguish *no attempts* from *N attempts, all caught* — the second is the stronger and far more interesting finding, and reporting them as one number destroys it.
+
 That third number converts the demonstrator's best *static* result into an empirical guardrail on
 agent-authored code, which is a claim nobody has made. If agents reach for `std::fs`, an ungranted interface,
 or an out-of-scope tool — and the check catches it every time, before the artifact ships — that is a new
