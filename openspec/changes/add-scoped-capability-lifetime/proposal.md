@@ -39,11 +39,3 @@ close with machinery that already exists.
 - Not in scope: making *all* instances revocable by default (universal caretakers). That is the
   stronger, more Effect-like design, and it is a real design decision with a cost — every capability
   crossing would route through a proxy — so it belongs in the agenda, not smuggled in here.
-
-## Tasks
-
-- [x] `AssembledGraph.close()` plus context-manager protocol, severing on the failure path too
-- [x] Tests: sever on exit, sever on raise, bare instance survives (the pinned limit), idempotent
-      close leaves the assembly inspectable, no-scope behaviour unchanged
-- [x] Paper 2 §3.4: the property and its limit, crediting the source
-- [x] Paper 2 §6.2: Effect in related work, positioned as the host tier at language scale
