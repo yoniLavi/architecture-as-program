@@ -808,3 +808,96 @@ def test_laundering_trust_is_rejected_by_trust_propagation(graph):
     assert "laundering" in errors
     assert "discharges_trust" in errors
     assert "type mismatch" not in errors
+
+
+# ── Scoped capability lifetime ────────────────────────────────────────
+#
+# Borrowed from Effect's `Scope`: a resource acquired in a scope is finalised
+# when the scope exits, so release is structural rather than remembered. Here
+# the scope is the assembly itself, and what it finalises is granted authority.
+
+
+def test_leaving_the_scope_severs_a_revocable_instance(graph):
+    """Spec: authority granted for a run does not outlive the run. The handle is
+    usable inside the scope and inert after it, with no explicit revoke call."""
+    with assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        revocable_instances=[(RC, "session_a")],
+    ) as g:
+        handle = g.handle_for(g.nodes["SendReply"], RC)
+        assert handle.send("inside").delivered
+
+    with pytest.raises(RevokedCapabilityError):
+        handle.send("after the scope closed")
+
+
+def test_scope_exit_severs_even_when_the_body_raises(graph):
+    """A run that failed part-way is the case where leaked authority matters most,
+    so the sever happens on the exception path too."""
+    boom = RuntimeError("node blew up")
+    try:
+        with assemble(
+            graph,
+            backend=StubLLM(),
+            stores=STORES,
+            identities={"SendReply": {RC: "session_a"}},
+            revocable_instances=[(RC, "session_a")],
+        ) as g:
+            handle = g.handle_for(g.nodes["SendReply"], RC)
+            raise boom
+    except RuntimeError as exc:
+        assert exc is boom  # the scope re-raises rather than swallowing
+
+    with pytest.raises(RevokedCapabilityError):
+        handle.send("after the failed run")
+
+
+def test_scope_exit_does_not_reach_a_bare_instance(graph):
+    """The honest limit, pinned as a test so the paper cannot overstate it: an
+    instance provisioned *without* `revocable_instances` has no caretaker to
+    sever, so it survives the scope. Closing this gap would mean a proxy on every
+    capability crossing, which is a design decision and not this change."""
+    with assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        # note: no revocable_instances — provisioned bare
+    ) as g:
+        bare = g.handle_for(g.nodes["SendReply"], RC)
+
+    assert bare.send("still works").delivered  # outlives the scope, by design
+
+
+def test_closing_is_idempotent_and_leaves_the_assembly_inspectable(graph):
+    """Spec: `close()` twice is a no-op, and severing authority does not destroy
+    the assembly — the graph stays readable for inspection afterwards."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        revocable_instances=[(RC, "session_a")],
+    )
+    g.close()
+    g.close()  # no raise
+
+    assert "SendReply" in g.nodes  # still inspectable
+    assert g.identities["SendReply"][RC] == "session_a"
+
+
+def test_assembling_without_a_scope_is_unchanged(graph):
+    """The bound is opt-in at the call site: every existing caller that does not
+    use `with` keeps its previous behaviour."""
+    g = assemble(
+        graph,
+        backend=StubLLM(),
+        stores=STORES,
+        identities={"SendReply": {RC: "session_a"}},
+        revocable_instances=[(RC, "session_a")],
+    )
+    handle = g.handle_for(g.nodes["SendReply"], RC)
+    assert handle.send("no scope, no sever").delivered

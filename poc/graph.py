@@ -109,6 +109,35 @@ class AssembledGraph:
                 f"revocable instances are {sorted(self.revokers)}"
             ) from None
 
+    def close(self) -> None:
+        """Sever every revocable instance this assembly provisioned.
+
+        Bounds granted authority to the assembly's lifetime: after `close()`, no
+        node-held handle over a revocable instance still exercises authority, even
+        if a caller kept a reference to it. Idempotent — `Revoker.revoke` is — and
+        the assembly stays inspectable afterwards (nodes, edges, and the identity
+        map are unaffected; only the caretakers are severed).
+
+        The limit is the honest half. This reaches exactly the instances
+        provisioned *revocable*; an instance provisioned bare has no caretaker to
+        sever and outlives the scope. That is weaker than the scoped-resource
+        discipline this borrows from (see the paper's related work on Effect),
+        where a scope finalises everything acquired within it. Making every
+        instance revocable by default would close the gap and would put a proxy on
+        every capability crossing — a design decision, not a detail."""
+        for revoker in self.revokers.values():
+            revoker.revoke()
+
+    def __enter__(self) -> AssembledGraph:
+        """Use an assembly as a scope: `with assemble(...) as g:`. Assemblies used
+        without `with` are unaffected, so the bound is opt-in at the call site."""
+        return self
+
+    def __exit__(self, *_exc_info: object) -> None:
+        # Severs on the way out whether or not the body raised: an assembly that
+        # failed mid-run is exactly the case where leaked authority matters most.
+        self.close()
+
     def rotate(self, cap_type: str, identity: str, new_handle: object) -> None:
         """Re-point the named rotatable capability instance at `new_handle`.
         Afterwards every node bound to `(cap_type, identity)` is served by the new
