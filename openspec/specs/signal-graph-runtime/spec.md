@@ -506,3 +506,118 @@ Every graph execution SHALL produce a machine-readable trace recording, in execu
 
 - **WHEN** the same graph is executed twice with the same input
 - **THEN** the two traces are structurally identical once optional timing fields are excluded
+
+### Requirement: Provisioned authority is bounded by the assembly's scope
+An assembled graph SHALL support use as a scope. On exit from that scope, every capability instance
+the assembly provisioned as revocable SHALL be severed, so that authority granted for a run does not
+outlive the run without the host taking a deliberate step to extend it. Severing on scope exit SHALL
+be idempotent and SHALL leave the assembly usable for inspection.
+
+Assemblies used without a scope SHALL behave exactly as before, so the guarantee is opt-in at the
+call site and no existing caller changes behaviour.
+
+The guarantee SHALL be documented as reaching only instances provisioned revocable: an instance
+provisioned bare has no caretaker to sever and outlives the scope.
+
+#### Scenario: Leaving the scope severs a revocable instance
+- **WHEN** a graph is assembled within a scope with a revocable capability instance, and the scope exits
+- **THEN** a node's handle for that instance raises on its next use
+
+#### Scenario: A bare instance is not severed by scope exit
+- **WHEN** a graph is assembled within a scope with an instance that was not declared revocable, and the scope exits
+- **THEN** that instance remains usable, and the limit is documented rather than presented as confinement
+
+#### Scenario: Assembling without a scope is unchanged
+- **WHEN** a graph is assembled without using it as a scope
+- **THEN** every capability instance behaves exactly as it did before this change
+
+### Requirement: The trace records crossings per call and derives the deduplicated view
+An execution trace SHALL record each capability crossing a node makes as an ordered, undeduplicated
+entry identifying the interface crossed, the capability instance it landed on, the operation invoked,
+and its position in the node's call sequence. The deduplicated `(interface, instance)` view SHALL be
+**derived** from those entries by projection rather than recorded separately, so the two views cannot
+disagree.
+
+The per-call layer SHALL be excluded from structural comparison between enforcement tiers, because the
+tiers legitimately differ in call count and operation naming; the derived view SHALL remain
+tier-comparable, and the existing structural-equality property SHALL continue to hold as a property of
+the projection.
+
+The per-call layer SHALL be documented as confined-tier-authoritative and host-tier-advisory: on the
+host tier it is exactly as circumventable as every other host-tier guarantee, and SHALL NOT be
+presented as stronger evidence than the deduplicated view it projects to.
+
+#### Scenario: The deduplicated view is a projection of the per-call layer
+- **WHEN** a node crosses one capability instance several times in a run
+- **THEN** the per-call layer contains one entry per call in order
+- **AND** the deduplicated view contains exactly one crossing for that interface and instance
+
+#### Scenario: Tier equality survives as a property of the projection
+- **WHEN** the same graph runs on the host tier and on the confined tier
+- **THEN** the derived deduplicated views are structurally equal once the tier field is set aside
+- **AND** the per-call layers may differ, and that difference does not fail the comparison
+
+### Requirement: A run binds a principal, and only declared nodes may rebind it
+An assembled graph SHALL support binding a principal representing the authenticated party on whose
+behalf the run executes. A node MAY declare that it binds a principal; such a node SHALL be the only kind licensed to
+rebind the acting principal for the work downstream of it, mirroring the discipline by which only a
+declared discharger may raise trust. A graph assembled without a principal SHALL behave exactly as it
+did before this capability existed.
+
+The validator SHALL reject a node that declares principal binding while holding no capabilities, since
+a binder with no authority to scope is a declaration with no meaning.
+
+#### Scenario: A run without a principal is unchanged
+- **WHEN** a graph is assembled without binding a principal
+- **THEN** every capability behaves exactly as it did before, and no crossing records a principal
+
+#### Scenario: A non-binder cannot rebind the acting principal
+- **WHEN** a node that does not declare principal binding attempts to act as a different principal
+- **THEN** the attempt fails rather than silently widening authority
+
+### Requirement: Capability crossings record the acting principal
+Every recorded capability crossing SHALL carry, where a run binds a principal, the principal on whose
+authority it was made, together with the chain of parties acting on that principal's behalf, so that
+delegation is visible in the trace rather than inferred. Sub-graph runs SHALL record it at every
+altitude.
+
+This SHALL make the confused-deputy property checkable: no crossing anywhere in a run SHALL record a
+principal outside the scope bound at entry unless it passed through a node declared to bind one.
+
+#### Scenario: The confused-deputy property is checkable from the trace
+- **WHEN** a run binds a principal and executes, including through a sub-graph
+- **THEN** every crossing at every altitude records that principal or a narrowing of it
+- **AND** a crossing recording a principal outside that scope, absent a declared binder, is detectable
+
+### Requirement: Nodes may carry checkable pre- and postconditions
+A node SHALL be able to declare preconditions over its inputs and postconditions over its outputs,
+expressed as conjunctions of predicates over field paths of its already-declared types. The predicate
+vocabulary SHALL be closed — comparisons, membership in a declared variant set, and field presence — with no
+quantification, recursion, or embedded code, so that a contract remains checkable without a solver and
+without a new dependency.
+
+The runtime SHALL evaluate preconditions before invoking a node body and postconditions after, and a
+violation SHALL carry **blame**: a failed precondition attributes fault to the upstream wiring, a
+failed postcondition to the node body.
+
+A malformed contract SHALL be rejected by the graph validator, and a contract referencing a field the
+node's value type does not carry SHALL be rejected at assembly, so an unevaluatable contract fails
+before execution rather than during it. The split reflects what each layer can know: the validator is
+dependency-free and has no field schema for a declared type name, so it checks that a predicate parses;
+assembly, which holds the value classes, checks that the paths resolve.
+
+#### Scenario: A precondition violation blames upstream
+- **WHEN** a node receives an input violating its declared precondition
+- **THEN** the run fails with a contract violation attributing fault to the wiring that supplied it
+
+#### Scenario: A postcondition violation blames the node body
+- **WHEN** a node body emits an output violating its declared postcondition
+- **THEN** the run fails with a contract violation attributing fault to that node's implementation
+
+#### Scenario: A malformed contract is rejected by the validator
+- **WHEN** a node declares a predicate outside the closed vocabulary
+- **THEN** graph validation rejects it rather than deferring the error to execution
+
+#### Scenario: An unresolvable field is rejected at assembly
+- **WHEN** a contract references a field the node's value type does not carry
+- **THEN** assembly fails rather than the run failing part-way through

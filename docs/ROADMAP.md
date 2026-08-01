@@ -2,34 +2,32 @@
 
 ## Start here: state as of 1 August 2026
 
-**Four OpenSpec changes are implemented, tested, and complete but not archived.** All four
-have green builds and full task lists; what remains is a human read of the paper prose each one
-touched, then `openspec archive <id> --yes`. Recommended order, which follows the dependency
-between what they touched rather than their size:
+**No active OpenSpec changes.** Everything proposed in July 2026 is implemented, tested and
+archived: the paper split, the scoped capability lifetime, the two-layer trace, principal binding,
+and the contract language. `make build` is green, the suite is 279 tests + 21 subtests, and the
+mutation corpus stands at four cases, each pinned to the analysis meant to catch it.
 
-1. **`add-scoped-capability-lifetime`** — smallest and self-contained. An assembly is a scope;
-   leaving it severs revocable instances. Touches Paper 2 §3.4 only.
-2. **`add-fine-grained-trace-layer`** — archive before principal binding, because that change
-   adds fields to the structure this one reshaped. Per-call journal with the deduplicated
-   crossing set as its projection; Paper 2 §3.5.
-3. **`add-principal-binding`** — builds on the trace above. Paper 2 §3.4 and §7.5.
-4. **`add-node-contracts`** — independent of the other three, but archive last: it adds a corpus
-   case, so the evaluation figures shift, and it is the one whose paper section (§3.6) is newest.
+The papers have **not been read end-to-end since the survey landed**, which is the one caveat on
+everything below — the author is reading them separately. Expect that read to produce corrections,
+and prefer them over anything here if the two disagree.
 
-A note for whoever archives them: two of the split change's `MODIFIED` deltas renamed their
-requirements, and the archiver matches headers exactly. A rename needs a `## RENAMED Requirements`
-block with `FROM:`/`TO:` lines *in addition to* the `MODIFIED` body. That will bite again.
+**Next, in order of value:**
 
-**Then, in order of value:**
+1. **Publish Paper 2 to Zenodo.** Metadata is drafted at
+   `openspec/changes/archive/2026-08-01-split-demonstrator-paper/zenodo-metadata.md`. Paper 2 takes a
+   DOI first because Paper 3 cites it — do not publish in the reverse order. Publishing is
+   outward-facing and needs an explicit go from the author every time, not once.
+2. **Clear the verification debts** in `docs/PRIOR-ART.md`. The Filament one matters most: only its
+   abstract was read, and its lattice arity bears directly on the open two-point-vs-graded decision.
+   Wassette's permission mechanism needs checking against source before the contrast in §6 is
+   published as fact, and AgenticOS's review status is unconfirmed.
+3. **M1 below** — the walking skeleton.
 
-- **Publish Paper 2 to Zenodo.** Metadata is drafted at
-  `openspec/changes/archive/2026-08-01-split-demonstrator-paper/zenodo-metadata.md`. Paper 2 takes a
-  DOI first; Paper 3 cites it, so do not publish in the reverse order. Publishing is outward-facing
-  and needs an explicit go from the author every time.
-- **Clear the verification debts** in `docs/PRIOR-ART.md` — Wassette's permission mechanism against
-  source, Filament's lattice arity from the full paper (it bears on the two-point-vs-graded
-  decision), and AgenticOS's review status.
-- **Then M1 below.**
+**A pitfall that has already cost time twice:** an OpenSpec `MODIFIED` delta that *renames* its
+requirement fails at archive, because the archiver matches headers exactly; a rename needs a
+`## RENAMED Requirements` block with `FROM:`/`TO:` alongside the `MODIFIED` body. Separately,
+`openspec validate --strict` wants SHALL or MUST in a requirement's **first line**, not merely
+somewhere in it.
 
 This is the execution plan for the corpus's next research artifact and the paper that reports it. The
 research *agenda* — the open problems — lives in the method paper; this document is narrower and more
