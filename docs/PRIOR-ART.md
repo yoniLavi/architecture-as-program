@@ -142,7 +142,10 @@ inexpressible unless added as an explicit dimension.
 **Also taken:** an anti-pattern to name explicitly — if a deployment needs
 Zanzibar-style dynamic ACLs, the check must be a first-class capability in a
 `with` clause, never called ambiently, or the authority decision moves into a
-store the validator cannot see.
+store the validator cannot see. **Landed** (Aug 2026) in §7.5, stated as a rule,
+citing `pang_zanzibar_2019` as the production instance of the dynamic side —
+which the paragraph previously lacked, naming only the analysable side (Cedar,
+Biscuit, IAM) and so describing a trade with one end missing.
 
 ### 6. The trace is not sufficient for replay, and the reason is interesting
 
@@ -236,10 +239,15 @@ strategies, run at test time rather than on the execution path.
   **fallback construction** (a provisioning step that fails over to a degraded
   handle) — a pattern absent from our design entirely. Its **memoized-vs-fresh**
   distinction is exactly our identity-routing question with prior art.
-- **Anthropic, *How we contain Claude***: names egress allowlisting as an
-  ambient-authority leak in production — "allowlisting api.anthropic.com exposes
-  all reachable API functions, not just safe operations." Real-world evidence for
-  the `unknown-unknown` argument.
+- **Anthropic, *How we contain Claude across products*** (McGuinness, Grace, De
+  Jonghe, Eaton, Ribbink; 25 May 2026): reframes an egress allowlist as a
+  *capability grant* rather than a destination filter — allowlisting
+  `api.anthropic.com` also permitted file uploads to arbitrary accounts.
+  Real-world evidence for the `unknown-unknown` argument. **Landed** (Aug 2026):
+  cited in §7.4, and pointed at our *own* `HTTPClient<[host, ...]>`, whose
+  allowlist is host-granular and therefore has the same coarseness. It argues
+  against the demonstrator as much as for the framing, which is why it belongs in
+  the threats section rather than beside the claim.
 - **Wassette** (Microsoft, not Bytecode Alliance) runs WASM components as MCP
   tools with deny-by-default permissions granted interactively — but **decoupled
   from the WIT interface**. A precise contrast: same ingredients, not connected
