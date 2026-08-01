@@ -58,7 +58,7 @@ CLOCK = "wasi:clocks/wall-clock@0.2.0"  # Clock
 # The graph-level capability kinds (heads of `with`-clause types) this tier
 # models. `LLMClient` is one kind realised by two interfaces (inference vs tool
 # scope), which is why this tuple and CAPABILITY_INTERFACES have different sizes.
-CAPABILITY_KINDS = (
+CAPABILITY_KINDS: tuple[str, ...] = (
     "LLMClient",
     "DBHandle",
     "ResponseChannel",
@@ -166,6 +166,55 @@ def interface_for(cap_type: str) -> str:
     raise UnmappedCapability(f"unknown capability kind: {cap_type!r}")
 
 
+def kind_of(cap_type: str) -> str:
+    """The graph-level capability *kind* a type names — the head of its `with`-clause type.
+
+    `interface_for` answers "which interface realises this"; this answers "which
+    kind is it". The two come apart wherever one kind has several interfaces —
+    `LLMClient` is one kind realised by both `inference-llm` and `tool-llm` — and
+    that gap is exactly what a coverage count must not blur. Counting interfaces
+    where the claim is about kinds (or counting the mapping table where the claim
+    is about the gate) overstates what the derivation has been exercised on.
+    """
+    ast = parse_type(cap_type)
+    if isinstance(ast, TName):
+        name = ast.name
+    elif isinstance(ast, TApp):
+        name = ast.head
+    else:
+        raise UnmappedCapability(f"not a capability type: {cap_type!r}")
+    if name not in CAPABILITY_KINDS:
+        raise UnmappedCapability(f"unknown capability kind: {cap_type!r}")
+    return name
+
+
+def capability_inputs(node: Mapping[str, object], capabilities: Iterable[str]) -> list[str]:
+    """The capability types in a node's inputs, in declaration order.
+
+    The node's `with` clause, recovered from the flat input list the way
+    `interfaces_for_node` recovers it — the graph JSON keeps data inputs and
+    capability inputs in one list and distinguishes them by membership in the
+    graph's capability set.
+    """
+    caps = set(capabilities)
+    inputs = node.get("inputs", [])
+    if not isinstance(inputs, list):
+        raise UnmappedCapability(f"node {node.get('name')!r} has malformed inputs")
+    return [i for i in inputs if i in caps]
+
+
+def kinds_for_node(graph: Mapping[str, object], node_name: str) -> list[str]:
+    """The distinct capability kinds a node's `with` clause names."""
+    nodes = graph.get("nodes", [])
+    capabilities = graph.get("capabilities", [])
+    if not isinstance(nodes, list) or not isinstance(capabilities, list):
+        raise UnmappedCapability("malformed graph")
+    for node in nodes:
+        if node.get("name") == node_name:
+            return sorted({kind_of(c) for c in capability_inputs(node, capabilities)})
+    raise UnmappedCapability(f"no node {node_name!r} in graph {graph.get('name')!r}")
+
+
 def interfaces_for_node(node: Mapping[str, object], capabilities: Iterable[str]) -> list[str]:
     """The WIT interfaces a node's `with` clause entitles it to import.
 
@@ -173,11 +222,7 @@ def interfaces_for_node(node: Mapping[str, object], capabilities: Iterable[str])
     graph JSON. `capabilities` is the graph's capability list — the inputs of the
     node that appear in it are its capability inputs; the rest is its data input.
     """
-    caps = set(capabilities)
-    inputs = node.get("inputs", [])
-    if not isinstance(inputs, list):
-        raise UnmappedCapability(f"node {node.get('name')!r} has malformed inputs")
-    return sorted({interface_for(i) for i in inputs if i in caps})
+    return sorted({interface_for(i) for i in capability_inputs(node, capabilities)})
 
 
 def expected_imports(graph: Mapping[str, object], node_name: str) -> list[str]:

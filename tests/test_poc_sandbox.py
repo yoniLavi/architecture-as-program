@@ -407,40 +407,19 @@ def test_heartbeat_imports_exactly_its_three_interfaces():
 def test_new_kinds_derive_from_a_with_clause_with_no_special_case():
     """Scenario: the derived and actual import sets agree for the new kinds.
 
-    The graph below does not ship as a canonical graph — the feed-triage service
-    it sketches is proposed separately — but the derivation is the same code path
-    the customer-support test uses: `expected_imports` parses the `with` clause
-    with the project's type parser and maps each capability to its interface.
-    That the three new kinds needed no change to that mechanism (each is one
-    mapping entry) is the point being pinned."""
-    graph = {
-        "name": "FeedPulse",
-        "parameters": [
-            "FeedRef",
-            "Clock",
-            "HTTPClient<['feeds.example.com']>",
-            "Notifier<'digest'>",
-        ],
-        "capabilities": [
-            "Clock",
-            "HTTPClient<['feeds.example.com']>",
-            "Notifier<'digest'>",
-        ],
-        "nodes": [
-            {
-                "name": "Heartbeat",
-                "inputs": [
-                    "FeedRef",
-                    "Clock",
-                    "HTTPClient<['feeds.example.com']>",
-                    "Notifier<'digest'>",
-                ],
-                "output": "HeartbeatReport",
-            }
-        ],
-        "data_edges": [],
-    }
-    assert component_imports("node_heartbeat") == expected_imports(graph, "Heartbeat")
+    `FEED_PULSE_GRAPH` does not ship as a canonical graph — the feed-triage
+    service it sketches is proposed separately — but the derivation is the same
+    code path the customer-support test uses: `expected_imports` parses the `with`
+    clause with the project's type parser and maps each capability to its
+    interface. That the three new kinds needed no change to that mechanism (each
+    is one mapping entry) is the point being pinned.
+
+    The graph is imported from the evaluation harness rather than restated here,
+    because it is now a row of the reported derivation as well as a test fixture,
+    and two copies of it are two things that can disagree."""
+    from poc.evaluate import FEED_PULSE_GRAPH
+
+    assert component_imports("node_heartbeat") == expected_imports(FEED_PULSE_GRAPH, "Heartbeat")
 
 
 def test_heartbeat_runs_within_its_allowlist():

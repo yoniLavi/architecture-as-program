@@ -37,6 +37,7 @@ from poc.evaluate import (
     check_traces,
     derive_and_compare,
     generate,
+    kinds_covered,
     main,
     render,
     run,
@@ -44,7 +45,7 @@ from poc.evaluate import (
     run_injection,
     serialise,
 )
-from poc.sandbox import TYPES, available
+from poc.sandbox import CAPABILITY_KINDS, TYPES, available
 from poc.trace import validate_document
 from poc.variants import UNSAFE_VARIANTS
 
@@ -195,6 +196,7 @@ def test_the_data_carries_every_figure_the_paper_states():
         "injection",
         "tiers",
         "derivation",
+        "graphs",
         "trace",
         "display",
     }
@@ -314,13 +316,32 @@ def test_the_derivation_covers_every_ported_node():
     """Scenario: the derivation is reported per node.
 
     Every node the injection scenario runs confined must appear, or the figure
-    would report a subset of the tier while reading as a property of it."""
+    would report a subset of the tier while reading as a property of it. The
+    derivation is a *superset* of those nodes: it also carries rows from graphs
+    that do not ship, which is how the three I/O capability kinds reach the gate
+    rather than only the test suite."""
     derivations = derive_and_compare()
-    assert {d.node for d in derivations} == set(SANDBOXED_NODES)
-    assert {d.node for d, _ in ((d, None) for d in derivations)} == {
-        node for node, _ in DERIVED_NODES
-    }
+    assert set(SANDBOXED_NODES) <= {d.node for d in derivations}
+    assert {d.node for d in derivations} == {node for _, node, _ in DERIVED_NODES}
     assert all(d.agrees for d in derivations)
+    # Every node of a shipped graph is a ported node; the extra rows are the
+    # unshipped ones, and the artifact must be able to tell them apart.
+    assert {d.node for d in derivations if d.shipped} == set(SANDBOXED_NODES)
+
+
+@sandboxed
+def test_kind_coverage_is_counted_from_the_rows_not_the_mapping_table():
+    """Scenario: the reported coverage is what the gate reached.
+
+    This is the distinction the paper turns on. `CAPABILITY_KINDS` is what the
+    mapping *could* map; `kinds_covered` is what has been held against a binary.
+    A kind mapped but held by no ported node must be reported as unexercised, not
+    counted — otherwise growing the mapping table would silently grow the claim."""
+    covered = kinds_covered(derive_and_compare())
+    assert set(covered) < set(CAPABILITY_KINDS)  # strict: something is unexercised
+    # EventEmitter is mapped, but its only holder (EscalateToHuman) is not ported.
+    assert "EventEmitter" not in covered
+    assert {"Clock", "HTTPClient", "Notifier"} <= set(covered)
 
 
 @sandboxed
@@ -342,10 +363,12 @@ def test_an_over_granting_world_fails_the_evaluation():
     component importing an interface its `with` clause never granted must stop the
     build, not render a row reading "no"."""
     over = Derivation(
+        graph="customer-support",
         node="ParseMessage",
         component="node_parse_message",
         derived=["aap:caps/inference-llm@0.1.0"],
         actual=["aap:caps/inference-llm@0.1.0", "aap:caps/tool-llm@0.1.0"],
+        kinds=["LLMClient"],
     )
     problems = check_derivations([over])
     assert problems and "tool-llm" in problems[0] and "over-granting" in problems[0]
@@ -356,10 +379,12 @@ def test_a_derivation_running_ahead_of_the_artifact_also_fails():
     does not import means the mapping has drifted ahead of the component, so the
     comparison would be vacuously passing on a stale artifact."""
     stale = Derivation(
+        graph="customer-support",
         node="FetchContext",
         component="node_fetch_context",
         derived=["aap:caps/kb-read@0.1.0"],
         actual=[],
+        kinds=["DBHandle"],
     )
     problems = check_derivations([stale])
     assert problems and "drifted" in problems[0]
@@ -374,8 +399,13 @@ def test_an_empty_derivation_fails_rather_than_reporting_nothing():
 @sandboxed
 def test_the_data_carries_the_derivation_figures():
     payload = json.loads(serialise(run()))["derivation"]
-    assert payload["total"] == payload["agreeing"] == len(SANDBOXED_NODES)
+    assert payload["total"] == payload["agreeing"] == len(DERIVED_NODES)
+    assert payload["shipped_total"] == len(SANDBOXED_NODES)
     assert payload["grants_compared"] == sum(n["granted_count"] for n in payload["nodes"])
+    # The coverage the paper states is the gate's, not the mapping table's.
+    assert payload["kinds_covered_count"] == len(payload["kinds_covered"])
+    assert payload["kinds_covered_count"] < len(CAPABILITY_KINDS)
+    assert payload["kinds_unexercised"] == ["EventEmitter"]
     # GenerateResponse is the interesting row: the only ported node holding two
     # capabilities, and the tool-capable one.
     generate_row = next(n for n in payload["nodes"] if n["node"] == "GenerateResponse")

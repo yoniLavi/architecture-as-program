@@ -69,7 +69,7 @@ from .sandbox.bench import (
 )
 from .sandbox.host import Sandbox, capability_imports, component_imports, wasi_imports
 from .sandbox.host import record as _record
-from .sandbox.interfaces import expected_imports
+from .sandbox.interfaces import expected_imports, kinds_for_node
 from .sandbox.nodes import heartbeat_sandbox
 from .trace import GraphTrace, validate_document
 from .values import ConversationContext, CustomerRequest, Untrusted
@@ -166,9 +166,11 @@ CORPUS: tuple[Case, ...] = (
         "canonical",
         ACCEPTED,
         None,
-        "The composition graph assembles, including its cross-graph capability narrowing "
-        "and the output-side check that each service sub-graph's declared boundary type is "
-        "the union of the referenced graph's terminal outputs.",
+        "The composition graph assembles, including the cross-graph capability check "
+        "(which these graphs satisfy at equality — strictly wider provision is exercised "
+        "in the validator suite, not here) and the output-side check that each service "
+        "sub-graph's declared boundary type is the union of the referenced graph's "
+        "terminal outputs.",
         with_graphs=("customer-support",),
     ),
     Case(
@@ -354,6 +356,20 @@ def run_injection(sandbox: set[str]) -> InjectionResult:
 # properties, read from trace *data* rather than asserted only in prose.
 
 DISCHARGE_NODE = "ParseMessage"  # cross-checked against the graph's own marker below
+
+
+def _interior_nodes(graph: dict) -> int:
+    """How many nodes sit strictly between a graph's entry and its terminal.
+
+    In `SupportPlatform` these are the service sub-graphs: the router has no
+    inbound data edge and the audit node no outbound one, so "a service" is
+    definable from the wiring rather than from a list of names that would go stale
+    the moment a fourth service is added.
+    """
+    edges = graph.get("data_edges", [])
+    sources = {e["from"].split(".")[0] for e in edges}
+    targets = {e["to"].split(".")[0] for e in edges}
+    return sum(1 for n in graph["nodes"] if n["name"] in sources and n["name"] in targets)
 
 
 def _trust_raisers(trace: GraphTrace) -> list[str]:
@@ -546,15 +562,59 @@ def probe_escapes() -> list[Escape]:
 # over-grant the claim is about, and a missing one means the derivation has drifted
 # ahead of the artifact.
 
-# The nodes ported to the confined tier, paired with the components built from
-# them. `SANDBOXED_NODES` is the set the demo and the injection scenario run
-# confined; the mapping to component names is the tier's own naming convention.
-DERIVED_NODES: tuple[tuple[str, str], ...] = (
-    ("ParseMessage", "node_parse_message"),
-    ("ModerateContent", "node_moderate_content"),
-    ("FetchContext", "node_fetch_context"),
-    ("GenerateResponse", "node_generate_response"),
-    ("SendReply", "node_send_reply"),
+# The graph behind the three I/O capability kinds. It does not ship as a canonical
+# graph — the feed-triage service it sketches is proposed separately — and it is
+# here rather than only in the test suite for a specific reason. The kinds a
+# derivation has been *exercised* on and the size of the capability→interface
+# mapping are different numbers, and reporting the second where the first is meant
+# overstates the gate's coverage. Running the same code path over this graph makes
+# the difference countable: `kinds_covered` below is computed from the rows, so the
+# paper can state what the comparison reached rather than what the table could
+# in principle map.
+FEED_PULSE_GRAPH: dict = {
+    "name": "FeedPulse",
+    "parameters": [
+        "FeedRef",
+        "Clock",
+        "HTTPClient<['feeds.example.com']>",
+        "Notifier<'digest'>",
+    ],
+    "capabilities": [
+        "Clock",
+        "HTTPClient<['feeds.example.com']>",
+        "Notifier<'digest'>",
+    ],
+    "nodes": [
+        {
+            "name": "Heartbeat",
+            "inputs": [
+                "FeedRef",
+                "Clock",
+                "HTTPClient<['feeds.example.com']>",
+                "Notifier<'digest'>",
+            ],
+            "output": "HeartbeatReport",
+        }
+    ],
+    "data_edges": [],
+}
+
+# Graphs the derivation reads that are not canonical, shipped graphs. Every row
+# sourced from one is marked in the artifact, because a reader must be able to tell
+# which evidence comes from a graph the repository actually runs.
+UNSHIPPED_GRAPHS: dict[str, dict] = {"feed-pulse": FEED_PULSE_GRAPH}
+
+# The nodes ported to the confined tier, paired with the graph their `with` clause
+# is read from and the components built from them. `SANDBOXED_NODES` is the set the
+# demo and the injection scenario run confined; the mapping to component names is
+# the tier's own naming convention.
+DERIVED_NODES: tuple[tuple[str, str, str], ...] = (
+    ("customer-support", "ParseMessage", "node_parse_message"),
+    ("customer-support", "ModerateContent", "node_moderate_content"),
+    ("customer-support", "FetchContext", "node_fetch_context"),
+    ("customer-support", "GenerateResponse", "node_generate_response"),
+    ("customer-support", "SendReply", "node_send_reply"),
+    ("feed-pulse", "Heartbeat", "node_heartbeat"),
 )
 
 
@@ -562,10 +622,17 @@ DERIVED_NODES: tuple[tuple[str, str], ...] = (
 class Derivation:
     """One node's `with` clause held against its compiled component."""
 
+    graph: str
     node: str
     component: str
     derived: list[str]
     actual: list[str]
+    kinds: list[str]
+
+    @property
+    def shipped(self) -> bool:
+        """Whether the `with` clause was read from a canonical, shipped graph."""
+        return self.graph not in UNSHIPPED_GRAPHS
 
     @property
     def agrees(self) -> bool:
@@ -592,20 +659,39 @@ class Derivation:
         return sorted(set(self.derived) - set(self.actual))
 
 
+def _derivation_graph(name: str) -> dict:
+    """The graph a derivation row reads its `with` clause from."""
+    unshipped = UNSHIPPED_GRAPHS.get(name)
+    return unshipped if unshipped is not None else load_graph_dict(name)
+
+
 def derive_and_compare(
-    nodes: tuple[tuple[str, str], ...] = DERIVED_NODES,
+    nodes: tuple[tuple[str, str, str], ...] = DERIVED_NODES,
 ) -> list[Derivation]:
     """Derive each ported node's permitted import set and hold the binary to it."""
-    graph = load_graph_dict("customer-support")
+    graphs = {name: _derivation_graph(name) for name in {n[0] for n in nodes}}
     return [
         Derivation(
+            graph=graph,
             node=node,
             component=component,
-            derived=sorted(expected_imports(graph, node)),
+            derived=sorted(expected_imports(graphs[graph], node)),
             actual=sorted(component_imports(component)),
+            kinds=kinds_for_node(graphs[graph], node),
         )
-        for node, component in nodes
+        for graph, node, component in nodes
     ]
+
+
+def kinds_covered(derivations: list[Derivation]) -> list[str]:
+    """The distinct capability kinds the comparison was actually exercised on.
+
+    Deliberately not `CAPABILITY_KINDS`: that is the size of the mapping table,
+    which is what the derivation *could* map, not what it has been held against a
+    binary for. A kind no ported node holds is unexercised however many mapping
+    entries exist, and the paper says so.
+    """
+    return sorted({k for d in derivations for k in d.kinds})
 
 
 def check_derivations(derivations: list[Derivation]) -> list[str]:
@@ -868,10 +954,10 @@ def render(
         f"capability like any other — and its ambient import count (imports **not** "
         f"granted as capabilities) is still {len(wasi_imports('hostile_clocked'))}. The "
         f"boundary between capability and ambient authority is the `with` clause, not "
-        f"the package namespace. The import-set derivation now covers "
-        f"{len(CAPABILITY_KINDS)} capability kinds realised by "
-        f"{len(CAPABILITY_INTERFACES)} typed interfaces, each derived from the graph "
-        f"type by the same mapping."
+        f"the package namespace. This tier maps {len(CAPABILITY_KINDS)} capability kinds "
+        f"onto {len(CAPABILITY_INTERFACES)} typed interfaces; how many of them the "
+        f"derivation has actually been *held against a binary* for is a different number, "
+        f"and section 5 reports it as such."
     )
     lines.append("")
     lines.append(
@@ -895,13 +981,19 @@ def render(
         "comparison, and the build with it."
     )
     lines.append("")
-    lines.append("| node | component | capability interfaces granted | matches binary |")
-    lines.append("|---|---|---:|---|")
+    lines.append("| node | graph | component | capability interfaces granted | matches binary |")
+    lines.append("|---|---|---|---:|---|")
     for d in derivations:
-        lines.append(f"| {d.node} | `{d.component}` | {len(d.granted)} | {_tick(d.agrees)} |")
+        shipped = "" if d.shipped else " †"
+        lines.append(
+            f"| {d.node}{shipped} | `{d.graph}` | `{d.component}` | "
+            f"{len(d.granted)} | {_tick(d.agrees)} |"
+        )
     lines.append("")
     grants = sum(len(d.granted) for d in derivations)
     agreeing = sum(1 for d in derivations if d.agrees)
+    covered = kinds_covered(derivations)
+    unexercised = sorted(set(CAPABILITY_KINDS) - set(covered))
     lines.append(
         f"{agreeing}/{len(derivations)} components match the import set derived from the "
         f"graph, across {grants} capability grants. Divergence in **either** direction "
@@ -911,13 +1003,33 @@ def render(
         f"is a marshalling dependency, not an authority, and it is compared like the rest.)"
     )
     lines.append("")
+    lines.append(
+        "† `feed-pulse` is not a canonical, shipped graph — the feed-triage service it "
+        "sketches is proposed separately. Its row runs the *same* derivation code path as "
+        "the rest, and it is reported because it is what carries the three I/O kinds "
+        "through the gate rather than only through the test suite."
+    )
+    lines.append("")
     for d in derivations:
         lines.append(f"- **{d.node}** (`{d.component}`) — {', '.join(f'`{i}`' for i in d.granted)}")
     lines.append("")
     lines.append(
-        "**Scope.** This is a hand-curated capability vocabulary in one repository, so it "
-        "is evidence that the derivation is implementable and that adding a kind costs no "
-        "special case — not that it covers arbitrary kinds."
+        f"**Scope.** The comparison has been exercised on {len(covered)} of the "
+        f"{len(CAPABILITY_KINDS)} capability kinds this tier models "
+        f"({', '.join(f'`{k}`' for k in covered)}); "
+        + (
+            f"`{'`, `'.join(unexercised)}` "
+            f"{'is' if len(unexercised) == 1 else 'are'} mapped but held by no ported "
+            f"node, so {'it is' if len(unexercised) == 1 else 'they are'} unexercised "
+            f"here. "
+            if unexercised
+            else ""
+        )
+        + "That distinction matters: the size of the capability→interface mapping is what "
+        "the derivation *could* map, not what it has been held against a binary for. This "
+        "is a hand-curated vocabulary in one repository, so it is evidence that the "
+        "derivation is implementable and that adding a kind costs no special case — not "
+        "that it covers arbitrary kinds."
     )
     lines.append("")
 
@@ -1008,6 +1120,8 @@ def serialise(ev: Evaluation) -> str:
     caught = sum(1 for o in mutations if o.actual == REJECTED)
     b = ev.bench
     inference_imports = capability_imports("node_parse_message")
+    _kinds = kinds_covered(ev.derivations)
+    _unexercised = sorted(set(CAPABILITY_KINDS) - set(_kinds))
 
     # Trace facts the paper's §3 reports, from the run rather than by hand. The
     # cross-tier crossing structure (tier excluded) is compared here so the "both
@@ -1107,11 +1221,14 @@ def serialise(ev: Evaluation) -> str:
         "derivation": {
             "nodes": [
                 {
+                    "graph": d.graph,
+                    "shipped": d.shipped,
                     "node": d.node,
                     "component": d.component,
                     "derived": d.derived,
                     "actual": d.actual,
                     "granted": d.granted,
+                    "kinds": d.kinds,
                     "agrees": d.agrees,
                     "granted_count": len(d.granted),
                 }
@@ -1120,6 +1237,21 @@ def serialise(ev: Evaluation) -> str:
             "total": len(ev.derivations),
             "agreeing": sum(1 for d in ev.derivations if d.agrees),
             "grants_compared": sum(len(d.granted) for d in ev.derivations),
+            # The coverage the *gate* reached, kept separate from the size of the
+            # mapping table (`tiers.capability_kinds`) on purpose. Stating the
+            # second where the first is meant is how a claim about what was checked
+            # becomes a claim about what could be mapped.
+            "kinds_covered": _kinds,
+            "kinds_covered_count": len(_kinds),
+            "kinds_unexercised": _unexercised,
+            "shipped_total": sum(1 for d in ev.derivations if d.shipped),
+        },
+        # Structural counts of the canonical graphs. Small, stable, and stated in
+        # several places across the corpus — which is exactly why they are derived
+        # here rather than typed into prose that outlives the graph it describes.
+        "graphs": {
+            "customer_support_nodes": len(load_graph_dict("customer-support")["nodes"]),
+            "platform_services": _interior_nodes(load_graph_dict("support-platform")),
         },
         # The execution trace, as a reported fact of §3. The traces themselves are
         # emitted to dist/trace-injection-{host,confined}.json; these are the pinned
