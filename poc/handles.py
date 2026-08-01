@@ -12,6 +12,9 @@ external authority. The handle's *surface* is the enforcement:
 * `AppendDBHandle`   (`DBHandle<scope, append>`)    — append only, NO read (write-once log).
 * `ResponseChannel`  (`ResponseChannel<...>`)       — write-only sink.
 * `EventEmitter`     (`EventEmitter<topic>`)        — write-only sink.
+* `Clock`            (`Clock`)                      — read the wall clock, nothing else.
+* `HTTPClient`       (`HTTPClient<[host, ...]>`)    — outbound HTTP, allowlisted hosts only.
+* `Notifier`         (`Notifier<channel>`)          — write-only notification sink.
 
 The three `DBHandle` surfaces make the mode lattice concrete: `read-write` covers both `read` and
 `append`, while `read` and `append` are mutually incomparable — neither handle's operations are a
@@ -25,8 +28,10 @@ Unforgeable confinement is the job of the WASM/WASI tier (a later change).
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 from type_parser import TApp, TList, TName, TString, parse_type
 
@@ -188,6 +193,74 @@ class EventEmitter:
         self.emitted.append(event)
 
 
+# ── I/O handles (clock, outbound HTTP, notification) ───────────────
+
+
+@dataclass(frozen=True)
+class WallTime:
+    """A wall-clock reading: seconds plus nanoseconds since the epoch. Mirrors the
+    `datetime` record of `wasi:clocks/wall-clock`, which is the interface the
+    confined tier grants for the same capability."""
+
+    seconds: int
+    nanoseconds: int
+
+
+@dataclass
+class Clock:
+    """`Clock` — read the current wall-clock time, and nothing else.
+
+    The one capability kind with no scope parameter: the authority it grants has
+    no narrower form. `_source` lets tests inject a fixed time; by default the
+    handle reads the real clock, since a node that declares `Clock` declares
+    exactly the intent to observe the world's time."""
+
+    _source: Callable[[], WallTime] | None = None
+
+    def now(self) -> WallTime:
+        if self._source is not None:
+            return self._source()
+        ns = time.time_ns()
+        return WallTime(seconds=ns // 1_000_000_000, nanoseconds=ns % 1_000_000_000)
+
+
+@dataclass
+class HTTPClient:
+    """`HTTPClient<[host, ...]>` — outbound HTTP scoped to an allowlist of hosts.
+
+    The first capability whose scope is a *set* rather than a mode or a name. The
+    allowlist is enforced at the handle: a request whose host is outside it raises
+    `CapabilityError`, exactly as `ToolLLM` refuses an out-of-scope tool — the
+    node holds the operation, the handle holds the scope. The PoC performs no live
+    network I/O: `_responses` is a canned url → body mapping seeded like `stores`,
+    so what is being demonstrated is the authority boundary, not an HTTP stack."""
+
+    allowlist: frozenset[str]
+    _responses: Mapping[str, str] = field(default_factory=dict)
+
+    def get(self, url: str) -> str:
+        host = urlsplit(url).hostname
+        if host is None or host not in self.allowlist:
+            raise CapabilityError(
+                f"node attempted HTTP to host {host!r} outside its "
+                f"allowlist {sorted(self.allowlist)}"
+            )
+        return self._responses.get(url, "")
+
+
+@dataclass
+class Notifier:
+    """`Notifier<channel>` — write-only sink for notifications to one channel.
+    Structurally a sibling of `EventEmitter`: the outbound side of the feed-triage
+    toy, and the simplest of the three I/O kinds."""
+
+    channel: str
+    sent: list[str] = field(default_factory=list)
+
+    def notify(self, message: str) -> None:
+        self.sent.append(message)
+
+
 # ── Provisioning: capability type string → handle instance ─────────
 
 
@@ -212,12 +285,18 @@ def provision(
     *,
     backend: LLMBackend,
     stores: Mapping[str, Mapping[str, list[str]]],
+    web: Mapping[str, str] | None = None,
 ):
     """Construct the capability handle named by a graph parameter/`with` type.
 
-    `stores` maps a database scope name (e.g. 'knowledge-base') to its contents.
-    Raises ValueError for capability shapes the PoC does not model."""
+    `stores` maps a database scope name (e.g. 'knowledge-base') to its contents;
+    `web` maps a URL to its canned response body (the PoC performs no live network
+    I/O). Raises ValueError for capability shapes the PoC does not model."""
     ast = parse_type(cap_type)
+
+    if isinstance(ast, TName) and ast.name == "Clock":
+        return Clock()
+
     if not isinstance(ast, TApp):
         raise ValueError(f"not a capability type: {cap_type!r}")
 
@@ -257,7 +336,35 @@ def provision(
         scope = _scope_label(ast)
         return EventEmitter(topic=scope)
 
+    if ast.head == "HTTPClient":
+        hosts = _http_hosts(ast)
+        if hosts is None:
+            raise ValueError(
+                f"unrecognised HTTPClient shape: {cap_type!r}; the scope is a "
+                f"non-empty list of string-literal hosts"
+            )
+        return HTTPClient(allowlist=hosts, _responses=dict(web or {}))
+
+    if ast.head == "Notifier":
+        return Notifier(channel=_scope_label(ast))
+
     raise ValueError(f"unknown capability kind: {cap_type!r}")
+
+
+def _http_hosts(app: TApp) -> frozenset[str] | None:
+    """The host allowlist of an `HTTPClient<[...]>` type, or None if the shape is
+    not a non-empty list of string literals."""
+    if len(app.args) != 1:
+        return None
+    arg = app.args[0]
+    if not isinstance(arg, TList) or not arg.items:
+        return None
+    hosts: set[str] = set()
+    for item in arg.items:
+        if not isinstance(item, TString):
+            return None
+        hosts.add(item.value)
+    return frozenset(hosts)
 
 
 def _scope_label(app: TApp) -> str:

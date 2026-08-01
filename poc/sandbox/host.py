@@ -140,6 +140,15 @@ def wasi_imports(component_name: str) -> list[str]:
     nothing to render powerless. Kept as a function, and asserted in the test
     suite, because "the list is empty" is the claim; deleting the function would
     turn a checked property back into prose.
+
+    Note what "ambient" means here, because the `Clock` capability sharpened it:
+    an ambient import is one the graph did not grant. A node whose `with` clause
+    names `Clock` imports `wasi:clocks/wall-clock` — a wasi-namespaced interface —
+    and this function still reports it clean, because that import is a *granted
+    capability*, derived from the signature like any other. The same import on a
+    node whose clause does not name `Clock` would be reported here, and the
+    derivation test would fail it. The boundary between capability and ambient
+    authority is the `with` clause, not the package namespace.
     """
     granted = CAPABILITY_INTERFACES | {TYPES}
     return [i for i in component_imports(component_name) if i not in granted]

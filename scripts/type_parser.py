@@ -381,6 +381,25 @@ _DB_MODE_COVERS: dict[str, frozenset[str]] = {
 }
 
 
+def _http_allowlist(app: TApp) -> frozenset[str] | None:
+    """Normalise an `HTTPClient<[...]>` argument to its permitted host set.
+    The scope must be a non-empty list of string-literal hosts; returns None
+    for any other shape. The first capability scope that is a *set* rather
+    than a mode or a name, which is why its narrowing rule below is plain
+    set inclusion."""
+    if len(app.args) != 1:
+        return None
+    arg = app.args[0]
+    if not isinstance(arg, TList) or not arg.items:
+        return None
+    hosts: set[str] = set()
+    for item in arg.items:
+        if not isinstance(item, TString):
+            return None
+        hosts.add(item.value)
+    return frozenset(hosts)
+
+
 def is_assignable(actual: Type, target: Type) -> bool:
     """True if a value of type `actual` can stand in where `target`
     is expected, under the PoC's capability-narrowing rules.
@@ -407,6 +426,15 @@ def is_assignable(actual: Type, target: Type) -> bool:
         if atools is None or ttools is None:
             return False
         return ttools.issubset(atools)
+    if actual.head == "HTTPClient":
+        # A parent may route a handle whose allowlist is a superset of what the
+        # sub-graph declares, never a subset: composition must not grant a child
+        # reach the parent's own handle does not have.
+        ahosts = _http_allowlist(actual)
+        thosts = _http_allowlist(target)
+        if ahosts is None or thosts is None:
+            return False
+        return thosts.issubset(ahosts)
     if actual.head == "DBHandle":
         if len(actual.args) != 2 or len(target.args) != 2:
             return False

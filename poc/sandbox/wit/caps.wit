@@ -122,6 +122,16 @@ interface types {
         escaped: bool,
         detail: string,
     }
+
+    /// What the heartbeat demonstrator returns: the time it read, how many
+    /// characters its one permitted fetch returned, and whether the notification
+    /// was accepted. Exists to exercise all three I/O capability kinds in one
+    /// confined body ahead of the feed-triage graph that will use them for real.
+    record heartbeat-report {
+        seconds: u64,
+        fetched: u32,
+        notified: bool,
+    }
 }
 
 /// `LLMClient<inference>` — model access with no tool calling.
@@ -185,6 +195,36 @@ interface response-channel {
 /// defined here, held only by host-tier nodes (EscalateToHuman) so far.
 interface event-emitter {
     emit: func(payload: string) -> bool;
+}
+
+// `Clock` has no interface in this package on purpose: it is granted as the
+// upstream `wasi:clocks/wall-clock@0.2.0` interface directly (vendored under
+// deps/clocks/). A WASI interface is one instance of capability-as-interface,
+// and granting the real one is the honest form of that argument — the worlds
+// below import it by its fully-qualified upstream name.
+
+/// `HTTPClient<[host, ...]>` — outbound HTTP, scoped to an allowlist of hosts.
+///
+/// The *interface* carries the operation; the *allowlist* lives in the handle the
+/// host binds behind it, exactly as `LLMClient<[lookup]>`'s tool scope lives in
+/// its handle. A confined node can therefore ask for any URL, and a request whose
+/// host is outside the handle's allowlist is refused at the crossing — the same
+/// shape as an out-of-scope tool call. This is the first capability kind whose
+/// scope is a *set* rather than a mode or a name, which is what makes its
+/// narrowing rule (superset may stand in for subset, never the reverse) worth
+/// having.
+interface http-client {
+    /// Fetch a URL. Refusal (host outside the allowlist) is a trap at the
+    /// boundary, not a value — a node cannot probe its own allowlist by
+    /// collecting error strings.
+    get: func(url: string) -> string;
+}
+
+/// `Notifier<'channel'>` — write-only sink for notifications to one channel.
+/// The outbound side of the feed-triage toy: the simplest of the three kinds,
+/// structurally a sibling of `event-emitter`.
+interface notifier {
+    notify: func(message: string) -> bool;
 }
 
 // ── Worlds: one per node, naming exactly that node's capability set ──────────
@@ -282,4 +322,36 @@ world hostile-ungranted {
     import kb-read;
 
     export run: func(message: raw-message) -> customer-query;
+}
+
+/// Heartbeat — the I/O-vocabulary demonstrator. Holds `Clock` (the upstream WASI
+/// wall clock, granted deliberately), `HTTPClient<[...]>`, and `Notifier<'...'>`
+/// — and nothing else: no filesystem, no ambient socket, no LLM. It reads the
+/// time, performs one fetch, and sends one notification. The clock import is the
+/// point: every other world in this file demonstrates the *absence* of
+/// `wasi:clocks` among its imports, and this one demonstrates the same mechanism
+/// granting it — a `with` clause visibly buying an authority the artifact
+/// otherwise does not have.
+world heartbeat {
+    use types.{heartbeat-report};
+
+    import wasi:clocks/wall-clock@0.2.0;
+    import http-client;
+    import notifier;
+
+    export run: func(feed-url: string) -> heartbeat-report;
+}
+
+/// A hostile node body granted exactly a clock. `read-clock` proves the grant is
+/// live; the escape exports prove that holding one deliberately-granted WASI
+/// interface does not reopen the ambient world — the socket and filesystem
+/// escapes still have no import to travel through.
+world hostile-clocked {
+    use types.{escape-verdict};
+
+    import wasi:clocks/wall-clock@0.2.0;
+
+    export read-clock: func() -> u64;
+    export escape-fs: func() -> escape-verdict;
+    export escape-net: func() -> escape-verdict;
 }

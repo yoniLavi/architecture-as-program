@@ -39,9 +39,14 @@ from .host import (
     wasm_path,
 )
 from .interfaces import (
+    CAPABILITY_INTERFACES,
+    CAPABILITY_KINDS,
+    CLOCK,
     EVENT_EMITTER,
+    HTTP_CLIENT,
     INFERENCE_LLM,
     KB_READ,
+    NOTIFIER,
     RESPONSE_CHANNEL,
     TOOL_LLM,
     TYPES,
@@ -51,9 +56,14 @@ from .interfaces import (
 )
 
 __all__ = [
+    "CAPABILITY_INTERFACES",
+    "CAPABILITY_KINDS",
+    "CLOCK",
     "EVENT_EMITTER",
+    "HTTP_CLIENT",
     "INFERENCE_LLM",
     "KB_READ",
+    "NOTIFIER",
     "RESPONSE_CHANNEL",
     "TOOL_LLM",
     "TYPES",

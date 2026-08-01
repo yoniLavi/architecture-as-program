@@ -26,7 +26,15 @@ shorter because the boundary got smarter.
 
 from __future__ import annotations
 
-from ..handles import InferenceLLM, ReadDBHandle, ResponseChannel, ToolLLM
+from ..handles import (
+    Clock,
+    HTTPClient,
+    InferenceLLM,
+    Notifier,
+    ReadDBHandle,
+    ResponseChannel,
+    ToolLLM,
+)
 from ..llm import LLMRequest
 from ..values import (
     AgentResponse,
@@ -43,7 +51,15 @@ from ..values import (
     Variant,
 )
 from .host import Sandbox, record
-from .interfaces import INFERENCE_LLM, KB_READ, RESPONSE_CHANNEL, TOOL_LLM
+from .interfaces import (
+    CLOCK,
+    HTTP_CLIENT,
+    INFERENCE_LLM,
+    KB_READ,
+    NOTIFIER,
+    RESPONSE_CHANNEL,
+    TOOL_LLM,
+)
 
 
 # WIT idents are kebab-case; the domain `Intent` enum's values are snake_case.
@@ -225,11 +241,51 @@ def send_reply_sandbox(resp: AgentResponse, channel: ResponseChannel) -> Deliver
     return DeliveryConfirmation(session_id=out.session, delivered=out.delivered)
 
 
+def heartbeat_sandbox(feed_url: str, clock: Clock, http: HTTPClient, notifier: Notifier):
+    """`Heartbeat` on the component tier — the I/O-vocabulary demonstrator.
+
+    Not (yet) a canonical-graph node: the feed-triage graph that will hold these
+    capabilities for real is proposed separately, and this adapter exists so the
+    three new kinds are exercised through one confined body ahead of it. Its world
+    imports exactly three interfaces, of which `wasi:clocks/wall-clock` is the
+    deliberate one: the upstream WASI interface granted as a capability like any
+    other, satisfied here by the host's own `Clock` handle rather than any WASI
+    runtime context. The allowlist stays host-side, in the `HTTPClient` handle —
+    the component can ask for any URL, and an out-of-allowlist request is refused
+    at the crossing, the same shape as an out-of-scope tool call.
+
+    Returns the component's typed `heartbeat-report` record (seconds, fetched,
+    notified) as wasmtime lifts it.
+    """
+
+    def now():
+        t = clock.now()
+        return record(seconds=t.seconds, nanoseconds=t.nanoseconds)
+
+    def get(url: str) -> str:
+        return http.get(url)
+
+    def notify(message: str) -> bool:
+        notifier.notify(message)
+        return True
+
+    sandbox = Sandbox(
+        "node_heartbeat",
+        {
+            CLOCK: {"now": now},
+            HTTP_CLIENT: {"get": get},
+            NOTIFIER: {"notify": notify},
+        },
+    )
+    return sandbox.call("run", feed_url)
+
+
 # Component-tier implementations, keyed by graph node name — the sandbox analogue
 # of `poc.nodes.REGISTRY`. A node not listed here has no component port yet and
 # runs on the host tier. Five of the six nodes on the demonstrated customer path
 # are ported (only the pure `ReceiveMessage` narrowing stays host-side), so a
-# majority of that path can run confined.
+# majority of that path can run confined. (`heartbeat_sandbox` above is not
+# registered: its node belongs to the feed-triage graph, which does not exist yet.)
 SANDBOX_REGISTRY = {
     "ParseMessage": parse_message_sandbox,
     "ModerateContent": moderate_content_sandbox,

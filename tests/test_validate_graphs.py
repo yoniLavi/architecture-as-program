@@ -330,6 +330,30 @@ class TestCrossGraphCapabilityNarrowing(unittest.TestCase):
             msg=f"Expected subtype failure; got: {errors}",
         )
 
+    def test_http_superset_allowlist_passes(self):
+        """A parent may route an HTTP handle whose allowlist is a superset of
+        what the sub-graph declares — the first narrowing over a scope that is
+        a set rather than a mode or a name."""
+        errors = self._run(
+            child_param="HTTPClient<['feeds.example.com']>",
+            parent_passed="HTTPClient<['feeds.example.com', 'blog.example.net']>",
+        )
+        cross_errors = [e for e in errors if "sub-graph" in e]
+        self.assertEqual(cross_errors, [], msg=f"All errors: {errors}")
+
+    def test_http_subset_allowlist_fails(self):
+        """Scenario: a parent cannot route a narrower allowlist than the child
+        declares — composition must not grant a child reach the parent's own
+        handle does not have."""
+        errors = self._run(
+            child_param="HTTPClient<['feeds.example.com', 'blog.example.net']>",
+            parent_passed="HTTPClient<['feeds.example.com']>",
+        )
+        self.assertTrue(
+            any("is not assignable to expected" in e for e in errors),
+            msg=f"Expected subtype failure; got: {errors}",
+        )
+
     def test_data_position_must_match_exactly(self):
         """Subtyping only applies to capability positions; data inputs
         still require strict equality."""

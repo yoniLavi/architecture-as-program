@@ -287,7 +287,8 @@ WASM_OUT    := $(ROOT)/poc/sandbox/wasm
 # interfaces — which is the property the component tier exists to demonstrate.
 WASM_TARGET := wasm32-unknown-unknown
 WASM_MODULES := node_parse_message node_moderate_content node_fetch_context \
-                node_generate_response node_send_reply hostile_ambient hostile_ungranted
+                node_generate_response node_send_reply node_heartbeat \
+                hostile_ambient hostile_ungranted hostile_clocked
 
 # Build the component-tier WASM node artifacts and copy them into
 # poc/sandbox/wasm/ (which is committed).

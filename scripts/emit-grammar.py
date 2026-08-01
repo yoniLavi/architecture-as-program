@@ -190,6 +190,37 @@ def render_card(canonical_types: list[str]) -> str:
         lines.append(_subtype_line(actual, target, expected))
     lines.append("")
 
+    lines.append("### `HTTPClient`")
+    lines.append("")
+    lines.append(
+        "An `HTTPClient<[hosts]>` handle with allowlist *H₁* is assignable "
+        "to one with allowlist *H₂* iff *H₂ ⊆ H₁* — the provided handle "
+        "may reach at least every host the target requires, so composition "
+        "cannot grant a sub-graph reach the parent's own handle does not "
+        "have. The scope is a non-empty *set* of string-literal hosts — "
+        "the first capability scope that is a set rather than a mode or a "
+        "name. `Clock` (no scope: the authority has no narrower form) and "
+        "`Notifier<'channel'>` (a name scope, like `EventEmitter`) round "
+        "out the I/O kinds and narrow only by equality."
+    )
+    lines.append("")
+    for actual, target, expected in [
+        (
+            "HTTPClient<['feeds.example.com', 'blog.example.net']>",
+            "HTTPClient<['feeds.example.com']>",
+            True,
+        ),
+        (
+            "HTTPClient<['feeds.example.com']>",
+            "HTTPClient<['feeds.example.com', 'blog.example.net']>",
+            False,
+        ),
+        ("HTTPClient<['feeds.example.com']>", "HTTPClient<['blog.example.net']>", False),
+        ("HTTPClient<['feeds.example.com']>", "HTTPClient<['feeds.example.com']>", True),
+    ]:
+        lines.append(_subtype_line(actual, target, expected))
+    lines.append("")
+
     lines.append("### `DBHandle`")
     lines.append("")
     lines.append(

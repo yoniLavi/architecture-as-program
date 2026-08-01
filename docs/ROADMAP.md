@@ -4,7 +4,8 @@
 
 **No active OpenSpec changes.** Everything proposed in July 2026 is implemented, tested and
 archived: the paper split, the scoped capability lifetime, the two-layer trace, principal binding,
-and the contract language. `make build` is green, the suite is 279 tests + 21 subtests, and the
+and the contract language — and the first August change, `add-io-capability-kinds`, landed on
+1 August (see item 3 below). `make build` is green, the suite is 307 tests + 21 subtests, and the
 mutation corpus stands at four cases, each pinned to the analysis meant to catch it.
 
 The papers have **not been read end-to-end since the survey landed**, which is the one caveat on
@@ -21,13 +22,14 @@ and prefer them over anything here if the two disagree.
    abstract was read, and its lattice arity bears directly on the open two-point-vs-graded decision.
    Wassette's permission mechanism needs checking against source before the contrast in §6 is
    published as fact, and AgenticOS's review status is unconfirmed.
-3. **M1 below** — the walking skeleton. Its first piece is now proposed as
-   `add-io-capability-kinds` (clock, allowlisted outbound HTTP, notification), which is worth doing
-   ahead of the rest of M1 because it widens the *current* paper's lead result: the import-set
-   derivation is presently evidence about four hand-modelled interfaces in one graph, and whether it
-   holds as the vocabulary grows is untested either way. It carries one decision for the author,
-   recorded in the proposal — whether to grant `wasi:clocks` directly, which is the honest
-   demonstration of the §6.7 argument, or a bespoke interface, which keeps a sentence simpler.
+3. **M1 below** — the walking skeleton. Its first piece, `add-io-capability-kinds` (clock,
+   allowlisted outbound HTTP, notification), is **implemented** (1 Aug 2026): the derivation now
+   covers seven kinds / eight typed interfaces with no special case, `Clock` is granted as upstream
+   `wasi:clocks/wall-clock` directly (the author-approved resolution of the recorded decision — the
+   honest demonstration of the §6.7 argument), and Paper 2 §3.3.2/§4.4 carry the widened evidence.
+   It was pulled ahead of Paper 2's publication deliberately, because it widens the current paper's
+   lead result before the DOI rather than after. What remains of M1: node-local state as a
+   capability, the scheduler driver, and the feed-triage graph itself.
 
    The rest of M1, and M2–M5, deliberately stay as roadmap rather than proposals: M2's fan-in has a
    live design question (the survey gave the *rule* — commutative combinators need no recording,
@@ -99,7 +101,7 @@ graph is self-hosting and cute, but has no untrusted input, so it would leave th
 |---|---|---|
 | **Node-local state** | Model state as a capability (`StateHandle<'seen', read-write>`), not as a stateful combinator or a feedback edge | Needs no new language surface, and all six analyses plus the confinement property apply unchanged. Reporting *"we did not need a stateful combinator"* is a genuine simplification of the agenda's three-way open question — and if it proves insufficient, that is equally reportable |
 | **Fan-in / aggregation** | A restricted fold over a homogeneous list; the runtime today *refuses* multi-terminal runs | The highest-value item. It is the first real test of the trust lattice's stated monotonicity condition: a node's output label must be a monotone function of the **meet** of its input labels. The paper asserts that condition and never exercises it. One tainted item in twenty must taint the digest |
-| **I/O capability kinds** | `HTTPClient<allowlist>`, `Clock`, `Notifier<channel>` as typed WIT interfaces | Directly widens the paper's strongest result — the import set derived from the `with` clause and checked against the binary. `Clock` is the sharp one: the demonstrator currently boasts that its components import *no* clock, so granting one deliberately shows a `with` clause doing visible work, and shows `wasi:clocks` granted as a capability like any other |
+| **I/O capability kinds** | ~~`HTTPClient<allowlist>`, `Clock`, `Notifier<channel>` as typed WIT interfaces~~ — **done** (`add-io-capability-kinds`): seven kinds derive with no special case, `wasi:clocks/wall-clock` granted directly, allowlist narrowing by set inclusion, hostile cases pinned | Directly widened the paper's strongest result — the import set derived from the `with` clause and checked against the binary. The clock demonstration replaced the "imports *no* clock" boast with a worked grant |
 | **A driver boundary** | A scheduler that ticks the graph | Small. Today the graph is driven by a test harness; a real service is driven by the world |
 | **A contract language** | ~~Deliberately minimal~~ — **done** (`poc/contracts.py`): closed vocabulary, blame, corpus-pinned. What remains is the *generative* mode: derive a Hypothesis strategy from a precondition and fuzz each node body off the execution path | Prerequisite for the generation experiment below — a generated body needs something to be checked *against* beyond "it compiled". The runtime half exists; the generative half is M3 |
 | **Agent-generated node bodies** | The experiment (below) | The thesis's central untested claim |

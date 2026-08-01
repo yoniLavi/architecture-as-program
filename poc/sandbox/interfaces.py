@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-from type_parser import TApp, TList, TName, parse_type
+from type_parser import TApp, TList, TName, TString, parse_type
 
 # The WIT package the node components are built against. Bumping the version is a
 # breaking change for every committed artifact: the host's interface names and the
@@ -36,12 +36,37 @@ def _iface(name: str) -> str:
     return f"{WIT_PACKAGE}/{name}@{WIT_VERSION}"
 
 
-# The five capability kinds of the vertical, as typed interfaces.
+# The capability kinds of the vertical, as typed interfaces.
 INFERENCE_LLM = _iface("inference-llm")  # LLMClient<inference>
 TOOL_LLM = _iface("tool-llm")  # LLMClient<[...]>
 KB_READ = _iface("kb-read")  # DBHandle<_, read>
 RESPONSE_CHANNEL = _iface("response-channel")  # ResponseChannel<_>
 EVENT_EMITTER = _iface("event-emitter")  # EventEmitter<_>
+HTTP_CLIENT = _iface("http-client")  # HTTPClient<[host, ...]>
+NOTIFIER = _iface("notifier")  # Notifier<'channel'>
+
+# `Clock` is deliberately NOT an aap:caps interface: it is the upstream WASI
+# wall clock, granted directly (the WIT source is vendored under wit/deps/clocks).
+# A WASI interface is one instance of capability-as-interface, and granting the
+# real one is the honest form of that argument. The consequence for this module is
+# exactly one line — the mapping entry — and the consequence for `wasi_imports()`
+# is definitional: ambient authority is an import that was *not* granted as a
+# capability, so a declared clock does not count against "no ambient imports"
+# while an undeclared one still would.
+CLOCK = "wasi:clocks/wall-clock@0.2.0"  # Clock
+
+# The graph-level capability kinds (heads of `with`-clause types) this tier
+# models. `LLMClient` is one kind realised by two interfaces (inference vs tool
+# scope), which is why this tuple and CAPABILITY_INTERFACES have different sizes.
+CAPABILITY_KINDS = (
+    "LLMClient",
+    "DBHandle",
+    "ResponseChannel",
+    "EventEmitter",
+    "Clock",
+    "HTTPClient",
+    "Notifier",
+)
 
 # The shared domain vocabulary: records, enums and variants, and *no functions*.
 # Every component imports it, and it grants no authority — it is how the two sides
@@ -53,7 +78,16 @@ TYPES = _iface("types")
 # not in here and is not TYPES is, by definition, something this tier did not
 # intend to hand out.
 CAPABILITY_INTERFACES = frozenset(
-    {INFERENCE_LLM, TOOL_LLM, KB_READ, RESPONSE_CHANNEL, EVENT_EMITTER}
+    {
+        INFERENCE_LLM,
+        TOOL_LLM,
+        KB_READ,
+        RESPONSE_CHANNEL,
+        EVENT_EMITTER,
+        HTTP_CLIENT,
+        NOTIFIER,
+        CLOCK,
+    }
 )
 
 
@@ -74,6 +108,12 @@ def interface_for(cap_type: str) -> str:
     derive it from the type rather than from a node's name.
     """
     ast = parse_type(cap_type)
+
+    # `Clock` is the one kind spelled as a bare name: it has no scope parameter,
+    # because the authority it grants (read the wall clock) has no narrower form.
+    if isinstance(ast, TName) and ast.name == "Clock":
+        return CLOCK
+
     if not isinstance(ast, TApp):
         raise UnmappedCapability(f"not a capability type: {cap_type!r}")
 
@@ -105,6 +145,23 @@ def interface_for(cap_type: str) -> str:
 
     if ast.head == "EventEmitter":
         return EVENT_EMITTER
+
+    if ast.head == "HTTPClient":
+        # The scope is a non-empty allowlist of string-literal hosts. The
+        # *interface* is the same whatever the allowlist says — the set lives in
+        # the handle, exactly as a tool-LLM's tool scope does — but a shape this
+        # mapping cannot read is refused rather than granted an interface anyway.
+        if (
+            len(ast.args) == 1
+            and isinstance(ast.args[0], TList)
+            and ast.args[0].items
+            and all(isinstance(i, TString) for i in ast.args[0].items)
+        ):
+            return HTTP_CLIENT
+        raise UnmappedCapability(f"unrecognised HTTPClient shape: {cap_type!r}")
+
+    if ast.head == "Notifier":
+        return NOTIFIER
 
     raise UnmappedCapability(f"unknown capability kind: {cap_type!r}")
 
