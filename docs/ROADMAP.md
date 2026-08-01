@@ -1,5 +1,36 @@
 # Roadmap: from demonstrator to a useful toy
 
+## Start here: state as of 1 August 2026
+
+**Four OpenSpec changes are implemented, tested, and complete but not archived.** All four
+have green builds and full task lists; what remains is a human read of the paper prose each one
+touched, then `openspec archive <id> --yes`. Recommended order, which follows the dependency
+between what they touched rather than their size:
+
+1. **`add-scoped-capability-lifetime`** — smallest and self-contained. An assembly is a scope;
+   leaving it severs revocable instances. Touches Paper 2 §3.4 only.
+2. **`add-fine-grained-trace-layer`** — archive before principal binding, because that change
+   adds fields to the structure this one reshaped. Per-call journal with the deduplicated
+   crossing set as its projection; Paper 2 §3.5.
+3. **`add-principal-binding`** — builds on the trace above. Paper 2 §3.4 and §7.5.
+4. **`add-node-contracts`** — independent of the other three, but archive last: it adds a corpus
+   case, so the evaluation figures shift, and it is the one whose paper section (§3.6) is newest.
+
+A note for whoever archives them: two of the split change's `MODIFIED` deltas renamed their
+requirements, and the archiver matches headers exactly. A rename needs a `## RENAMED Requirements`
+block with `FROM:`/`TO:` lines *in addition to* the `MODIFIED` body. That will bite again.
+
+**Then, in order of value:**
+
+- **Publish Paper 2 to Zenodo.** Metadata is drafted at
+  `openspec/changes/archive/2026-08-01-split-demonstrator-paper/zenodo-metadata.md`. Paper 2 takes a
+  DOI first; Paper 3 cites it, so do not publish in the reverse order. Publishing is outward-facing
+  and needs an explicit go from the author every time.
+- **Clear the verification debts** in `docs/PRIOR-ART.md` — Wassette's permission mechanism against
+  source, Filament's lattice arity from the full paper (it bears on the two-point-vs-graded
+  decision), and AgenticOS's review status.
+- **Then M1 below.**
+
 This is the execution plan for the corpus's next research artifact and the paper that reports it. The
 research *agenda* — the open problems — lives in the method paper; this document is narrower and more
 concrete: **what we build next, in what order, and what it would let a paper claim.**

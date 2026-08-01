@@ -1,3 +1,9 @@
+## RENAMED Requirements
+- FROM: `### Requirement: The demonstrator paper is in paper form and positions against the vision`
+- TO: `### Requirement: The demonstrator paper is in paper form and reports what the artifact establishes`
+- FROM: `### Requirement: The demonstrator paper reports the inspector without overclaiming the editor prediction`
+- TO: `### Requirement: Demonstration interfaces are reported as a mention, not as a contribution`
+
 ## MODIFIED Requirements
 
 ### Requirement: The demonstrator paper is in paper form and reports what the artifact establishes
