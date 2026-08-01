@@ -56,6 +56,7 @@ from .sandbox import (
     CLOCK,
     INFERENCE_LLM,
     TOOL_LLM,
+    TYPES,
     SandboxError,
     available,
 )
@@ -66,8 +67,9 @@ from .sandbox.bench import (
     BenchResult,
     measure,
 )
-from .sandbox.host import Sandbox, capability_imports, wasi_imports
+from .sandbox.host import Sandbox, capability_imports, component_imports, wasi_imports
 from .sandbox.host import record as _record
+from .sandbox.interfaces import expected_imports
 from .sandbox.nodes import heartbeat_sandbox
 from .trace import GraphTrace, validate_document
 from .values import ConversationContext, CustomerRequest, Untrusted
@@ -527,6 +529,107 @@ def probe_escapes() -> list[Escape]:
     ]
 
 
+# ── The graph-to-binary derivation: the paper's lead claim, as a figure ──
+#
+# The other three sections of this harness measure things *around* the central
+# claim — what the validator rejects, what a crossing costs, what an adversarial
+# message reaches. The claim itself is that a node's `with` clause *determines* the
+# import surface of its compiled component, and until now its only evidence was a
+# test. A test is a fine place for a property and a poor place for a result: it is
+# invisible to a reader of the paper, and the Evaluation section carried four
+# measurements of which none was the lead.
+#
+# So the comparison is reported as well as asserted. For each ported node: the
+# interface set *derived* from the graph JSON (via `type_parser`, the same parser
+# the validator uses), the set the built component *actually* imports, and whether
+# they agree. Divergence in either direction is a failure — an extra import is the
+# over-grant the claim is about, and a missing one means the derivation has drifted
+# ahead of the artifact.
+
+# The nodes ported to the confined tier, paired with the components built from
+# them. `SANDBOXED_NODES` is the set the demo and the injection scenario run
+# confined; the mapping to component names is the tier's own naming convention.
+DERIVED_NODES: tuple[tuple[str, str], ...] = (
+    ("ParseMessage", "node_parse_message"),
+    ("ModerateContent", "node_moderate_content"),
+    ("FetchContext", "node_fetch_context"),
+    ("GenerateResponse", "node_generate_response"),
+    ("SendReply", "node_send_reply"),
+)
+
+
+@dataclass(frozen=True)
+class Derivation:
+    """One node's `with` clause held against its compiled component."""
+
+    node: str
+    component: str
+    derived: list[str]
+    actual: list[str]
+
+    @property
+    def agrees(self) -> bool:
+        return self.derived == self.actual
+
+    @property
+    def granted(self) -> list[str]:
+        """The interfaces the `with` clause actually grants.
+
+        `expected_imports` also includes `aap:caps/types`, the shared type
+        vocabulary every component links against. It is a marshalling dependency
+        rather than an authority, so counting it as a granted capability would
+        inflate every row of the paper's table by one."""
+        return [i for i in self.derived if i != TYPES]
+
+    @property
+    def over_granted(self) -> list[str]:
+        """Interfaces the binary imports that the graph never granted."""
+        return sorted(set(self.actual) - set(self.derived))
+
+    @property
+    def missing(self) -> list[str]:
+        """Interfaces the graph grants that the binary does not import."""
+        return sorted(set(self.derived) - set(self.actual))
+
+
+def derive_and_compare(
+    nodes: tuple[tuple[str, str], ...] = DERIVED_NODES,
+) -> list[Derivation]:
+    """Derive each ported node's permitted import set and hold the binary to it."""
+    graph = load_graph_dict("customer-support")
+    return [
+        Derivation(
+            node=node,
+            component=component,
+            derived=sorted(expected_imports(graph, node)),
+            actual=sorted(component_imports(component)),
+        )
+        for node, component in nodes
+    ]
+
+
+def check_derivations(derivations: list[Derivation]) -> list[str]:
+    """Pin the derivation the same way the corpus verdicts are pinned.
+
+    An over-granting world must fail the build rather than be reported as a figure
+    with one row reading "no". The whole claim is that the comparison is a gate."""
+    problems: list[str] = []
+    if not derivations:
+        problems.append("the derivation reported no nodes — the lead claim would have no evidence")
+    for d in derivations:
+        if d.over_granted:
+            problems.append(
+                f"{d.node} ({d.component}) imports {', '.join(d.over_granted)}, which its "
+                f"`with` clause does not grant — an over-granting world"
+            )
+        if d.missing:
+            problems.append(
+                f"{d.node} ({d.component}) does not import {', '.join(d.missing)}, which its "
+                f"`with` clause grants — the derivation has drifted from the artifact"
+            )
+    return problems
+
+
 # ── Rendering ────────────────────────────────────────────────────────
 
 
@@ -557,6 +660,7 @@ def render(
     bench: BenchResult,
     injection: InjectionResult,
     escapes: list[Escape],
+    derivations: list[Derivation],
 ) -> str:
     lines: list[str] = []
     lines.append("# Demonstrator evaluation")
@@ -779,6 +883,44 @@ def render(
     )
     lines.append("")
 
+    # ── The derivation ──
+    lines.append("## 5. The graph-to-binary derivation")
+    lines.append("")
+    lines.append(
+        "The demonstrator's central claim, held to the artifact. For each node ported to "
+        "the sandbox tier: the WIT interface set *derived* from its `with` clause in "
+        "`graphs/customer-support.json` (parsed with the project's own type parser, the "
+        "same one the validator uses), against the set its built component *actually* "
+        "imports. A world granting an interface the graph never asked for fails this "
+        "comparison, and the build with it."
+    )
+    lines.append("")
+    lines.append("| node | component | capability interfaces granted | matches binary |")
+    lines.append("|---|---|---:|---|")
+    for d in derivations:
+        lines.append(f"| {d.node} | `{d.component}` | {len(d.granted)} | {_tick(d.agrees)} |")
+    lines.append("")
+    grants = sum(len(d.granted) for d in derivations)
+    agreeing = sum(1 for d in derivations if d.agrees)
+    lines.append(
+        f"{agreeing}/{len(derivations)} components match the import set derived from the "
+        f"graph, across {grants} capability grants. Divergence in **either** direction "
+        f"fails: an extra import is the over-grant the claim is about, and a missing one "
+        f"means the derivation has drifted ahead of the artifact. (The counts exclude "
+        f"`aap:caps/types`, the shared type vocabulary every component links against; it "
+        f"is a marshalling dependency, not an authority, and it is compared like the rest.)"
+    )
+    lines.append("")
+    for d in derivations:
+        lines.append(f"- **{d.node}** (`{d.component}`) — {', '.join(f'`{i}`' for i in d.granted)}")
+    lines.append("")
+    lines.append(
+        "**Scope.** This is a hand-curated capability vocabulary in one repository, so it "
+        "is evidence that the derivation is implementable and that adding a kind costs no "
+        "special case — not that it covers arbitrary kinds."
+    )
+    lines.append("")
+
     return "\n".join(lines) + "\n"
 
 
@@ -795,6 +937,7 @@ class Evaluation:
     injection: InjectionResult  # the confined-tier run (what the paper's figures read)
     injection_host: InjectionResult  # the host-tier run, for the paired canonical trace
     escapes: list[Escape]
+    derivations: list[Derivation]  # the lead claim: `with` clause vs built binary
 
 
 def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
@@ -804,7 +947,8 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
     its pins — no artifact is ever written to match a regression. The injection
     traces are pinned the same way: their structural properties (sole trust
     discharge; the free-text residual reaching the confined tool-capable node) must
-    hold, or the build stops."""
+    hold, or the build stops. So is the graph-to-binary derivation, which is the
+    paper's lead claim: an over-granting world fails here rather than shipping."""
     outcomes = run_corpus(corpus)
     problems = check(outcomes)
     if problems:
@@ -813,6 +957,18 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
             + "\n  ".join(problems)
             + "\n\nThe artifact was not written. Either this is a regression, or the pin in "
             "poc/evaluate.py is now wrong and should be updated deliberately."
+        )
+
+    derivations = derive_and_compare()
+    derivation_problems = check_derivations(derivations)
+    if derivation_problems:
+        raise EvaluationError(
+            "a node's compiled component diverged from the import set derived from its "
+            "`with` clause:\n  "
+            + "\n  ".join(derivation_problems)
+            + "\n\nThe artifact was not written. This is the paper's central claim, so a "
+            "divergence here is a result, not a detail: either the graph, the mapping in "
+            "poc/sandbox/interfaces.py, or the built component is wrong."
         )
 
     injection_confined = run_injection(set(SANDBOXED_NODES))
@@ -832,13 +988,14 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
         injection=injection_confined,
         injection_host=injection_host,
         escapes=probe_escapes(),
+        derivations=derivations,
     )
 
 
 def generate(corpus: tuple[Case, ...] = CORPUS) -> str:
     """Run the whole evaluation and render the human-readable artifact."""
     ev = run(corpus)
-    return render(ev.outcomes, ev.bench, ev.injection, ev.escapes)
+    return render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations)
 
 
 def serialise(ev: Evaluation) -> str:
@@ -941,6 +1098,29 @@ def serialise(ev: Evaluation) -> str:
             "clock_node_ambient_imports": len(wasi_imports("hostile_clocked")),
             "heartbeat_imports": list(capability_imports("node_heartbeat")),
         },
+        # The lead claim as a figure rather than only as a test: each ported node's
+        # permitted import set, derived from its `with` clause in the canonical
+        # graph, held against what its built component actually imports. Pinned in
+        # `run()`, so every row below necessarily agrees — the value of reporting it
+        # is that the *comparison* is visible and its scope is countable, not that
+        # the answer could have been otherwise in a shipped artifact.
+        "derivation": {
+            "nodes": [
+                {
+                    "node": d.node,
+                    "component": d.component,
+                    "derived": d.derived,
+                    "actual": d.actual,
+                    "granted": d.granted,
+                    "agrees": d.agrees,
+                    "granted_count": len(d.granted),
+                }
+                for d in ev.derivations
+            ],
+            "total": len(ev.derivations),
+            "agreeing": sum(1 for d in ev.derivations if d.agrees),
+            "grants_compared": sum(len(d.granted) for d in ev.derivations),
+        },
         # The execution trace, as a reported fact of §3. The traces themselves are
         # emitted to dist/trace-injection-{host,confined}.json; these are the pinned
         # summary numbers the paper states without hand-typing them.
@@ -999,7 +1179,7 @@ def main() -> int:
         return 1
 
     ev = run()
-    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes)
+    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations)
     data = serialise(ev)
 
     # The canonical injection traces, timing excluded so structure is byte-stable

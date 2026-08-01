@@ -26,12 +26,16 @@ from poc.demo import SANDBOXED_NODES
 from poc.evaluate import (
     ACCEPTED,
     CORPUS,
+    DERIVED_NODES,
     REASON_EDGE_TYPE,
     REASON_TRUST_LATTICE,
     REJECTED,
+    Derivation,
     EvaluationError,
     check,
+    check_derivations,
     check_traces,
+    derive_and_compare,
     generate,
     main,
     render,
@@ -40,7 +44,7 @@ from poc.evaluate import (
     run_injection,
     serialise,
 )
-from poc.sandbox import available
+from poc.sandbox import TYPES, available
 from poc.trace import validate_document
 from poc.variants import UNSAFE_VARIANTS
 
@@ -132,6 +136,7 @@ def test_the_artifact_reports_every_evaluation_dimension():
     assert "## 2. Capability-boundary overhead" in artifact
     assert "## 3. Prompt-injection attenuation" in artifact
     assert "## 4. Enforcement tiers: host vs sandbox" in artifact
+    assert "## 5. The graph-to-binary derivation" in artifact
     # The corpus verdicts, the overhead figure, and both tiers are present.
     assert "marginal per-crossing" in artifact
     assert "µs" in artifact
@@ -189,6 +194,7 @@ def test_the_data_carries_every_figure_the_paper_states():
         "overhead",
         "injection",
         "tiers",
+        "derivation",
         "trace",
         "display",
     }
@@ -245,7 +251,7 @@ def test_both_artifacts_come_from_one_run():
     that neither is re-measured: the crossing figure the paper typesets is the
     same one the artifact prints."""
     ev = run()
-    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes)
+    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations)
     payload = json.loads(serialise(ev))
 
     assert f"{payload['overhead']['crossing_us']:.1f} µs" in artifact
@@ -293,6 +299,88 @@ def test_main_writes_the_injection_traces(tmp_path, monkeypatch):
     assert evaluate.main() == 0
     for path in (host, confined):
         assert validate_document(json.loads(path.read_text())) == []
+
+
+# ── The graph-to-binary derivation: the lead claim as a reported figure ──
+#
+# The comparison itself is asserted in tests/test_poc_sandbox.py. What is pinned
+# here is that it is *reported*: the paper's central claim had evidence only in a
+# test suite, which is invisible to a reader, and the Evaluation section measured
+# four things of which none was the lead.
+
+
+@sandboxed
+def test_the_derivation_covers_every_ported_node():
+    """Scenario: the derivation is reported per node.
+
+    Every node the injection scenario runs confined must appear, or the figure
+    would report a subset of the tier while reading as a property of it."""
+    derivations = derive_and_compare()
+    assert {d.node for d in derivations} == set(SANDBOXED_NODES)
+    assert {d.node for d, _ in ((d, None) for d in derivations)} == {
+        node for node, _ in DERIVED_NODES
+    }
+    assert all(d.agrees for d in derivations)
+
+
+@sandboxed
+def test_the_granted_count_excludes_the_shared_type_vocabulary():
+    """`aap:caps/types` is linked by every component and grants no authority, so
+    counting it as a capability would inflate the paper's table by one per row —
+    and would make an inference-only node look as though it holds two."""
+    parse = next(d for d in derive_and_compare() if d.node == "ParseMessage")
+    assert parse.granted == ["aap:caps/inference-llm@0.1.0"]
+    assert TYPES in parse.derived and TYPES not in parse.granted
+    # It is excluded from the count, not from the comparison.
+    assert TYPES in parse.actual
+
+
+def test_an_over_granting_world_fails_the_evaluation():
+    """Scenario: an over-granting world fails the build.
+
+    This is the claim, so the guard is what makes the figure worth reporting: a
+    component importing an interface its `with` clause never granted must stop the
+    build, not render a row reading "no"."""
+    over = Derivation(
+        node="ParseMessage",
+        component="node_parse_message",
+        derived=["aap:caps/inference-llm@0.1.0"],
+        actual=["aap:caps/inference-llm@0.1.0", "aap:caps/tool-llm@0.1.0"],
+    )
+    problems = check_derivations([over])
+    assert problems and "tool-llm" in problems[0] and "over-granting" in problems[0]
+
+
+def test_a_derivation_running_ahead_of_the_artifact_also_fails():
+    """The dual direction, and it is not symmetric in meaning: a grant the binary
+    does not import means the mapping has drifted ahead of the component, so the
+    comparison would be vacuously passing on a stale artifact."""
+    stale = Derivation(
+        node="FetchContext",
+        component="node_fetch_context",
+        derived=["aap:caps/kb-read@0.1.0"],
+        actual=[],
+    )
+    problems = check_derivations([stale])
+    assert problems and "drifted" in problems[0]
+
+
+def test_an_empty_derivation_fails_rather_than_reporting_nothing():
+    """A silently empty comparison is the failure mode that would leave the lead
+    claim with no evidence while the build stayed green."""
+    assert check_derivations([])
+
+
+@sandboxed
+def test_the_data_carries_the_derivation_figures():
+    payload = json.loads(serialise(run()))["derivation"]
+    assert payload["total"] == payload["agreeing"] == len(SANDBOXED_NODES)
+    assert payload["grants_compared"] == sum(n["granted_count"] for n in payload["nodes"])
+    # GenerateResponse is the interesting row: the only ported node holding two
+    # capabilities, and the tool-capable one.
+    generate_row = next(n for n in payload["nodes"] if n["node"] == "GenerateResponse")
+    assert generate_row["granted_count"] == 2
+    assert "aap:caps/tool-llm@0.1.0" in generate_row["granted"]
 
 
 def test_main_is_importable_without_running():
