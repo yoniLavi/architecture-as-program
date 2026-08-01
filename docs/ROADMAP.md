@@ -21,7 +21,18 @@ and prefer them over anything here if the two disagree.
    abstract was read, and its lattice arity bears directly on the open two-point-vs-graded decision.
    Wassette's permission mechanism needs checking against source before the contrast in §6 is
    published as fact, and AgenticOS's review status is unconfirmed.
-3. **M1 below** — the walking skeleton.
+3. **M1 below** — the walking skeleton. Its first piece is now proposed as
+   `add-io-capability-kinds` (clock, allowlisted outbound HTTP, notification), which is worth doing
+   ahead of the rest of M1 because it widens the *current* paper's lead result: the import-set
+   derivation is presently evidence about four hand-modelled interfaces in one graph, and whether it
+   holds as the vocabulary grows is untested either way. It carries one decision for the author,
+   recorded in the proposal — whether to grant `wasi:clocks` directly, which is the honest
+   demonstration of the §6.7 argument, or a bespoke interface, which keeps a sentence simpler.
+
+   The rest of M1, and M2–M5, deliberately stay as roadmap rather than proposals: M2's fan-in has a
+   live design question (the survey gave the *rule* — commutative combinators need no recording,
+   order-sensitive ones journal the realised choice — but not the combinator language), and settling
+   it inside a proposal written now would settle it by accident.
 
 **A pitfall that has already cost time twice:** an OpenSpec `MODIFIED` delta that *renames* its
 requirement fails at archive, because the archiver matches headers exactly; a rename needs a
