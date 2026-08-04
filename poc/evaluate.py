@@ -683,15 +683,22 @@ def derive_and_compare(
     ]
 
 
-def kinds_covered(derivations: list[Derivation]) -> list[str]:
+def kinds_covered(derivations: list[Derivation], *, shipped_only: bool = False) -> list[str]:
     """The distinct capability kinds the comparison was actually exercised on.
 
     Deliberately not `CAPABILITY_KINDS`: that is the size of the mapping table,
     which is what the derivation *could* map, not what it has been held against a
     binary for. A kind no ported node holds is unexercised however many mapping
     entries exist, and the paper says so.
+
+    `shipped_only` gives the same count restricted to nodes of graphs that ship,
+    which is the *baseline* the paper contrasts the full figure against. It exists
+    because a comparison with one side interpolated and the other typed by hand
+    drifts exactly as fast as one with neither: the baseline was written as "the
+    four kinds the customer-support graph needed" and was three, since one of that
+    graph's four kinds is held by no ported node.
     """
-    return sorted({k for d in derivations for k in d.kinds})
+    return sorted({k for d in derivations if d.shipped or not shipped_only for k in d.kinds})
 
 
 def check_derivations(derivations: list[Derivation]) -> list[str]:
@@ -1121,6 +1128,7 @@ def serialise(ev: Evaluation) -> str:
     b = ev.bench
     inference_imports = capability_imports("node_parse_message")
     _kinds = kinds_covered(ev.derivations)
+    _kinds_shipped = kinds_covered(ev.derivations, shipped_only=True)
     _unexercised = sorted(set(CAPABILITY_KINDS) - set(_kinds))
 
     # Trace facts the paper's §3 reports, from the run rather than by hand. The
@@ -1243,6 +1251,11 @@ def serialise(ev: Evaluation) -> str:
             # becomes a claim about what could be mapped.
             "kinds_covered": _kinds,
             "kinds_covered_count": len(_kinds),
+            # The baseline the full figure is contrasted against: what the gate
+            # reached before the I/O kinds arrived. Interpolated rather than typed
+            # because half a comparison is not half safe — see kinds_covered().
+            "kinds_covered_shipped": _kinds_shipped,
+            "kinds_covered_shipped_count": len(_kinds_shipped),
             "kinds_unexercised": _unexercised,
             "shipped_total": sum(1 for d in ev.derivations if d.shipped),
         },

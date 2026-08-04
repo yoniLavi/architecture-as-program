@@ -345,6 +345,24 @@ def test_kind_coverage_is_counted_from_the_rows_not_the_mapping_table():
 
 
 @sandboxed
+def test_the_shipped_baseline_counts_ported_nodes_not_declared_capabilities():
+    """Scenario: the figure the coverage claim is contrasted *against*.
+
+    §4.5 reports the gate's coverage as a rise from a baseline, and a comparison
+    is only as honest as its worse half. The baseline is the kinds the shipped
+    graph's *ported* nodes carry — not the kinds that graph *declares*, which is
+    one more, because `EventEmitter`'s only holder was never ported. Writing the
+    larger number there would credit the gate with a kind it has never checked."""
+    derivations = derive_and_compare()
+    baseline = kinds_covered(derivations, shipped_only=True)
+    assert set(baseline) == {"DBHandle", "LLMClient", "ResponseChannel"}
+    # The trap: the shipped graph declares EventEmitter, so a baseline read off the
+    # graph rather than off the ported rows would be one larger.
+    assert "EventEmitter" not in baseline
+    assert set(baseline) < set(kinds_covered(derivations))
+
+
+@sandboxed
 def test_the_granted_count_excludes_the_shared_type_vocabulary():
     """`aap:caps/types` is linked by every component and grants no authority, so
     counting it as a capability would inflate the paper's table by one per row —

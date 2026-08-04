@@ -2,7 +2,7 @@
 #set document(
   title: "Predicting Before Building: A Pre-Registration Protocol for Architecture Research, and What One Instance Corrected",
   author: ("Yoni Lavi"),
-  date: datetime(year: 2026, month: 7, day: 29),
+  date: datetime(year: 2026, month: 8, day: 4),
 )
 #set page(margin: 2.5cm, numbering: "1")
 #set text(font: "New Computer Modern", size: 11pt)
@@ -28,7 +28,7 @@
 ]
 
 #align(center)[
-  #text(size: 11pt)[July 2026]
+  #text(size: 11pt)[August 2026]
 ]
 
 #v(1em)
@@ -142,7 +142,7 @@ Four statuses are used. *Substantiated* means the artifact backs the claim at th
     [Agent tooling for the graph workflow], [Not attempted], [—],
     [The visual graph editor], [Not attempted], [see @sec:conditional],
   ),
-  caption: [The founding vision's nineteen claims and what the demonstrator does to each. Every "Substantiated" is qualified by the demonstrator's scale — nine nodes, one domain, a curated corpus — as @sec:threats and the demonstrator paper's own limitations section both state.],
+  caption: [The founding vision's nineteen claims and what the demonstrator does to each. Every "Substantiated" is qualified by the demonstrator's scale — one graph, one domain, a curated corpus — as @sec:threats and the demonstrator paper's own limitations section both state.],
 ) <tab:outcomes>
 
 == What the demonstrator substantiates <sec:substantiated>
@@ -215,7 +215,7 @@ The demonstrator establishes that the graph-level analyses and capability confin
 
 *Graph evolution and type-system evolution.* When a node's signature changes, downstream consumers may break; the language must define compatibility rules for signature evolution and support versioned interfaces at sub-graph boundaries to enable independent team ownership. Distinctly, the type system will itself need to evolve — new trust levels, new capability kinds, refined subtyping — and migration of existing graphs across type-system versions, with preservation of verified properties, is an open problem the design should anticipate.
 
-*Agent tooling and developer experience.* Build the workflow that takes a natural-language change description, proposes a graph transformation, generates node implementations, and submits them for automated verification, extending existing SDD tooling to operate on typed graph artifacts rather than prose. Alongside it, the visual graph editor and diff viewer: capability edge additions, trust boundary crossings, and sanitisation gaps must be visually salient. The demonstrator's inspector narrows the *viewing* half — rendering, running, and trace overlay exist against the real runtime — so the open editor-side question is specifically *authoring*: graph edits made from the interface with the validator in the loop, and the diff view over them. It narrows nothing about the agent workflow, and nothing about *graph-scale comprehension*, which the demonstrator does nothing to address — its concrete example has nine nodes and real systems have hundreds. Hierarchical decomposition is the expected approach, but the interaction between hierarchical abstraction, capability wiring, and trust propagation across sub-graph boundaries has not been designed, and a type error deep in a sub-graph's wiring must produce an error message comprehensible at the level the developer is working at.
+*Agent tooling and developer experience.* Build the workflow that takes a natural-language change description, proposes a graph transformation, generates node implementations, and submits them for automated verification, extending existing SDD tooling to operate on typed graph artifacts rather than prose. Alongside it, the visual graph editor and diff viewer: capability edge additions, trust boundary crossings, and sanitisation gaps must be visually salient. The demonstrator's inspector narrows the *viewing* half — rendering, running, and trace overlay exist against the real runtime — so the open editor-side question is specifically *authoring*: graph edits made from the interface with the validator in the loop, and the diff view over them. It narrows nothing about the agent workflow, and nothing about *graph-scale comprehension*, which the demonstrator does nothing to address — its concrete example is a single small graph and real systems have hundreds of nodes, a gap @lavi_confinement_2026 states with the empirical figures behind it. Hierarchical decomposition is the expected approach, but the interaction between hierarchical abstraction, capability wiring, and trust propagation across sub-graph boundaries has not been designed, and a type error deep in a sub-graph's wiring must produce an error message comprehensible at the level the developer is working at.
 
 == Phase 2: hardening and deployment <sec:phase2>
 

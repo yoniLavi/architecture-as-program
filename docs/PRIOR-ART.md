@@ -70,7 +70,10 @@ code audit.
 leaned on as novel; cite wasi-virt, wasmCloud and WAC as nearest prior art.
 **Not taken (yet):** wasi-virt-style forced composition as defence-in-depth on
 top of the derive-and-compare test, so drift is unforgeable rather than merely
-tested. Recorded as a research-agenda item.
+tested. **Landed** (Aug 2026) in §7.5's CHERI/replay item, having been claimed as
+recorded for a fortnight while living nowhere — §6.7 pointed at §7.5 for it and
+§7.5 did not carry it. Stated where it costs us: test-then-reject is the weaker
+of the two forms, so this bounds the lead claim rather than sitting beside it.
 
 ### 3. The text-vs-graph premise does not hold as a *comprehension* claim
 
