@@ -26,14 +26,18 @@ from poc.demo import SANDBOXED_NODES
 from poc.evaluate import (
     ACCEPTED,
     CORPUS,
+    CROSSING_BAND_MAX_MS,
+    CROSSING_BAND_MIN_MS,
     DERIVED_NODES,
     REASON_EDGE_TYPE,
     REASON_TRUST_LATTICE,
     REJECTED,
     Derivation,
     EvaluationError,
+    _magnitude,
     check,
     check_derivations,
+    check_overhead,
     check_traces,
     derive_and_compare,
     generate,
@@ -46,6 +50,7 @@ from poc.evaluate import (
     serialise,
 )
 from poc.sandbox import CAPABILITY_KINDS, TYPES, available
+from poc.sandbox.bench import BenchResult
 from poc.trace import validate_document
 from poc.variants import UNSAFE_VARIANTS
 
@@ -53,6 +58,20 @@ from poc.variants import UNSAFE_VARIANTS
 def _corpus_with(name: str, **changes):
     """The real corpus with one case's pin altered."""
     return tuple(replace(c, **changes) if c.name == name else c for c in CORPUS)
+
+
+def _bench(crossing_ms: float) -> BenchResult:
+    """A benchmark result with one crossing cost. Only that field is under test,
+    so the rest are plausible constants rather than a second measurement."""
+    return BenchResult(
+        compilation_ms=4.2,
+        instantiation_ms=0.04,
+        crossing_ms=crossing_ms,
+        parse_invocation_ms=0.045,
+        generate_invocation_ms=0.117,
+        parse_crossings=1,
+        generate_crossings=3,
+    )
 
 
 # ── The evaluation, as pinned ────────────────────────────────────────
@@ -208,6 +227,12 @@ def test_the_data_carries_every_figure_the_paper_states():
     assert payload["display"]["crossing_us"] == f"{payload['overhead']['crossing_us']:.1f}"
     assert payload["display"]["mutations_caught_pct"] == "100%"
 
+    # The magnitude the paper states in prose outside this section is derived from
+    # the same measurement as the figure, not maintained beside it.
+    assert payload["display"]["crossing_magnitude"] == _magnitude(
+        payload["overhead"]["crossing_ms"]
+    )
+
     corpus = payload["corpus"]
     assert {c["name"] for c in corpus["cases"]} == {c.name for c in CORPUS}
     assert corpus["canonical_accepted"] == corpus["canonical_total"]
@@ -301,6 +326,78 @@ def test_main_writes_the_injection_traces(tmp_path, monkeypatch):
     assert evaluate.main() == 0
     for path in (host, confined):
         assert validate_document(json.loads(path.read_text())) == []
+
+
+# ── The overhead figure, pinned to its magnitude ─────────────────────
+#
+# The crossing cost is the one figure in the Evaluation section that is a
+# *measurement* rather than a property of an artifact, so it is the one that can go
+# wrong on a machine that is merely busy rather than broken. A build on a contended
+# machine once reported 343µs where the same code reports ~23µs otherwise, and
+# nothing caught it: the only gate asked whether the crossing was under the 1ms
+# envelope, which hundreds of microseconds passes while falsifying the magnitude
+# the paper states in prose. These pin the guard that now closes that.
+
+
+def test_a_crossing_in_the_normal_range_passes_the_band():
+    assert check_overhead(_bench(0.023)) == []
+
+
+def test_a_contended_machines_inflated_crossing_fails_the_band():
+    problems = check_overhead(_bench(0.3431))
+    assert len(problems) == 1
+    assert "above the pinned band" in problems[0]
+
+
+def test_a_collapsed_crossing_difference_fails_the_band():
+    """A near-zero differenced quantity means the two timed paths stopped differing
+    in crossing count, not that the boundary got cheaper."""
+    problems = check_overhead(_bench(0.0001))
+    assert len(problems) == 1
+    assert "below the pinned band" in problems[0]
+
+
+def test_a_transient_excursion_is_retried_rather_than_failing_the_build(monkeypatch):
+    """One bad measurement is noise. Retrying rather than widening the band keeps
+    the band tight enough to be worth having."""
+    from poc import evaluate
+
+    results = iter([_bench(0.3431), _bench(0.023)])
+    monkeypatch.setattr(evaluate, "measure", lambda: next(results))
+
+    bench, problems = evaluate.measure_within_band()
+    assert problems == []
+    assert bench.crossing_ms == 0.023
+
+
+def test_a_sustained_excursion_is_reported_after_the_attempts_run_out(monkeypatch):
+    from poc import evaluate
+
+    calls = []
+
+    def _always_contended():
+        calls.append(1)
+        return _bench(0.3431)
+
+    monkeypatch.setattr(evaluate, "measure", _always_contended)
+
+    _, problems = evaluate.measure_within_band()
+    assert len(calls) == evaluate.CROSSING_ATTEMPTS
+    assert problems and "above the pinned band" in problems[0]
+
+
+def test_every_measurement_the_band_admits_names_the_same_magnitude():
+    """The prose magnitude and the interpolated figure cannot disagree, because the
+    band's ceiling *is* a decade boundary and the band is half-open there."""
+    admitted = {
+        _magnitude(ms)
+        for ms in (CROSSING_BAND_MIN_MS, 0.0231, 0.0999, CROSSING_BAND_MAX_MS * 0.999)
+    }
+    assert admitted <= {"single-digit microseconds", "tens of microseconds"}
+    # And the excursion that prompted the guard names a different one, which is
+    # exactly the disagreement the band exists to prevent from shipping.
+    assert _magnitude(0.3431) == "hundreds of microseconds"
+    assert check_overhead(_bench(CROSSING_BAND_MAX_MS)) != []
 
 
 # ── The graph-to-binary derivation: the lead claim as a reported figure ──

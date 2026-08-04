@@ -443,6 +443,85 @@ def check_traces(host: InjectionResult, confined: InjectionResult) -> list[str]:
     return problems
 
 
+# ── The overhead figure, pinned to its order of magnitude ────────────
+#
+# Every other figure this harness emits is pinned: a corpus case pins its verdict
+# *and* the reason class that must catch it, a derivation row pins agreement in
+# both directions, a trace pins its structural properties. The overhead figure was
+# the exception, and it is the one figure that is also a *measurement* rather than
+# a property of an artifact — so it is the one that can silently go wrong on a
+# machine that is merely busy.
+#
+# It did. A build on a contended machine reported a marginal crossing cost of
+# 343µs where the same code on the same machine reports ~23µs otherwise: the whole
+# measurement had slowed by roughly 7x, and since the crossing cost is a
+# *difference* of two timings, the excursion landed on the boundary amplified to
+# 13x. Nothing caught it. The only gate was `within_envelope`, which asks whether
+# the crossing is under 1ms — and hundreds of microseconds passes that comfortably
+# while falsifying the paper's stated magnitude in the same breath.
+#
+# So the band below pins the decade, not the value. It is deliberately wide: this
+# is a guard against a contaminated run, not a performance regression test, and a
+# genuine change in the crossing cost should be re-pinned deliberately rather than
+# absorbed. What it buys is that the paper can state a magnitude — see
+# `_magnitude` below — with the same build-failing discipline behind it that the
+# corpus verdicts have. The ceiling is a decade boundary and the band is half-open
+# there on purpose, so every measurement that passes names a decade at or below
+# "tens of microseconds" and the prose cannot disagree with the table.
+CROSSING_BAND_MIN_MS = 0.005
+CROSSING_BAND_MAX_MS = 0.100
+
+
+def check_overhead(bench: BenchResult) -> list[str]:
+    """Divergences of the measured crossing cost from its pinned band.
+    Empty means the measurement is usable."""
+    problems: list[str] = []
+    us = bench.crossing_ms * 1000.0
+
+    if bench.crossing_ms < CROSSING_BAND_MIN_MS:
+        problems.append(
+            f"marginal per-crossing cost {us:.1f}µs is below the pinned band "
+            f"({CROSSING_BAND_MIN_MS * 1000:.0f} to {CROSSING_BAND_MAX_MS * 1000:.0f}µs) — a "
+            f"differenced quantity this small usually means the two timed paths stopped "
+            f"differing in crossing count, not that the boundary got cheaper"
+        )
+    elif bench.crossing_ms >= CROSSING_BAND_MAX_MS:
+        problems.append(
+            f"marginal per-crossing cost {us:.1f}µs is above the pinned band "
+            f"({CROSSING_BAND_MIN_MS * 1000:.0f} to {CROSSING_BAND_MAX_MS * 1000:.0f}µs) — the "
+            f"crossing is differenced between two warm timings, so a loaded machine "
+            f"inflates it by more than it inflates either term"
+        )
+
+    return problems
+
+
+# How many times to re-measure before treating an excursion as real. The
+# excursions are transient — the machine that reports 343µs under momentary
+# contention reports ~23µs a moment later — so a single one is noise and should
+# not fail a build, while a run of them is a signal: either the machine is busy
+# enough that no measurement from it is usable, or the cost genuinely moved.
+CROSSING_ATTEMPTS = 3
+
+
+def measure_within_band(attempts: int = CROSSING_ATTEMPTS) -> tuple[BenchResult, list[str]]:
+    """Measure the tier until the crossing cost lands in its pinned band.
+
+    Returns the measurement and any problems remaining after the last attempt, so
+    the caller decides what a sustained excursion means. Retrying rather than
+    widening the band is the point: a band wide enough to admit a contended
+    machine's figure is a band wide enough to admit a figure the paper's prose
+    contradicts."""
+    bench = measure()
+    problems = check_overhead(bench)
+    for _ in range(attempts - 1):
+        if not problems:
+            break
+        bench = measure()
+        problems = check_overhead(bench)
+    return bench, problems
+
+
 # ── Host vs sandbox: what each tier actually stops ───────────────────
 
 
@@ -746,6 +825,31 @@ def _environment() -> list[tuple[str, str]]:
 
 def _tick(ok: bool) -> str:
     return "✓" if ok else "✗"
+
+
+# Decade names for a duration, so the paper can state a magnitude in prose without
+# anyone typing it. "Tens of microseconds" is a claim about the measurement exactly
+# as "23.1µs" is, and it was previously the one figure in the Evaluation section a
+# human maintained by hand — which is how the paper came to say "tens of
+# microseconds" beside an interpolated 343.1µs on a contaminated build. Deriving it
+# puts the sentence and the table under the same discipline.
+_DECADES: tuple[tuple[float, str], ...] = (
+    (1e-3, "under a microsecond"),
+    (1e-2, "single-digit microseconds"),
+    (1e-1, "tens of microseconds"),
+    (1e0, "hundreds of microseconds"),
+    (1e1, "single-digit milliseconds"),
+    (1e2, "tens of milliseconds"),
+    (1e3, "hundreds of milliseconds"),
+)
+
+
+def _magnitude(ms: float) -> str:
+    """The decade a duration falls in, named as prose."""
+    for ceiling, name in _DECADES:
+        if ms < ceiling:
+            return name
+    return "seconds or more"
 
 
 def render(
@@ -1067,7 +1171,10 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
     traces are pinned the same way: their structural properties (sole trust
     discharge; the free-text residual reaching the confined tool-capable node) must
     hold, or the build stops. So is the graph-to-binary derivation, which is the
-    paper's lead claim: an over-granting world fails here rather than shipping."""
+    paper's lead claim: an over-granting world fails here rather than shipping. And
+    so is the overhead measurement, to its order of magnitude rather than its value
+    — the paper states that magnitude in prose, so a run on a loaded machine must
+    fail the build rather than quietly contradict it."""
     outcomes = run_corpus(corpus)
     problems = check(outcomes)
     if problems:
@@ -1101,9 +1208,23 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
             "in poc/evaluate.py is now wrong and should be updated deliberately."
         )
 
+    bench, overhead_problems = measure_within_band()
+    if overhead_problems:
+        raise EvaluationError(
+            f"the overhead measurement fell outside its pinned band on all "
+            f"{CROSSING_ATTEMPTS} attempts:\n  "
+            + "\n  ".join(overhead_problems)
+            + "\n\nNo artifact was written. A single excursion is retried, so this is a "
+            "sustained one: either the machine is busy enough that no measurement from "
+            "it is usable — re-run on an idle one — or the crossing cost has genuinely "
+            "moved, in which case re-pin the band in poc/evaluate.py deliberately. The "
+            "paper states this figure's *magnitude*, so widening the band is an edit to "
+            "a claim rather than a tuning knob."
+        )
+
     return Evaluation(
         outcomes=outcomes,
-        bench=measure(),
+        bench=bench,
         injection=injection_confined,
         injection_host=injection_host,
         escapes=probe_escapes(),
@@ -1299,6 +1420,7 @@ def serialise(ev: Evaluation) -> str:
             "compilation_ms": f"{b.compilation_ms:.2f}",
             "instantiation_ms": f"{b.instantiation_ms:.3f}",
             "crossing_us": f"{b.crossing_ms * 1000.0:.1f}",
+            "crossing_magnitude": _magnitude(b.crossing_ms),
             "parse_invocation_ms": f"{b.parse_invocation_ms:.3f}",
             "generate_invocation_ms": f"{b.generate_invocation_ms:.3f}",
             "projected_overhead": f"{b.projected_overhead:.2%}",
