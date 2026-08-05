@@ -109,3 +109,15 @@
       clean, 16pp unchanged. Nothing here is accounting
 - [x] 4.4 Page count before and after, recorded in the archive → Paper 2 **42pp →
       42pp**; §6.3 562→437 words, §2.5 507→506, §2.3 1006→1014 (the correction)
+
+## 5. Spec delta and archive
+
+- [x] 5.1 Apply the new "checked or merely obliged" requirement to the requirement
+      it most obviously bears on. "No paper states that the artifact lacks a
+      capability the artifact has" already forbade the understatement this change
+      found, and had failed silently for four days — the principal-binding change
+      should have swept it. Added as a MODIFIED delta stating that the requirement
+      rests on review, why no check is possible (there is no artifact against which
+      to decide that a sentence *understates*), and a scenario requiring the two
+      directions to be attributed separately rather than both left looking checked
+- [x] 5.2 `openspec validate --strict`, then archive
