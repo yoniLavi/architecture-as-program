@@ -76,9 +76,9 @@ UI_FIGS := $(addprefix $(DIST)/ui/,$(UI_FIGS_USED))
 # dist/papers/02-demonstrator/ (see README).
 ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 
-.PHONY: build clean validate-graphs test wasm check-freeze grammar evaluation paper1 paper2 paper3 aliases api ui ui-check ui-e2e
+.PHONY: build clean validate-graphs test wasm check-freeze check-hedges grammar evaluation paper1 paper2 paper3 aliases api ui ui-check ui-e2e
 
-build: validate-graphs check-freeze grammar evaluation paper1 paper2 paper3 aliases
+build: validate-graphs check-freeze check-hedges grammar evaluation paper1 paper2 paper3 aliases
 	@echo "Build complete."
 
 grammar: $(DIST)/grammar.md
@@ -127,6 +127,14 @@ validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_val
 # shallow CI checkout.
 check-freeze:
 	@$(PY) scripts/check-freeze.py
+
+# Guard the hedging of the living papers' unproven claims. Each pin quotes a
+# claim and the qualification that bounds it *together*, so a rewrite cannot
+# shed the hedge and keep the claim. A regression guard over the passages it
+# pins, not a check that the corpus is hedged — see the script's docstring and
+# the review obligation in AGENTS.md for what it does not cover.
+check-hedges:
+	@$(PY) scripts/check-hedges.py
 
 # Run the test suite (type parser + graph validator + runtime) via pytest.
 test:
