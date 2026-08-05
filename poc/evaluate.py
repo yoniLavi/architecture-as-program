@@ -1171,10 +1171,13 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
     traces are pinned the same way: their structural properties (sole trust
     discharge; the free-text residual reaching the confined tool-capable node) must
     hold, or the build stops. So is the graph-to-binary derivation, which is the
-    paper's lead claim: an over-granting world fails here rather than shipping. And
-    so is the overhead measurement, to its order of magnitude rather than its value
-    — the paper states that magnitude in prose, so a run on a loaded machine must
-    fail the build rather than quietly contradict it."""
+    paper's lead claim: an over-granting world fails here rather than shipping.
+
+    The overhead measurement is retried into its pinned band here but *not* enforced
+    here — `main` refuses to write an artifact whose figure is still outside it. The
+    pins above guard properties, which must hold wherever the code runs; the band
+    guards a measurement, whose usability is a fact about the machine rather than
+    the code."""
     outcomes = run_corpus(corpus)
     problems = check(outcomes)
     if problems:
@@ -1208,19 +1211,7 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
             "in poc/evaluate.py is now wrong and should be updated deliberately."
         )
 
-    bench, overhead_problems = measure_within_band()
-    if overhead_problems:
-        raise EvaluationError(
-            f"the overhead measurement fell outside its pinned band on all "
-            f"{CROSSING_ATTEMPTS} attempts:\n  "
-            + "\n  ".join(overhead_problems)
-            + "\n\nNo artifact was written. A single excursion is retried, so this is a "
-            "sustained one: either the machine is busy enough that no measurement from "
-            "it is usable — re-run on an idle one — or the crossing cost has genuinely "
-            "moved, in which case re-pin the band in poc/evaluate.py deliberately. The "
-            "paper states this figure's *magnitude*, so widening the band is an edit to "
-            "a claim rather than a tuning knob."
-        )
+    bench, _ = measure_within_band()
 
     return Evaluation(
         outcomes=outcomes,
@@ -1446,6 +1437,32 @@ def main() -> int:
         return 1
 
     ev = run()
+
+    # The overhead band is checked here rather than in `run()`, and the difference
+    # is deliberate. The other pins guard *properties* — a corpus verdict, a
+    # derivation, a trace's structure — which are facts about the code and must
+    # hold wherever it runs, tests included. This one guards a *measurement*, whose
+    # usability is a fact about the machine that took it. Failing every caller of
+    # `run()` on a busy machine would make the suite unreliable without protecting
+    # anything, because a test does not publish a figure. What must never happen is
+    # a contaminated measurement reaching the artifact the paper typesets from, and
+    # that is exactly here.
+    overhead_problems = check_overhead(ev.bench)
+    if overhead_problems:
+        print(
+            f"error: the overhead measurement fell outside its pinned band on all "
+            f"{CROSSING_ATTEMPTS} attempts:\n  " + "\n  ".join(overhead_problems) + "\n\n"
+            "       No artifact was written. A single excursion is already retried, so\n"
+            "       this is a sustained one: either the machine is busy enough that no\n"
+            "       measurement from it is usable — re-run on an idle one — or the\n"
+            "       crossing cost has genuinely moved, in which case re-pin the band in\n"
+            "       poc/evaluate.py deliberately. The paper states this figure's\n"
+            "       *magnitude*, so widening the band is an edit to a claim rather than\n"
+            "       a tuning knob.",
+            file=sys.stderr,
+        )
+        return 1
+
     artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations)
     data = serialise(ev)
 

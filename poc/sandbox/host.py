@@ -64,6 +64,48 @@ class SandboxTypeError(SandboxError):
 _ENGINE: Any = None
 _COMPONENT_CACHE: dict[str, Any] = {}
 
+# Address space each store reserves for a guest's linear memory, and the guard
+# region after it. wasmtime's defaults are tuned for a server running a few
+# long-lived guests: a 4GiB reservation plus a 64MiB guard, sized so that every
+# 32-bit guest address is representable and bounds checks fold into the guard.
+#
+# That is the wrong trade here and it failed in practice. A node body is a few
+# hundred KiB of Rust that touches a fraction of a page, but every node
+# invocation builds a *fresh* store, so the tier asks the OS to reserve 4.06GiB
+# per instantiation. The reservation is virtual and normally free — until the
+# machine is loaded, at which point `mmap` refuses and instantiation fails with
+# "Cannot allocate memory". The symptom is badly misleading: the failure lands in
+# the same place an ungranted capability does, so a busy machine produced what
+# looked like a capability error.
+#
+# 32MiB is roughly two orders of magnitude more than any node here uses, and
+# `memory_may_move` keeps the cap from being a correctness limit: a guest that
+# outgrows the reservation gets its memory reallocated rather than trapping. The
+# cost is that accesses past the smaller guard need an explicit bounds check;
+# @sec:eval-overhead's crossing measurement is unmoved by it, which is the only
+# number that would have noticed.
+MEMORY_RESERVATION = 32 * 1024 * 1024
+MEMORY_GUARD_SIZE = 64 * 1024
+
+
+def engine_config() -> Any:
+    """The engine configuration both the runtime and the benchmark build from, so
+    the tier is measured as it is run."""
+    import wasmtime
+
+    config = wasmtime.Config()
+    config.memory_reservation = MEMORY_RESERVATION
+    config.memory_guard_size = MEMORY_GUARD_SIZE
+    config.memory_may_move = True
+    return config
+
+
+def _is_resource_exhaustion(error: Exception) -> bool:
+    """True if an instantiation failure is the host running out of memory rather
+    than the guest reaching for authority it was not granted."""
+    text = str(error).lower()
+    return "cannot allocate memory" in text or "mmap failed" in text
+
 
 def _compiled(path: Path):
     """Return `(engine, component)` for an artifact, compiling and caching on first use."""
@@ -72,7 +114,7 @@ def _compiled(path: Path):
 
     global _ENGINE
     if _ENGINE is None:
-        _ENGINE = wasmtime.Engine()
+        _ENGINE = wasmtime.Engine(engine_config())
     key = str(path)
     component = _COMPONENT_CACHE.get(key)
     if component is None:
@@ -209,6 +251,18 @@ class Sandbox:
         try:
             self._instance = linker.instantiate(self._store, self._component)
         except Exception as e:  # wasmtime raises on an unsatisfied import
+            # An unsatisfied import is the interesting failure and the one this
+            # tier is built to produce, but it is not the only way instantiation
+            # can fail — exhausting the host's address space lands here too, and
+            # reporting that as an ungranted capability sends the reader hunting
+            # for a security bug that is not there. Name the resource failure as
+            # what it is; everything else is the capability case.
+            if _is_resource_exhaustion(e):
+                raise SandboxError(
+                    f"{component_name!r} could not be instantiated — the host could not "
+                    f"allocate memory for the guest, which is a resource failure and not "
+                    f"a capability one: {e}"
+                ) from e
             raise SandboxError(
                 f"{component_name!r} could not be instantiated — it imports a capability "
                 f"it was not granted: {e}"

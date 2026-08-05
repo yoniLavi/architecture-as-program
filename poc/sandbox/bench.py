@@ -35,7 +35,7 @@ from time import perf_counter
 
 from ..handles import ReadDBHandle
 from ..values import ConversationContext, Intent, RawMessage, Untrusted
-from .host import Sandbox, available, record, wasm_path
+from .host import Sandbox, available, engine_config, record, wasm_path
 from .interfaces import INFERENCE_LLM, KB_READ, TOOL_LLM
 from .nodes import _from_intent
 
@@ -151,8 +151,9 @@ def measure(*, repeats: int = 500) -> BenchResult:
     )
 
     # Compilation: cold parse + JIT of the component, on its own engine so the
-    # shared component cache is untouched. One-time, not a per-invocation cost.
-    engine = wasmtime.Engine()
+    # shared component cache is untouched — but configured exactly as the runtime's
+    # engine is, or the benchmark would report a tier nobody runs.
+    engine = wasmtime.Engine(engine_config())
     path = str(wasm_path("node_parse_message"))
     compilation_ms = _time(lambda: Component.from_file(engine, path), max(repeats // 20, 5))
 

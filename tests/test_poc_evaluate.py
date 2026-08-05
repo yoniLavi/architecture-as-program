@@ -189,6 +189,11 @@ def test_main_writes_both_artifacts(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(evaluate, "TRACE_HOST_PATH", tmp_path / "trace-injection-host.json")
     monkeypatch.setattr(evaluate, "TRACE_CONFINED_PATH", tmp_path / "trace-injection-confined.json")
     monkeypatch.setattr(evaluate, "REPO_ROOT", tmp_path)
+    # What is under test is that `main` writes both artifacts, not how fast this
+    # machine happens to be. Stubbing the measurement keeps a loaded machine from
+    # failing a test about file output — the band that would refuse the real figure
+    # is exercised deliberately in its own test below.
+    monkeypatch.setattr(evaluate, "measure", lambda: _bench(0.023))
 
     assert evaluate.main() == 0
     assert "Demonstrator evaluation" in out.read_text()
@@ -322,6 +327,7 @@ def test_main_writes_the_injection_traces(tmp_path, monkeypatch):
     monkeypatch.setattr(evaluate, "TRACE_HOST_PATH", host)
     monkeypatch.setattr(evaluate, "TRACE_CONFINED_PATH", confined)
     monkeypatch.setattr(evaluate, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(evaluate, "measure", lambda: _bench(0.023))
 
     assert evaluate.main() == 0
     for path in (host, confined):
@@ -384,6 +390,24 @@ def test_a_sustained_excursion_is_reported_after_the_attempts_run_out(monkeypatc
     _, problems = evaluate.measure_within_band()
     assert len(calls) == evaluate.CROSSING_ATTEMPTS
     assert problems and "above the pinned band" in problems[0]
+
+
+@sandboxed
+def test_main_refuses_to_write_an_artifact_with_a_contaminated_figure(
+    tmp_path, monkeypatch, capsys
+):
+    """The band guards the artifact, not every caller of `run()`. A test does not
+    publish a figure; the artifact the paper typesets from does."""
+    from poc import evaluate
+
+    out = tmp_path / "evaluation.md"
+    monkeypatch.setattr(evaluate, "ARTIFACT_PATH", out)
+    monkeypatch.setattr(evaluate, "DATA_PATH", tmp_path / "evaluation.json")
+    monkeypatch.setattr(evaluate, "measure", lambda: _bench(0.3431))
+
+    assert evaluate.main() == 1
+    assert not out.exists(), "a contaminated measurement must not reach the artifact"
+    assert "outside its pinned band" in capsys.readouterr().err
 
 
 def test_every_measurement_the_band_admits_names_the_same_magnitude():
