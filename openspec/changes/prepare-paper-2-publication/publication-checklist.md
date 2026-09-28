@@ -93,6 +93,7 @@ copy on Zenodo in bibliography formatting only**:
 - the ASIAN 2003 entry renders with its editors, after the post-freeze bib fix
 
 The causes are the Typst upgrade (0.14 → 0.15) and that shared-bib fix. No body text
-differs. The Zenodo PDF is the record, and nothing here changes it. Whether to pin
-Paper 1's build toolchain, so that a rebuild reproduces the record, is a decision
-for the author.
+differs. **Resolved the same day by `mark-published-papers`**, at the author's request.
+Paper 1 is now marked published and served from its stored artifacts, starting with
+the Zenodo PDF byte-for-byte, and is never rebuilt, so this drift cannot reach
+readers.
