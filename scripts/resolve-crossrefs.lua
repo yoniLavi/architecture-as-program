@@ -72,6 +72,7 @@ function Pandoc(doc)
 
   -- Pass 2: transform blocks
   local numbering_enabled = true
+  local keep_centred_notes = doc.meta["keep-centred-notes"] ~= nil
   local new_blocks = pandoc.List()
 
   -- Helper: replace cross-references in an inline list using label_map
@@ -172,6 +173,12 @@ function Pandoc(doc)
             if #lines > 0 then
               new_blocks:insert(pandoc.Para({pandoc.Strong(lines)}))
             end
+          elseif child.t == "Para" and keep_centred_notes then
+            -- A centred prose note (the living papers' corpus and process notes).
+            -- Pandoc 3.11 parses these as a Div rather than a Span, and dropping
+            -- them silently is how they went missing from the markdown and HTML.
+            -- Opt-in via metadata so the frozen Paper 1's outputs do not move.
+            new_blocks:insert(pandoc.Para({pandoc.Strong(child.content)}))
           end
         end
         goto continue

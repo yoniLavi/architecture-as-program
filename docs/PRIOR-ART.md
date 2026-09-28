@@ -254,7 +254,8 @@ strategies, run at test time rather than on the execution path.
 - **Wassette** (Microsoft, not Bytecode Alliance) runs WASM components as MCP
   tools with deny-by-default permissions granted interactively — but **decoupled
   from the WIT interface**. A precise contrast: same ingredients, not connected
-  the way we connect them.
+  the way we connect them. *(Source-verified September 2026 — see the debts
+  list below; now cited in §6.6.)*
 - **MCP**'s authorization is OAuth-style session consent; tool schemas describe
   *shape*, not authority. Closer to ambient authority behind one UI gate than to
   a per-node typed handle.
@@ -302,12 +303,82 @@ strategies, run at test time rather than on the execution path.
 
 ---
 
+## Survey, September 2026 — before Paper 2's DOI
+
+A re-survey on 28 September 2026, run to check whether the narrowed novelty claim
+(§2 above) survived eight weeks of other people's work. **It survives, in its
+narrow form, and the narrow form is now doing all the work.** Every item below was
+checked against a primary source before it reached a paper; two of the survey
+agent's summaries were wrong in ways the primary source corrected, noted inline.
+
+### 12. CAmkES / capDL — the precedent the July survey missed, and it is stronger
+
+seL4's CAmkES compiles a component architecture description into a capDL
+capability distribution, and a *generated proof* shows the distribution has
+exactly the inter-component authority the description declares (Klein et al.,
+CACM 2018, Theorem 4; details in Fernandez's 2016 thesis, ch. 7). The initialiser
+is proved at model level, not implementation level. This falsified Paper 2's
+opening sentence ("architecture models describe … they do not constrain") as a
+universal, and it is a *proof* where we offer a test.
+
+**Taken:** the abstract and conclusion now scope the claim to models in mainstream
+use; §6.2 cites CAmkES and concedes it is stronger. The difference we can defend:
+CAmkES *generates* the authority-bearing artifact, whereas we *check* components
+compiled independently, which is the case agent-authored bodies create. This is
+also why the generation experiment (ROADMAP M3) matters more than it did: it is
+where derive-and-check does something generate-and-prove cannot.
+
+### 13. The gate half has independent convergence
+
+- **McCann, *Certified Purity for Cognitive Workflow Executors*** (arXiv:2605.01037
+  v3). Checks a WASM import section at runtime admission against **one global
+  host-function whitelist**, and binds the result with a signed certificate. It is
+  the same check on the same object, but the permitted set is not derived per
+  component from a model. Cited in §6.6. *(Verified in the full text: the abstract
+  alone describes a restricted compile target and does not mention the
+  import-section check.)*
+- **`5omeOtherGuy/phaseone` PR #270** (26 Sep 2026): CI extracts each component's
+  imports with `wasm-tools component wit` and compares them against a hand-written
+  manifest. This is our exact gate against a hand-authored source of truth.
+  **Not cited**, because it is an unreviewed PR in a small repository. It is recorded
+  here as the clearest signal that the derivation, not the gate, is what is new.
+- **ACT (Agent Component Tools)**: MCP tools as wasmtime components with a
+  manifest-declared capability ceiling intersected with operator grants at runtime.
+  Runtime, not build-time; nothing is derived. Not cited.
+
+### 14. Agent-security comparators added
+
+- **Language-Based Agent Control** (Zhou, D'Antoni, Polikarpova, arXiv:2605.12863).
+  TypeGuard, in Haskell: agent programs must type-check against scaffolding; a
+  hidden-constructor `Trusted` wrapper; runtime policies for access, provenance and
+  IFC. On AgentDojo it matches CaMeL's utility within confidence intervals. It is
+  the nearest relative of our discharge, and is cited in §6.1. *(Verified in the full
+  text: the abstract does not mention AgentDojo or CaMeL.)*
+- Recorded, not cited (each is low relevance to a *static, topology-level* claim):
+  CaMeLoT (arXiv:2609.18674, model-checks CaMeL plans against CTL taint policies);
+  SPA (arXiv:2608.27234, plan-first IFC with a dual lattice); IntentCap
+  (arXiv:2609.14631, task-scoped narrowing leases); PORTICO (arXiv:2606.22504,
+  epoch-bound revocable handles, relevant to §3.4 if revocation is revisited);
+  Type-Directed Privilege Separation (arXiv:2509.25926).
+
+---
+
 ## Open verification debts
 
-- **Wassette's permission mechanism** — the "decoupled from WIT" claim is
-  documentation-level. Verify against source before publishing it as a contrast.
-- **Filament's lattice arity** — abstract only; needs a full read before the
-  two-point-vs-graded decision is settled.
-- **AgenticOS** (arXiv:2606.21129) — real but unreviewed; at most a defensive
-  sentence.
+- ~~**Wassette's permission mechanism**~~ — **resolved, confirmed and sharpened**
+  (source, v0.7.1, September 2026). `crates/wassette/src/runtime_context.rs` builds
+  one linker for every component and adds WASI 0.2, wasi-http, and wasi-config to it;
+  access comes from a per-component policy file (`crates/policy`). So it is not only
+  decoupled from WIT: every component is *linked against all of WASI*, and
+  confinement is host-configured, which is exactly our earlier wasip1 contrast. We
+  found no comparison of imports against policy. Cited in §6.6.
+- ~~**Filament's lattice arity**~~ — **resolved, and it cuts the other way.**
+  arXiv:2604.14357 (Ching, Zhou, Zhang; v1 only): the lattice is **user-defined**,
+  with labels as types ordered by a `FlowsTo` trait and a four-point diamond as the
+  running example. It is evidence for an open lattice, not for two points, and is
+  now cited as such in Paper 3's lattice agenda item, beside the shipped taint
+  systems of §8 above.
+- **AgenticOS** (arXiv:2606.21129) — checked again September 2026: still v1 only,
+  with no journal reference or venue, so it remains an unrefereed preprint and is
+  at most a defensive sentence. Not cited.
 - **Foundry's two-altitude lineage** — marketing-level sourcing only.

@@ -201,6 +201,7 @@ $(P2_PUB_PDF): $(P2_OUT)/proposal.pdf
 
 $(P2_OUT)/proposal.md: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json $(UI_FIGS) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P2_OUT)
 	pandoc $(P2_DIR)/proposal.typ -f typst -t markdown --wrap=none \
+		-M keep-centred-notes=true \
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		-o $@
@@ -211,6 +212,7 @@ $(P2_OUT)/proposal.md: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAP
 # paths to bare graphs/… and diagrams/… relative to the HTML).
 $(P2_OUT)/proposal.html: $(P2_DIR)/proposal.typ citations.bib $(GRAPHS_TXT) $(GRAPHS_SVG) $(DIAGRAMS_SVG) $(DIST)/evaluation.json $(UI_FIGS) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css scripts/clean-html.py | $(P2_OUT)
 	pandoc $(P2_DIR)/proposal.typ -f typst -t html --standalone --wrap=none \
+		-M keep-centred-notes=true \
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		--css=proposal.css \
@@ -234,6 +236,7 @@ $(P3_PUB_PDF): $(P3_OUT)/proposal.pdf
 
 $(P3_OUT)/proposal.md: $(P3_DIR)/proposal.typ citations.bib scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P3_OUT)
 	pandoc $(P3_DIR)/proposal.typ -f typst -t markdown --wrap=none \
+		-M keep-centred-notes=true \
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		-o $@
@@ -241,6 +244,7 @@ $(P3_OUT)/proposal.md: $(P3_DIR)/proposal.typ citations.bib scripts/resolve-cros
 
 $(P3_OUT)/proposal.html: $(P3_DIR)/proposal.typ citations.bib scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css scripts/clean-html.py | $(P3_OUT)
 	pandoc $(P3_DIR)/proposal.typ -f typst -t html --standalone --wrap=none \
+		-M keep-centred-notes=true \
 		--lua-filter=scripts/resolve-crossrefs.lua \
 		--citeproc --bibliography=citations.bib --csl=scripts/ieee.csl \
 		--css=proposal.css \

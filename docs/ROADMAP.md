@@ -1,28 +1,32 @@
 # Roadmap: from demonstrator to a useful toy
 
-## Start here: state as of 1 August 2026
+## Start here: state as of 28 September 2026
 
-**No active OpenSpec changes.** Everything proposed in July 2026 is implemented, tested and
-archived: the paper split, the scoped capability lifetime, the two-layer trace, principal binding,
-and the contract language — and the first August change, `add-io-capability-kinds`, landed on
-1 August (see item 3 below). `make build` is green, the suite is 307 tests + 21 subtests, and the
-mutation corpus stands at four cases, each pinned to the analysis meant to catch it.
-
-The papers have **not been read end-to-end since the survey landed**, which is the one caveat on
-everything below — the author is reading them separately. Expect that read to produce corrections,
-and prefer them over anything here if the two disagree.
+**One active OpenSpec change: `prepare-paper-2-publication`**, implemented and awaiting the
+author's Zenodo upload (planned 29 September). After a two-month gap, a whole-project review
+found Paper 2 substantively ready and fixed what should not ship under a DOI. It scoped the
+"architecture models do not constrain" claim against seL4's CAmkES (a proved precedent the July
+survey missed), moved the abstract off a per-run figure, added a real over-granting binary as a
+pinned negative control on the derivation gate, and added three related-work comparators. It
+also resolved every verification debt. `make build` is green at 340 tests + 21 subtests.
+`docs/PRIOR-ART.md` §12–§14 has the September survey.
 
 **Next, in order of value:**
 
-1. **Publish Paper 2 to Zenodo.** Metadata is drafted at
-   `openspec/changes/archive/2026-08-01-split-demonstrator-paper/zenodo-metadata.md`. Paper 2 takes a
-   DOI first because Paper 3 cites it — do not publish in the reverse order. Publishing is
-   outward-facing and needs an explicit go from the author every time, not once.
-2. **Clear the verification debts** in `docs/PRIOR-ART.md`. The Filament one matters most: only its
-   abstract was read, and its lattice arity bears directly on the open two-point-vs-graded decision.
-   Wassette's permission mechanism needs checking against source before the contrast in §6 is
-   published as fact, and AgenticOS's review status is unconfirmed.
-3. **M1 below** — the walking skeleton. Its first piece, `add-io-capability-kinds` (clock,
+1. **Publish Paper 2 to Zenodo**, following
+   `openspec/changes/prepare-paper-2-publication/publication-checklist.md`. Paper 2 takes a DOI first
+   because Paper 3 cites it, so do not publish in the reverse order. Publishing is outward-facing and
+   needs an explicit go from the author every time, not once. Then stamp the DOI (a follow-up
+   commit) and archive the change.
+2. **Publish Paper 3**, once its `lavi_confinement_2026` citation carries Paper 2's DOI.
+3. **Recommended, not yet decided: pilot M3's generation experiment before the rest of M1.** The six
+   ported nodes already have signatures, WIT interfaces, contracts and the import gate, so a small
+   run of agent-written bodies against them needs none of the toy's plumbing. It answers the
+   roadmap's named risk early (whether the gate ever fires on generated code) before a 20-node
+   service is built around the answer. It is also where this work differs most from CAmkES, which
+   generates the authority-bearing artifact rather than checking one written elsewhere. The toy
+   stays Paper 4's vehicle either way.
+4. **M1 below** — the walking skeleton. Its first piece, `add-io-capability-kinds` (clock,
    allowlisted outbound HTTP, notification), is **implemented** (1 Aug 2026): the derivation now
    covers seven kinds / eight typed interfaces with no special case, `Clock` is granted as upstream
    `wasi:clocks/wall-clock` directly (the author-approved resolution of the recorded decision — the
