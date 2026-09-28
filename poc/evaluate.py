@@ -35,7 +35,7 @@ import os
 import platform
 import socket
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .demo import ADVERSARIAL, SANDBOXED_NODES, STORES
@@ -738,6 +738,74 @@ class Derivation:
         return sorted(set(self.derived) - set(self.actual))
 
 
+@dataclass(frozen=True)
+class NegativeControl:
+    """A real binary the derivation must *reject*, and the interface it must reject it for.
+
+    Every row of `DERIVED_NODES` agrees, necessarily, because `run()` refuses to write
+    an artifact otherwise. That leaves the table unable to distinguish a gate that works
+    from one that cannot fail — the reverse of the corpus's argument that a validator
+    rejecting everything would be worthless. The fixture in the test suite shows the
+    failing direction on an import list typed by hand; a control shows it on a binary a
+    toolchain actually built, through the same code path as the rows it sits beside.
+
+    Pinned like a corpus case: to the fact of rejection *and* to what it is rejected
+    for. A control caught for some other interface has stopped testing what it names.
+    """
+
+    graph: str
+    node: str
+    component: str
+    over_granted: tuple[str, ...]
+
+
+# `hostile_ungranted` has `ParseMessage`'s signature — it consumes a raw message and
+# produces a customer query — and its world imports `kb-read` beside the inference
+# client that node is granted. It is the over-grant the paper's central claim is about,
+# compiled rather than described.
+NEGATIVE_CONTROLS: tuple[NegativeControl, ...] = (
+    NegativeControl(
+        graph="customer-support",
+        node="ParseMessage",
+        component="hostile_ungranted",
+        over_granted=("aap:caps/kb-read@0.1.0",),
+    ),
+)
+
+
+def derive_controls(
+    controls: tuple[NegativeControl, ...] = NEGATIVE_CONTROLS,
+) -> list[Derivation]:
+    """Hold each control's binary to its node's `with` clause, as the agreeing rows are."""
+    return derive_and_compare(tuple((c.graph, c.node, c.component) for c in controls))
+
+
+def check_controls(
+    derivations: list[Derivation],
+    controls: tuple[NegativeControl, ...] = NEGATIVE_CONTROLS,
+) -> list[str]:
+    """Each control must be caught, for exactly its pinned interfaces and nothing else."""
+    problems: list[str] = []
+    if not controls:
+        problems.append(
+            "no negative control — the derivation would be shown only agreeing, which a "
+            "gate that cannot fail also does"
+        )
+    for control, d in zip(controls, derivations, strict=True):
+        if d.agrees:
+            problems.append(
+                f"negative control {control.component} agrees with {control.node}'s `with` "
+                f"clause — the gate did not catch an over-granting binary"
+            )
+        elif tuple(d.over_granted) != control.over_granted or d.missing:
+            problems.append(
+                f"negative control {control.component} was caught for "
+                f"over-granting {d.over_granted} and missing {d.missing}, "
+                f"not for over-granting {list(control.over_granted)} as pinned"
+            )
+    return problems
+
+
 def _derivation_graph(name: str) -> dict:
     """The graph a derivation row reads its `with` clause from."""
     unshipped = UNSHIPPED_GRAPHS.get(name)
@@ -858,6 +926,7 @@ def render(
     injection: InjectionResult,
     escapes: list[Escape],
     derivations: list[Derivation],
+    controls: list[Derivation] | None = None,
 ) -> str:
     lines: list[str] = []
     lines.append("# Demonstrator evaluation")
@@ -1124,6 +1193,21 @@ def render(
     for d in derivations:
         lines.append(f"- **{d.node}** (`{d.component}`) — {', '.join(f'`{i}`' for i in d.granted)}")
     lines.append("")
+    if controls:
+        lines.append(
+            "**Negative control.** Every row above agrees, because the build refuses to "
+            "emit this artifact otherwise — so the table alone cannot distinguish a gate "
+            "that works from one that cannot fail. Each control below is a real, built "
+            "component held to a node's `with` clause through the same code path, and "
+            "pinned to be caught for exactly the interface named:"
+        )
+        lines.append("")
+        for d in controls:
+            lines.append(
+                f"- `{d.component}` against **{d.node}**'s `with` clause — caught, "
+                f"over-granting {', '.join(f'`{i}`' for i in d.over_granted)}"
+            )
+        lines.append("")
     lines.append(
         f"**Scope.** The comparison has been exercised on {len(covered)} of the "
         f"{len(CAPABILITY_KINDS)} capability kinds this tier models "
@@ -1161,6 +1245,7 @@ class Evaluation:
     injection_host: InjectionResult  # the host-tier run, for the paired canonical trace
     escapes: list[Escape]
     derivations: list[Derivation]  # the lead claim: `with` clause vs built binary
+    controls: list[Derivation] = field(default_factory=list)  # real binaries it must reject
 
 
 def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
@@ -1200,6 +1285,16 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
             "poc/sandbox/interfaces.py, or the built component is wrong."
         )
 
+    controls = derive_controls()
+    control_problems = check_controls(controls)
+    if control_problems:
+        raise EvaluationError(
+            "the derivation's negative control diverged from its pin:\n  "
+            + "\n  ".join(control_problems)
+            + "\n\nThe artifact was not written. A gate that stops rejecting a known "
+            "over-granting binary is no longer evidence for the paper's central claim."
+        )
+
     injection_confined = run_injection(set(SANDBOXED_NODES))
     injection_host = run_injection(set())
     trace_problems = check_traces(injection_host, injection_confined)
@@ -1220,13 +1315,14 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
         injection_host=injection_host,
         escapes=probe_escapes(),
         derivations=derivations,
+        controls=controls,
     )
 
 
 def generate(corpus: tuple[Case, ...] = CORPUS) -> str:
     """Run the whole evaluation and render the human-readable artifact."""
     ev = run(corpus)
-    return render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations)
+    return render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations, ev.controls)
 
 
 def serialise(ev: Evaluation) -> str:
@@ -1370,6 +1466,18 @@ def serialise(ev: Evaluation) -> str:
             "kinds_covered_shipped_count": len(_kinds_shipped),
             "kinds_unexercised": _unexercised,
             "shipped_total": sum(1 for d in ev.derivations if d.shipped),
+            # Real binaries the gate must reject, reported apart from the rows above so
+            # `agreeing`/`total` keep meaning "ported nodes whose binary matches".
+            "controls": [
+                {
+                    "node": d.node,
+                    "component": d.component,
+                    "over_granted": d.over_granted,
+                    "caught": not d.agrees,
+                }
+                for d in ev.controls
+            ],
+            "controls_caught": sum(1 for d in ev.controls if not d.agrees),
         },
         # Structural counts of the canonical graphs. Small, stable, and stated in
         # several places across the corpus — which is exactly why they are derived
@@ -1463,7 +1571,7 @@ def main() -> int:
         )
         return 1
 
-    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations)
+    artifact = render(ev.outcomes, ev.bench, ev.injection, ev.escapes, ev.derivations, ev.controls)
     data = serialise(ev)
 
     # The canonical injection traces, timing excluded so structure is byte-stable

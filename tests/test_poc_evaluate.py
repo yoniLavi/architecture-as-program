@@ -29,6 +29,7 @@ from poc.evaluate import (
     CROSSING_BAND_MAX_MS,
     CROSSING_BAND_MIN_MS,
     DERIVED_NODES,
+    NEGATIVE_CONTROLS,
     REASON_EDGE_TYPE,
     REASON_TRUST_LATTICE,
     REJECTED,
@@ -36,10 +37,12 @@ from poc.evaluate import (
     EvaluationError,
     _magnitude,
     check,
+    check_controls,
     check_derivations,
     check_overhead,
     check_traces,
     derive_and_compare,
+    derive_controls,
     generate,
     kinds_covered,
     main,
@@ -550,6 +553,60 @@ def test_the_data_carries_the_derivation_figures():
     generate_row = next(n for n in payload["nodes"] if n["node"] == "GenerateResponse")
     assert generate_row["granted_count"] == 2
     assert "aap:caps/tool-llm@0.1.0" in generate_row["granted"]
+
+
+@sandboxed
+def test_the_gate_rejects_a_real_over_granting_binary():
+    """Scenario: the negative control is caught.
+
+    The fixture above shows the failing direction on an import list typed by hand.
+    This shows it on a binary the toolchain built: `hostile_ungranted` carries
+    `ParseMessage`'s signature and imports `kb-read` beside the inference client."""
+    [control] = derive_controls()
+    assert not control.agrees
+    assert control.over_granted == list(NEGATIVE_CONTROLS[0].over_granted)
+    assert check_controls([control]) == []
+
+
+def test_a_negative_control_that_agrees_fails_the_pin():
+    """Scenario: a negative control that stops being caught fails the build."""
+    agreeing = Derivation(
+        graph="customer-support",
+        node="ParseMessage",
+        component="hostile_ungranted",
+        derived=["aap:caps/inference-llm@0.1.0"],
+        actual=["aap:caps/inference-llm@0.1.0"],
+        kinds=["LLMClient"],
+    )
+    problems = check_controls([agreeing])
+    assert problems and "did not catch" in problems[0]
+
+
+def test_a_negative_control_caught_for_the_wrong_interface_fails_the_pin():
+    """Caught, but not for what the control names — it has stopped testing that."""
+    elsewhere = Derivation(
+        graph="customer-support",
+        node="ParseMessage",
+        component="hostile_ungranted",
+        derived=["aap:caps/inference-llm@0.1.0"],
+        actual=["aap:caps/inference-llm@0.1.0", "aap:caps/tool-llm@0.1.0"],
+        kinds=["LLMClient"],
+    )
+    problems = check_controls([elsewhere])
+    assert problems and "as pinned" in problems[0]
+
+
+def test_no_negative_control_fails_rather_than_passing_silently():
+    assert check_controls([], controls=())
+
+
+@sandboxed
+def test_the_data_carries_the_negative_control():
+    payload = json.loads(serialise(run()))["derivation"]
+    assert payload["controls_caught"] == len(NEGATIVE_CONTROLS) == len(payload["controls"])
+    assert payload["controls"][0]["over_granted"] == ["aap:caps/kb-read@0.1.0"]
+    # Reported apart from the rows, so the agreement count keeps its meaning.
+    assert payload["agreeing"] == payload["total"] == len(DERIVED_NODES)
 
 
 def test_main_is_importable_without_running():
