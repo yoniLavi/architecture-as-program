@@ -21,28 +21,26 @@ DIAGRAMS_SVG := $(patsubst diagrams/%.typ,$(DIST)/diagrams/%.svg,$(DIAGRAMS_SRC)
 # ── Paper corpus ─────────────────────────────────────────────────────
 # Documents live under papers/<id>/; outputs under dist/papers/<id>/.
 #
-# Paper 1 (frozen) is self-contained: it carries its own pinned graph
-# JSONs and diagram source and builds *only* from them, so it can never
-# drift as the shared artifact evolves. Its frozen proposal.typ references
-# figures with relative `dist/...` paths (it is byte-identical to the
-# freeze commit and must not be edited); the committed symlink
-# papers/01-vision/dist -> ../../dist/papers/01-vision makes those paths
-# resolve to its own output tree, for both typst (file-relative) and
-# pandoc (cwd-relative).
+# Paper 1 is frozen *and published* (papers/01-vision/PUBLISHED.json), so it
+# is not built at all: the build serves the files stored under
+# papers/01-vision/published/ — the Zenodo PDF byte-for-byte, plus web copies
+# and figures rendered once and frozen — and check-freeze holds them to the
+# checksums in the marker. Rebuilding it would route the published paper
+# through shared inputs (filter, CSL, bibliography, typst and pandoc versions)
+# that move with the living papers; it did, until September 2026. Its frozen
+# sources stay in the tree as the provenance of the record, guarded as before.
 P1_DIR := papers/01-vision
 P1_OUT := $(DIST)/papers/01-vision
-P1_GRAPHS_SRC := $(filter-out $(P1_DIR)/graphs/schema.json,$(wildcard $(P1_DIR)/graphs/*.json))
-P1_GRAPH_TXT  := $(patsubst $(P1_DIR)/graphs/%.json,$(P1_OUT)/graphs/%.graph,$(P1_GRAPHS_SRC))
-P1_GRAPH_SVG  := $(patsubst $(P1_DIR)/graphs/%.json,$(P1_OUT)/graphs/%.svg,$(P1_GRAPHS_SRC))
-P1_DIAG_SVG   := $(patsubst $(P1_DIR)/diagrams/%.typ,$(P1_OUT)/diagrams/%.svg,$(wildcard $(P1_DIR)/diagrams/*.typ))
+P1_STORE := $(P1_DIR)/published
+P1_SERVED := $(patsubst $(P1_STORE)/%,$(P1_OUT)/%,$(shell find $(P1_STORE) -type f))
 P1_DOCS := $(P1_OUT)/proposal.pdf $(P1_OUT)/proposal.md $(P1_OUT)/proposal.html
 
 # Publication-named PDF alias. Convention: each paper's PDF is also emitted as
 # a citable, self-identifying copy named lavi-<year>-<slug>.pdf — the file to
 # upload to venues. Internal build names stay proposal.*. The year is finalised
-# at publication (Paper 1: 2026, Zenodo, doi:10.5281/zenodo.21473361; Paper 2:
+# at publication (Paper 1: 2026, Zenodo, doi:10.5281/zenodo.21473361 — now
+# served from papers/01-vision/published/ rather than built; Paper 2:
 # provisional until published — rename if the year slips).
-P1_PUB_PDF := $(P1_OUT)/lavi-2026-architecture-as-program.pdf
 
 # Paper 2 (living) builds from the shared top-level artifact.
 P2_DIR := papers/02-demonstrator
@@ -83,7 +81,7 @@ build: validate-graphs check-freeze check-hedges grammar evaluation paper1 paper
 
 grammar: $(DIST)/grammar.md
 evaluation: $(DIST)/evaluation.md $(DIST)/evaluation.json
-paper1: $(P1_DOCS) $(P1_PUB_PDF)
+paper1: $(P1_SERVED) $(P1_DOCS)
 paper2: $(P2_DOCS) $(P2_PUB_PDF)
 paper3: $(P3_DOCS) $(P3_PUB_PDF)
 aliases: $(ALIASES)
@@ -153,41 +151,15 @@ $(DIST)/graphs/%.svg: $(DIST)/graphs/%.typ
 $(DIST)/diagrams/%.svg: diagrams/%.typ | $(DIST)/diagrams
 	typst compile $< $@ --format svg --root $(ROOT)
 
-# ── Paper 1 (frozen): figures from its own pinned inputs ────────────
-$(P1_OUT)/graphs/%.graph $(P1_OUT)/graphs/%.typ: $(P1_DIR)/graphs/%.json scripts/generate-graph.py | $(P1_OUT)/graphs
-	$(PY) scripts/generate-graph.py $< $(P1_OUT)/graphs
-
-$(P1_OUT)/graphs/%.svg: $(P1_OUT)/graphs/%.typ
-	typst compile $< $@ --format svg --root $(ROOT)
-
-$(P1_OUT)/diagrams/%.svg: $(P1_DIR)/diagrams/%.typ | $(P1_OUT)/diagrams
-	typst compile $< $@ --format svg --root $(ROOT)
-
-# Paper 1 documents. typst reads figures through the papers/01-vision/dist
-# symlink; --root keeps that (real) path inside the project root.
-$(P1_OUT)/proposal.pdf: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) | $(P1_OUT)
-	typst compile $(P1_DIR)/proposal.typ $@ --root $(ROOT) --pdf-standard a-2b
-
-$(P1_PUB_PDF): $(P1_OUT)/proposal.pdf
+# ── Paper 1 (frozen, published): served, never rebuilt ──────────────
+# Copies only. No typst, pandoc, filter, CSL, or bibliography touches it.
+$(P1_SERVED): $(P1_OUT)/%: $(P1_STORE)/%
+	@mkdir -p $(@D)
 	cp $< $@
 
-# pandoc for Paper 1 runs from the paper directory so its relative `dist/...`
-# figure paths resolve through the symlink; project files are reached via ../../.
-$(P1_OUT)/proposal.md: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/clean-markdown.py | $(P1_OUT)
-	cd $(P1_DIR) && pandoc proposal.typ -f typst -t markdown --wrap=none \
-		--lua-filter=$(ROOT)/scripts/resolve-crossrefs.lua \
-		--citeproc --bibliography=$(ROOT)/citations.bib --csl=$(ROOT)/scripts/ieee.csl \
-		-o $@
-	$(PY) scripts/clean-markdown.py $@
-
-$(P1_OUT)/proposal.html: $(P1_DIR)/proposal.typ citations.bib $(P1_GRAPH_TXT) $(P1_GRAPH_SVG) $(P1_DIAG_SVG) scripts/resolve-crossrefs.lua scripts/ieee.csl scripts/proposal.css scripts/clean-html.py | $(P1_OUT)
-	cd $(P1_DIR) && pandoc proposal.typ -f typst -t html --standalone --wrap=none \
-		--lua-filter=$(ROOT)/scripts/resolve-crossrefs.lua \
-		--citeproc --bibliography=$(ROOT)/citations.bib --csl=$(ROOT)/scripts/ieee.csl \
-		--css=proposal.css \
-		-o $@
-	$(PY) scripts/clean-html.py $@
-	cp scripts/proposal.css $(P1_OUT)/
+# The internal name, kept so existing links resolve: the same published bytes.
+$(P1_OUT)/proposal.pdf: $(P1_STORE)/lavi-2026-architecture-as-program.pdf | $(P1_OUT)
+	cp $< $@
 
 # ── Paper 2 (living): figures from the shared artifact ──────────────
 $(DIST)/ui/%.png: ui/screenshots/%.png | $(DIST)/ui

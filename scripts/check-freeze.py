@@ -26,8 +26,20 @@ If the freeze commit is unavailable (e.g. a shallow CI checkout with no history)
 the check prints a warning and passes, rather than failing a build that simply
 cannot see the reference. The pre-commit hook, which runs against a full clone,
 is the effective guard.
+
+Freezing the *sources* is not enough once a paper is published. Its PDF,
+Markdown, HTML and figures were regenerated on every build through shared inputs
+this check never saw (the Lua filter, the CSL, the shared bibliography, the
+typst and pandoc versions). So a published paper carries a PUBLISHED.json
+marker, and the build serves the files under its published/ directory instead of
+regenerating them. The second check here holds those files to the marker: each
+must exist and match its SHA-256, no unlisted file may sit beside them, and the
+PDF must still have the MD5 the publication record states for it. That check
+needs no git history, so it runs in a shallow checkout too.
 """
 
+import hashlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -61,8 +73,61 @@ def git_show(ref_path: str) -> bytes | None:
     return result.stdout if result.returncode == 0 else None
 
 
+# Frozen papers that have been published, and so are served from their stored
+# artifacts rather than rebuilt.
+PUBLISHED_PAPERS = ["papers/01-vision"]
+
+
+def published_problems(paper_dir: Path) -> list[str]:
+    """Hold a published paper's stored artifacts to its PUBLISHED.json marker."""
+    marker_path = paper_dir / "PUBLISHED.json"
+    if not marker_path.exists():
+        return [f"{marker_path}: missing — a published paper must carry its marker"]
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    artifacts: dict[str, str] = marker.get("artifacts", {})
+    store = paper_dir / "published"
+    problems: list[str] = []
+    if not artifacts:
+        problems.append(f"{marker_path}: lists no artifacts, so nothing would be guarded")
+    for rel, expected in sorted(artifacts.items()):
+        path = store / rel
+        if not path.is_file():
+            problems.append(f"{path}: missing")
+        elif hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            problems.append(f"{path}: differs from the SHA-256 recorded in {marker_path.name}")
+    if store.is_dir():
+        present = {p.relative_to(store).as_posix() for p in store.rglob("*") if p.is_file()}
+        for rel in sorted(present - set(artifacts)):
+            problems.append(f"{store / rel}: present but not listed in {marker_path.name}")
+    record = marker.get("record_file", {})
+    record_path = store / record.get("path", "")
+    if not record.get("path") or not record.get("md5"):
+        problems.append(f"{marker_path}: record_file must name the published file and its MD5")
+    elif (
+        record_path.is_file() and hashlib.md5(record_path.read_bytes()).hexdigest() != record["md5"]
+    ):
+        problems.append(
+            f"{record_path}: no longer the publication record's file "
+            f"(MD5 differs from {record['md5']})"
+        )
+    return problems
+
+
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
+
+    published = [p for paper in PUBLISHED_PAPERS for p in published_problems(root / paper)]
+    if published:
+        print("ERROR: a published paper's served artifacts have drifted:", file=sys.stderr)
+        for p in published:
+            print(f"  {p}", file=sys.stderr)
+        print(
+            "\nA published paper is served exactly as published. Its artifacts change only\n"
+            "by a deliberate, author-approved act recorded in its ERRATA.md, with the\n"
+            "checksums in PUBLISHED.json updated in the same commit.",
+            file=sys.stderr,
+        )
+        return 1
 
     # Probe once: if the freeze commit itself is not present, skip gracefully.
     probe = subprocess.run(

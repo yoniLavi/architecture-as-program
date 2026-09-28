@@ -178,7 +178,9 @@ function Pandoc(doc)
             -- Pandoc 3.11 parses these as a Div rather than a Span, and dropping
             -- them silently is how they went missing from the markdown and HTML.
             -- Opt-in via metadata so the frozen Paper 1's outputs do not move.
-            new_blocks:insert(pandoc.Para({pandoc.Strong(child.content)}))
+            -- Passed through as written: wrapping it in Strong would bold the whole
+            -- note, which the PDF does not.
+            new_blocks:insert(child)
           end
         end
         goto continue

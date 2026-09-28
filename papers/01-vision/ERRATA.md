@@ -48,3 +48,22 @@ see Paper 2 (`papers/02-demonstrator/`) and the change history under
 ## Corrections
 
 _None recorded yet._
+
+## Served copies
+
+**28 September 2026 — served from the published artifacts; web copies restored and
+frozen.** Not a correction to the paper, whose text is unchanged. Until this date
+every build regenerated the paper's PDF, Markdown, HTML and figures from the frozen
+sources, through shared tooling that kept moving.
+- A rebuilt PDF had drifted from the Zenodo record in bibliography formatting only.
+- pandoc 3.11 had begun dropping the *Note on process* (the paper's AI-attribution
+  paragraph, which the published PDF carries) from the Markdown and HTML web copies.
+
+From this date the paper is marked published (`PUBLISHED.json`) and is **served, not
+built**:
+- the PDF is the Zenodo record's file byte-for-byte;
+- the web copies and figure SVGs were rendered once more, with the *Note on process*
+  restored and no other change, and are frozen.
+
+`scripts/check-freeze.py` fails the build if any served file drifts from its
+recorded checksum.

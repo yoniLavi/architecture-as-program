@@ -43,12 +43,27 @@ only by **dated errata** (`01-vision/ERRATA.md`), never by silent rewriting;
 `scripts/check-freeze.py` fails the build if its sources drift from the freeze
 commit.
 
+A frozen paper that has been **published** (Paper 1, since 21 July 2026) goes one
+step further. It carries a `PUBLISHED.json` marker, which records the DOI, the
+record, the date, the source commit, the record's MD5 of its file, and a SHA-256
+for every served file. From then on it is **served, not built**: `make` copies
+`01-vision/published/` into `dist/`, and no typst, pandoc, filter, CSL or
+bibliography change can reach it. The PDF is the Zenodo record's file
+byte-for-byte. The web copies and figures were rendered once and frozen.
+`check-freeze.py` fails the build if a served file is missing, altered, unlisted,
+or (for the PDF) no longer the record's file.
+
+A source freeze alone was not enough. The sources did not move, but the tooling
+that rendered them did, and a rebuilt Paper 1 had drifted from its published copy
+in September 2026 (see `01-vision/ERRATA.md`).
+
 ### A note on the two symlinks in `01-vision/`
 
 The frozen `proposal.typ` is byte-identical to the freeze commit and so cannot be
-edited to re-point its file references. Two committed symlinks make its original
-relative paths resolve correctly against the shared bibliography and its own
-figure tree:
+edited to re-point its file references. Since Paper 1 is served rather than built,
+these now matter only if the frozen source is ever rendered again deliberately. Two
+committed symlinks make its original relative paths resolve correctly against the
+shared bibliography and its own figure tree:
 
 - `01-vision/citations.bib → ../../citations.bib` — the shared bibliography.
 - `01-vision/dist → ../../dist/papers/01-vision` — its frozen figure outputs, so
