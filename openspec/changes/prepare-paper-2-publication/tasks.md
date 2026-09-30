@@ -51,3 +51,11 @@
       the Markdown and HTML. Now kept under an opt-in `keep-centred-notes` metadata flag that only
       Papers 2 and 3 set, so Paper 1's outputs are byte-identical to a build from the pre-change
       commit (checked for the Markdown, the HTML, and the PDF text)
+
+## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
+
+- [ ] 7.1 Author's end-to-end read of the merged paper, which also decides whether §5.2's
+      Correction 2 stays a correction building forced
+- [ ] 7.2 Upload per `publication-checklist.md`, with *Continues* as the only relation to
+      Paper 1
+- [ ] 7.3 `openspec archive prepare-paper-2-publication`

@@ -517,9 +517,9 @@ def test_mixed_tier_graph_runs_end_to_end_and_reports_tiers():
 
 
 def test_component_and_host_tiers_produce_the_same_outcome():
-    """Code as compiled artifact: the Rust/WASM node bodies and the Python ones satisfy
-    the same contracts, so the graph reaches the same terminal along the same path
-    regardless of which tier runs the two ported nodes."""
+    """Code as compiled artifact: with the Rust/WASM node bodies or the Python ones, the
+    graph reaches the same terminal along the same path regardless of which tier runs the
+    ported nodes. This test, not a checked contract, is what shows interchangeability."""
     from poc.demo import BENIGN
 
     host = _run(BENIGN, sandbox=())
@@ -551,7 +551,7 @@ def test_majority_of_the_customer_path_runs_confined():
     confined = _run(BENIGN, sandbox=_MOST_CONFINED)
     host = _run(BENIGN, sandbox=())
 
-    # Same terminal, same path, regardless of tier — the contracts are what match.
+    # Same terminal, same path, regardless of tier.
     assert confined.order == host.order
     assert isinstance(confined.terminals["SendReply"], DeliveryConfirmation)
     assert confined.terminals["SendReply"] == host.terminals["SendReply"]

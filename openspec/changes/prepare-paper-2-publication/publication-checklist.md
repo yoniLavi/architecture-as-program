@@ -9,7 +9,7 @@ avoids both.
 
 > **Amended 30 September 2026 by `merge-and-condense-papers`.** Paper 3 is merged into
 > Paper 2, and the steps below still govern the upload, with these changes:
-> - Step 2's DOI stamp is done (`58211c8`). Its `lavi_confinement_2026` bib step is moot,
+> - Steps 2.1–2.2 are done: the DOI is reserved and stamped (`58211c8`); only 2.3 remains. Its `lavi_confinement_2026` bib step is moot,
 >   because that entry was deleted: it was only Paper 3's citation of Paper 2.
 > - The title is unchanged. The **description** is the *new* abstract, which now also
 >   reports the accounting of Paper 1's predictions. Consider adding the keyword
@@ -18,7 +18,7 @@ avoids both.
 >   decision; *Reviews* was declined as a likely misreading).
 > - Step 4's "Paper 3 can now publish" no longer applies.
 > - **Before step 1:** the author's end-to-end read of the merged paper, carried over from
->   `merge-and-condense-papers` (archived 30 September after three review rounds; see its
+>   `merge-and-condense-papers` (archived 30 September after four review rounds; see its
 >   `tasks.md`). One decision from those rounds is left to that read: whether §5.2's
 >   "trust was one rule, not two" is still a correction *building forced*, given that the
 >   pre-freeze validator's separate rules already caught the laundering graph, or a

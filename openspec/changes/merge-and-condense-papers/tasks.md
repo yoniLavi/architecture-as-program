@@ -69,15 +69,23 @@ Words are prose only, measured on 30 September 2026 (target in brackets).
       §2's preamble, §5.1, §8 and the ROADMAP now say so. Stale section numbers in the UI, tests,
       ROADMAP and PRIOR-ART fixed. Left to the author: whether Correction 2 is still a
       correction building forced (see the publication checklist)
+- [x] 3.3c A fourth round. Must-fix, now of precision rather than history: "the freeze
+      commit" named both the pre-build commit and the guard's reference, which was re-pointed
+      to the published commit, so only version history fixes the pre-build text; and the
+      ported and generated bodies were said to be held to "a contract", but no canonical
+      node carries one (the generated body predates the contract language, and a
+      tier-equality test is what shows interchangeability). Also the conclusion's
+      sub-graph sentence regained its host-tier qualifier
 - [x] 3.5 `openspec validate merge-and-condense-papers --strict`
 
 ## 4. Handed off at archive (30 September 2026)
 
-This change was archived once the paper was written and three review rounds had run.
-Its open steps moved to `prepare-paper-2-publication`, which stays open until upload:
+This change was archived once the paper was written and four review rounds had run.
+Its open steps moved to `prepare-paper-2-publication` (its tasks 7.1–7.3), which stays open
+until upload:
 
-- 3.4, the author's end-to-end read: now the first item of that change's
-  `publication-checklist.md`
-- 4.1, the upload to the reserved DOI 10.5281/zenodo.23057135 with *Continues* as the only
-  relation to Paper 1: that checklist's steps
-- 4.2, archiving `prepare-paper-2-publication`: after the upload
+- formerly 3.4, the author's end-to-end read (task 7.1 there, and the first item of its
+  `publication-checklist.md`)
+- formerly 4.1, the upload to the reserved DOI 10.5281/zenodo.23057135 with *Continues* as
+  the only relation to Paper 1 (task 7.2)
+- formerly 4.2, archiving `prepare-paper-2-publication` after the upload (task 7.3)

@@ -28,7 +28,8 @@ published and served from its stored artifacts (`mark-published-papers`, archive
    already stamped in the title block. Publishing is outward-facing and needs an explicit go from
    the author every time.
 3. **Recommended, not yet decided: pilot M3's generation experiment before the rest of M1.** The six
-   ported nodes already have signatures, WIT interfaces, contracts and the import gate, so a small
+   ported nodes already have signatures, WIT interfaces, the import gate, and a contract language
+   to attach contracts with, so a small
    run of agent-written bodies against them needs none of the toy's plumbing. It answers the
    roadmap's named risk early (whether the gate ever fires on generated code) before a 20-node
    service is built around the answer. It is also where this work differs most from CAmkES, which
@@ -62,11 +63,11 @@ concrete: **what we build next, in what order, and what it would let a paper cla
 
 The demonstrator establishes that graph-level capability analysis and confinement are implementable. It does
 not establish that anyone can *build software this way*, and two of the thesis's load-bearing claims are
-entirely untested by it:
+untested by it at any useful scale:
 
 1. **"Code as compiled artifact."** Every node body in the demonstrator but one — Python and Rust alike — was
-   written in the ordinary directed loop; `ParseMessage` was generated once from its signature and contract
-   (prompts in `poc/generated/`), uncontrolled and unmeasured. The claim that AI agents generate node
+   written in the ordinary directed loop; `ParseMessage` was generated from its signature and a prose contract
+   (prompts in `poc/generated/`), uncontrolled and unmeasured, before the contract language existed. The claim that AI agents generate node
    implementations from signatures and contracts, and that those implementations are interchangeable, has
    no evidence behind it at any useful scale. The outcomes table says so:
    *Agent tooling for the graph workflow — Not attempted.*
@@ -160,7 +161,7 @@ design questions are still open.
 - **M2 — Fan-in and the digest.** The aggregation design and the trust-meet result. ~1 change, with a real
   `design.md`; timebox it — a restricted fold over a homogeneous list is enough, and a general combinator
   library is not the goal.
-- **M3 — Contracts and generated bodies.** The minimal contract language, then the generation harness and its
+- **M3 — Contracts and generated bodies.** Contracts attached in the graph (the language exists), then the generation harness and its
   three numbers. ~2 changes. *This is the paper.*
 - **M4 — Adversarial evaluation.** An injection corpus of hostile feed items, evaluated against the running
   service, positioned against AgentDojo's threat model and CaMeL's defence. ~1 change.
