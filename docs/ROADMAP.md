@@ -11,19 +11,19 @@ is written (`merge-and-condense-papers`): Paper 2 is now ~10,000 words with the 
 author's read, then the upload to the reserved DOI with *Continues* as the only relation to
 Paper 1.
 
-Two changes are open:
+One change is open:
 - **`prepare-paper-2-publication`** is implemented. It carries the CAmkES scoping, the magnitude
   in the abstract, the negative control, the new comparators, and the DOI stamp (`58211c8`). Its
   `publication-checklist.md` still governs the upload steps, with the title and description
   updated for the merged paper. It is archived when the merged paper publishes.
-- **`merge-and-condense-papers`**: see above.
 
-Paper 1 is marked published and served from its stored artifacts (`mark-published-papers`,
-archived 30 September). `make build` is green at 348 tests + 21 subtests.
+`merge-and-condense-papers` is written, reviewed, and archived (30 September). Paper 1 is marked
+published and served from its stored artifacts (`mark-published-papers`, archived 30 September).
+`make build` is green at 351 tests + 21 subtests.
 
 **Next, in order of value:**
 
-1. **Merge and condense**, per `merge-and-condense-papers`, timeboxed to about a week.
+1. **The author's end-to-end read** of the merged paper, the one step of the merge left open.
 2. **Publish the merged paper** to the reserved Zenodo DOI **10.5281/zenodo.23057135**, which is
    already stamped in the title block. Publishing is outward-facing and needs an explicit go from
    the author every time.

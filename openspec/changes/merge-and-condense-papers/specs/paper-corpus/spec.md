@@ -40,8 +40,8 @@ exactly as the figure is, and a hand-typed magnitude beside an interpolated figu
 as a hand-typed count beside an interpolated one: it stays green while the data moves underneath it.
 Such a magnitude SHALL be interpolated from the evaluation artifact.
 
-The one-owner-per-number rule SHALL apply to magnitudes as it applies to figures: a corpus paper that does
-not itself source a measurement SHALL cite the paper that does rather than state a magnitude in its own voice.
+A later corpus paper that does not itself source a measurement SHALL cite the published paper that does
+rather than state a magnitude in its own voice.
 
 #### Scenario: A magnitude in the demonstrator paper is interpolated
 - **WHEN** the demonstrator paper states the magnitude of a measured figure anywhere, including
@@ -52,6 +52,46 @@ not itself source a measurement SHALL cite the paper that does rather than state
 - **WHEN** a later corpus paper (a methods paper, or a successor to the demonstrator) refers to the
   magnitude of a measurement the demonstrator paper sources
 - **THEN** it cites the demonstrator paper for it and states no magnitude in its own voice
+
+### Requirement: No paper states that the artifact lacks a capability the artifact has
+Every living paper SHALL describe the artifact's capabilities as they stand at build time. A
+paper SHALL NOT state that the demonstrator lacks a capability it has; where a capability
+exists but is weaker than the corpus once anticipated, the paper SHALL state the *restriction*
+rather than the absence.
+
+This closes the gap the corpus's other guards leave open. Interpolation prevents a *number*
+from drifting and pinned verdicts prevent a *mechanism* from silently regressing, but a
+sentence asserting an absence stays green forever after the thing is built. When a change adds
+a capability, correcting every "the demonstrator has no X" claim in every living paper is
+part of that change, not a later sweep.
+
+This requirement rests on review and no check enforces it, which is recorded here because it
+has already failed once undetected: the change that built principal binding left three passages
+of the demonstrator paper (§2.3, and §2.5 twice) calling the binding *undesigned*, and they were
+found four days later by a tightening pass that had no mandate to look for them. The evaluation
+harness guards only the *overstating* direction — a paper cannot claim what the artifact cannot
+do, because the harness runs the artifact — and there is no artifact against which to decide
+that a sentence understates. The sweep is therefore a step in any change that lands a
+capability, and the absence of a check on it SHALL stay stated rather than assumed.
+
+#### Scenario: A newly built capability is swept through the prose
+
+- **WHEN** a change gives the artifact a capability a living paper previously described as
+  absent, undesigned, or unbuilt
+- **THEN** that change also replaces each such statement with the capability's actual
+  restriction, in every living paper
+
+#### Scenario: An accounting verdict reflects the artifact
+
+- **WHEN** the accounting records a prediction as *conditional* or *not attempted*
+- **THEN** no evidence for that prediction exists in the artifact at build time; a prediction
+  the artifact has partial evidence for is recorded as *partial* with its restriction stated
+
+#### Scenario: The understating direction is known to be unguarded
+
+- **WHEN** the corpus's drift guards are described, in documentation or in a paper
+- **THEN** the overstating direction is attributed to the evaluation harness and the
+  understating direction to the per-change sweep, rather than both being left to look checked
 
 ## REMOVED Requirements
 

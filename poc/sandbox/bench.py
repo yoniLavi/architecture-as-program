@@ -1,6 +1,6 @@
-"""Measure the cost of the component tier, against the proposal's envelope.
+"""Measure the cost of the component tier, against the vision's envelope.
 
-@sec:performance asserts a *working envelope* it had no numbers for: if a node
+Paper 1's @sec:performance asserts a *working envelope* it had no measurement for: if a node
 does ~10ms of useful work, a per-capability-crossing cost below ~1ms keeps total
 overhead under ~10%. This module produces the numbers, and reports them whichever
 way they fall.
@@ -39,7 +39,7 @@ from .host import Sandbox, available, engine_config, record, wasm_path
 from .interfaces import INFERENCE_LLM, KB_READ, TOOL_LLM
 from .nodes import _from_intent
 
-# The proposal's asserted envelope (see @sec:performance).
+# The vision's asserted envelope (see Paper 1's @sec:performance).
 ENVELOPE_CROSSING_MS = 1.0
 ENVELOPE_NODE_WORK_MS = 10.0
 ENVELOPE_MAX_OVERHEAD = 0.10
@@ -223,7 +223,7 @@ def main() -> int:
     )
     print(f"  marginal per-crossing:            {us:8.1f} µs  (differenced)")
     print("─" * 74)
-    print("  Proposal envelope (@sec:performance):")
+    print("  Paper 1's envelope (@sec:performance):")
     print(
         f"    per-crossing < {ENVELOPE_CROSSING_MS:.1f} ms keeps overhead < "
         f"{ENVELOPE_MAX_OVERHEAD:.0%} at ~{ENVELOPE_NODE_WORK_MS:.0f} ms of node work."

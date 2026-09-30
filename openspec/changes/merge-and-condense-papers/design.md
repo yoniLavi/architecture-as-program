@@ -13,8 +13,10 @@ A node's `with` clause *determines* its compiled component's import surface, der
 the graph and checked against the binary (now including a real over-granting binary as a
 pinned negative control). Second: a trust lattice with no upward coercion rejects
 laundering that type-checks on every edge. The merged paper adds a third, supporting
-strand: these results were **predicted in a paper frozen and published before any of it
-was built**, and are reported against those predictions without revision.
+strand: these results were **predicted in a paper frozen before the executable
+demonstrator was built** (an early validator predates the freeze, and the paper was
+published a week after building began), and are reported against those predictions
+without revision.
 
 ## Budget (~12,000 words, ~24 pages)
 

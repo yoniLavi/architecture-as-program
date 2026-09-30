@@ -48,6 +48,17 @@ Words are prose only, measured on 30 September 2026 (target in brackets).
       and Paper 1 was published on 21 July, so only the June *freeze* precedes the build. All
       five are corrected, and the protocol now says the publication revision came after
       building began. All should-fix and most nice-to-have items applied
+- [x] 3.3a A second round of independent paper and corpus reviews. Must-fix: the fix in 3.3
+      kept "frozen before any of it was built" at five sites, but a stdlib validator running
+      early forms of all six §3.1 analyses (and rejecting `launder_trust`) already existed at
+      the freeze commit, described by a passage the publication revision removed. The five
+      sites now say "before its executable demonstrator was built", §5.1 names the early
+      validator and the removed passage, and §7.5 discloses that three rows credit analyses
+      that partly predate the freeze. Correction 2 misstated what the vision separated (local
+      discharge vs the wiring check) and what admits laundering; restated. Also: the
+      change's own proposal and design repeated the timeline error, AGENTS.md recorded the
+      editor verdict as *partial* (it is *not attempted*), and the spec delta left "both
+      living papers" in the capability-sweep requirement
 - [ ] 3.4 Author's end-to-end read
 - [x] 3.5 `openspec validate merge-and-condense-papers --strict`
 

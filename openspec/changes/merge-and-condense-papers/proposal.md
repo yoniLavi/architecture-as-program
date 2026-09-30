@@ -1,7 +1,8 @@
 # Merge Papers 2 and 3 into one condensed paper
 
-> **Status: in progress.** Scaffolded 30 September 2026. The author settled the open
-> questions and approved the budget the same day (`design.md` §"Decisions").
+> **Status: written and reviewed; archived before publication.** Scaffolded 30 September
+> 2026. The author settled the open questions and approved the budget the same day
+> (`design.md` §"Decisions"). The author's read and the upload remain (see `tasks.md`).
 
 ## Why
 
@@ -21,7 +22,8 @@ prose — a scope decision to raise with the author". The author has now made it
 
 At the right size, the method material strengthens the systems claim instead of
 competing with it. Two parts carry it: the outcomes table, with 19 predictions frozen
-and published before building and reported without revision, and the four design
+before the executable demonstrator was built (an early validator predates the freeze),
+published a week after building began, and reported without revision, and the four design
 corrections that building forced. Together they show that the claims were not
 rationalised after the fact, which few systems papers can show.
 
@@ -34,16 +36,17 @@ rationalised after the fact, which few systems papers can show.
   future-work passage, and its protocol description to a subsection.
 - **The cycle dissolves**, and a rule stops it recurring: a paper published under a DOI
   cites no unpublished work.
-- **Machinery that existed only for two papers goes**: the one-owner-per-number rule
-  between papers, "the method paper interpolates no data", and the
+- **Machinery that existed only for two papers goes**: "the method paper interpolates
+  no data", the method paper's name in the magnitude rule (generalised to any later
+  paper that does not source a measurement), and the
   `lavi_predicting_2026` citation.
 - **Publication** uses the DOI already reserved on Zenodo, **10.5281/zenodo.23057135**.
   A draft's title and file may change before it is published. The stamp is committed
   (`58211c8`) and stays.
 - **Nothing is cut that bounds a claim.** Every stated limitation and hedge survives.
-  Where a cut would shed one, the hedge wins and the budget is missed. The hedge guard's
-  pins in §2.3 and §2.5 will need deliberate re-seeding as §2 condenses, and each
-  re-seed is named in its commit.
+  Where a cut would shed one, the hedge wins and the budget is missed. Any hedge
+  pin a rewrite breaks is re-seeded deliberately and named in its commit (in the event,
+  none was).
 
 ## Impact
 
@@ -51,11 +54,12 @@ rationalised after the fact, which few systems papers can show.
   the no-unpublished-citation rule
 - Affected papers: `papers/02-demonstrator/proposal.typ` (rewritten and condensed);
   `papers/03-method/` (retired)
-- Affected build: `Makefile` (Paper 3 targets), `scripts/check-hedges.py` (re-seeded
-  pins), `scripts/check-citations.py` (a bib entry cited by no paper becomes an orphan)
+- Affected build: `Makefile` (Paper 3 targets), `scripts/check-hedges.py` (section-number
+  comments only; no pin re-seeded), `scripts/check-citations.py` (a bib entry cited by no paper becomes an orphan)
 - Affected docs: `AGENTS.md` (the corpus description, the two-paper structure, the
   "42pp" note), `papers/README.md`, `METHODOLOGY.md`, `docs/ROADMAP.md`
 - Supersedes the `publication-checklist.md` of `prepare-paper-2-publication` for the
-  upload itself (title, description, and possibly the filename slug change); that change
-  is archived when this one publishes
+  upload itself (title and description; the slug stands). This change was archived once
+  the paper was written and reviewed; that one stays open, holding the checklist, until
+  the author's upload
 - Paper 1 is untouched. It is published, frozen, and served from its stored artifacts.
