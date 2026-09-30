@@ -150,5 +150,6 @@ def test_a_value_no_edge_carries_is_refused_not_dropped():
     swallowed silently (round J, 30 September 2026). It is now refused."""
     graph = assemble(load_graph_dict("customer-support"), backend=StubLLM(), stores=STORES)
     graph.edges = [e for e in graph.edges if e.src_port != "violation"]
+    del graph.nodes["NotifyUser"]  # else it is a second entry, refused before the run
     with pytest.raises(ExecutionError, match="no edge carries"):
         execute(graph, CustomerRequest(session_id="user-session", body="about self-harm"))

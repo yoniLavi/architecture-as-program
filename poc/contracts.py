@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from enum import Enum
 
 # Blame: which side a violation indicts. A contract that says only "something is
 # wrong" is much less useful than one that says which of the two parties to a
@@ -122,6 +123,12 @@ def _resolve(value: object, path: str) -> object:
             if not hasattr(current, part):
                 return _MISSING
             current = getattr(current, part)
+    # A closed-set field is an Enum at run time, and a contract literal is a string,
+    # so compared raw, no literal ever matched: an exhaustive `intent in [...]` came
+    # out false and blamed the body (round K, 30 September 2026). A member compares
+    # as its value, which is how the graph and the WIT enum both spell it.
+    if isinstance(current, Enum):
+        return current.value
     return current
 
 

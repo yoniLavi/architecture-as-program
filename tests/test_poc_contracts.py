@@ -26,7 +26,7 @@ from poc.demo import BENIGN, STORES
 from poc.graph import AssemblyError, assemble, load_graph_dict
 from poc.llm import StubLLM
 from poc.runtime import execute
-from poc.values import CustomerRequest
+from poc.values import CustomerRequest, Intent
 
 # ── The vocabulary, and its ceiling ──────────────────────────────────────────
 
@@ -43,6 +43,28 @@ def test_the_four_permitted_forms_parse_and_evaluate():
     assert parse("intent in ['billing_question', 'refund']").holds(value)
     assert parse("present(text)").holds(value)
     assert parse("len(text) > 0").holds(value)
+
+
+def test_a_real_intent_compares_as_its_value():
+    """`intent` is an `Enum` at run time, not the string the box above holds. Compared
+    raw, no literal matched it: an exhaustive membership contract failed and blamed
+    the body, and `intent == 'billing_question'` was false on a billing query
+    (round K, 30 September 2026)."""
+    value = _Box(intent=Intent.BILLING_QUESTION)
+    every = ", ".join(f"'{i.value}'" for i in Intent)
+    assert parse(f"intent in [{every}]").holds(value)
+    assert parse("intent == 'billing_question'").holds(value)
+    assert not parse("intent != 'billing_question'").holds(value)
+    assert not parse("intent == 'unknown'").holds(value)
+
+
+def test_an_intent_contract_holds_on_a_real_run():
+    graph = load_graph_dict("customer-support")
+    for node in graph["nodes"]:
+        if node["name"] == "ParseMessage":
+            node["ensures"] = ["intent in [" + ", ".join(f"'{i.value}'" for i in Intent) + "]"]
+    assembled = assemble(graph, backend=StubLLM(), stores=STORES)
+    execute(assembled, CustomerRequest(session_id="user-session", body=BENIGN))
 
 
 def test_a_predicate_outside_the_vocabulary_is_rejected():

@@ -123,6 +123,13 @@
       snapshotting joined to replay); the ambient-authority correction restated as the
       substrate's failure, not the sentence's, and the aggregation correction as the alias
       convention's; Fuchsia's component framework cited in §6.2
+- [x] 6.26 The runtime chose its entry node by file order, so a validated gate listed after
+      the node it guards was skipped and an unreached node never ran; a graph now has exactly
+      one entry, the node no edge reaches, taking the boundary input (validator and runtime;
+      `unreached_audit_node` pinned). A contract compared an `Enum` field raw against string
+      literals, so membership over `intent` was always false and blamed the body; a member now
+      compares as its value. §3.3.3 says "set membership" and that a postcondition cannot
+      see which variant was emitted
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

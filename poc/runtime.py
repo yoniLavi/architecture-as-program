@@ -315,15 +315,24 @@ def _run_subgraph(
 
 
 def _entry_node(graph: AssembledGraph) -> Node:
-    """The node that consumes the graph's boundary data parameter."""
+    """The graph's one entry: the node no edge reaches, which takes the boundary
+    data parameter. Chosen by the edges, never by file order, which once let a
+    validated gate listed after the node it guards be skipped."""
     data_params = [p for p in graph.parameters if p not in graph.capabilities]
     if len(data_params) != 1:
         raise ExecutionError(f"expected exactly one boundary data parameter, got {data_params}")
     boundary = data_params[0]
-    for node in graph.nodes.values():
-        if graph.data_input_type(node) == boundary:
-            return node
-    raise ExecutionError(f"no node consumes boundary input {boundary!r}")
+    targets = {e.dst_node for e in graph.edges}
+    entries = [n for name, n in graph.nodes.items() if name not in targets]
+    if len(entries) != 1:
+        raise ExecutionError(
+            f"expected exactly one entry node, got {sorted(n.name for n in entries)}"
+        )
+    if graph.data_input_type(entries[0]) != boundary:
+        raise ExecutionError(
+            f"entry node {entries[0].name!r} does not consume boundary input {boundary!r}"
+        )
+    return entries[0]
 
 
 def execute(

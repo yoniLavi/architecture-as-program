@@ -285,6 +285,47 @@ class TestEdgesAreAPath(unittest.TestCase):
         self.assertTrue(any("form a cycle" in e for e in errors), errors)
 
 
+class TestOneEntryNode(unittest.TestCase):
+    """A graph runs from the one node no edge reaches (round K, 30 September 2026:
+    the runtime chose its entry by file order, so a validated gate listed after the
+    node it guards was skipped, and an unreached node validated and never ran)."""
+
+    def _errors(self, nodes: list[dict], edges: list[dict]) -> list[str]:
+        graph = {
+            "name": "Pipeline",
+            "parameters": ["RawInput"],
+            "capabilities": [],
+            "nodes": nodes,
+            "data_edges": edges,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            return validate_files(_write({"p.json": graph}, Path(td)))
+
+    def test_a_gate_before_its_guarded_node_is_the_entry_in_any_order(self):
+        nodes = [
+            {"name": "Guarded", "inputs": ["RawInput"], "output": "Out"},
+            {"name": "Gate", "inputs": ["RawInput"], "output": "RawInput"},
+        ]
+        self.assertEqual(self._errors(nodes, [{"from": "Gate", "to": "Guarded"}]), [])
+
+    def test_two_unreached_nodes_are_rejected(self):
+        nodes = [
+            {"name": "A", "inputs": ["RawInput"], "output": "Out"},
+            {"name": "B", "inputs": ["RawInput"], "output": "Other"},
+        ]
+        errors = self._errors(nodes, [])
+        self.assertTrue(any("reached by no edge" in e for e in errors), errors)
+
+    def test_the_entry_must_take_the_boundary_input(self):
+        nodes = [
+            {"name": "A", "inputs": ["Mid"], "output": "Out"},
+            {"name": "B", "inputs": ["Out"], "output": "Done"},
+            {"name": "C", "inputs": ["RawInput"], "output": "Mid"},
+        ]
+        errors = self._errors(nodes, [{"from": "A", "to": "B"}, {"from": "B", "to": "C"}])
+        self.assertTrue(any("does not take the boundary input" in e for e in errors), errors)
+
+
 class TestCrossGraphCapabilityNarrowing(unittest.TestCase):
     def _child_graph(self, param: str) -> dict:
         return {

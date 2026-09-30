@@ -227,6 +227,7 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
             errors.append(f"{path.name}: boundary data input {p!r} declared but never consumed")
 
     _validate_edges(path, node_map, caps, edges, errors)
+    _validate_entry(path, node_map, data_params, edges, errors)
     _validate_node_trust_flow(path, node_map, caps, errors)
     _validate_identities(path, node_map, caps, errors)
     _validate_layout(path, node_map, graph.get("layout", {}), errors)
@@ -292,6 +293,34 @@ def _validate_identities(
                     f"{cap_type!r} it does not hold; an identity may be declared only for "
                     f"a capability the node's `inputs` names"
                 )
+
+
+def _validate_entry(
+    path: Path,
+    node_map: dict[str, dict],
+    data_params: list[str],
+    edges: list[dict],
+    errors: list[str],
+) -> None:
+    """A graph runs from one entry: the only node no data edge reaches, taking the
+    boundary input. The runtime once took the first node in file order whose input
+    matched the boundary type, so a validated `T → T` gate (an audit step, a filter)
+    listed after the node it guards was skipped silently, and a node no edge reached
+    validated and never ran (round K, 30 September 2026). With one entry and no
+    cycle, every node is reachable from it."""
+    targets = {e["to"] for e in edges if isinstance(e, dict) and "to" in e}
+    entries = sorted(n for n in node_map if n not in targets)
+    if len(entries) != 1:
+        errors.append(
+            f"{path.name}: {len(entries)} nodes are reached by no edge ({entries}); a graph "
+            f"runs from exactly one entry node, so any other would never run"
+        )
+        return
+    if len(data_params) == 1 and data_params[0] not in node_map[entries[0]]["inputs"]:
+        errors.append(
+            f"{path.name}: entry node {entries[0]!r} does not take the boundary input "
+            f"{data_params[0]!r}"
+        )
 
 
 def _validate_edges(

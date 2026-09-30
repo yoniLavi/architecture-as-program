@@ -203,6 +203,25 @@ def hide_branch_behind_unlabelled_variant(graph: dict) -> dict:
     return g
 
 
+def unreached_audit_node(graph: dict) -> dict:
+    """A second node taking the boundary input, reached by no edge.
+
+    `AuditRequest` consumes the raw `CustomerRequest` beside `ReceiveMessage`. Every
+    edge type-checks, and the runtime chose its entry by file order, so it ran
+    whichever of the two came first and silently skipped the other — an audit step
+    listed after the node it guards never ran, and nothing said so. A graph runs
+    from exactly one entry node."""
+    g = copy.deepcopy(graph)
+    g["nodes"].append(
+        {
+            "name": "AuditRequest",
+            "inputs": ["CustomerRequest", "EventEmitter<'support-queue'>"],
+            "output": "EscalationTicket",
+        }
+    )
+    return g
+
+
 def mislabel_subgraph_output(platform: dict) -> dict:
     """Make a sub-graph node lie about what it emits at its boundary.
 
@@ -256,6 +275,7 @@ UNSAFE_VARIANTS = {
     "launder_via_duplicate_role": launder_via_duplicate_role,
     "hide_branch_behind_whole_edge": hide_branch_behind_whole_edge,
     "hide_branch_behind_unlabelled_variant": hide_branch_behind_unlabelled_variant,
+    "unreached_audit_node": unreached_audit_node,
     "mislabel_subgraph_output": mislabel_subgraph_output,
     "unevaluatable_contract": unevaluatable_contract,
 }

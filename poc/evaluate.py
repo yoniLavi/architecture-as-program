@@ -138,6 +138,7 @@ REASON_CAPABILITY_DATA = "capability as data"
 REASON_SINK = "sink rule"
 REASON_SUM_ROLE = "one variant per port"
 REASON_VARIANT = "variant completeness"
+REASON_ENTRY = "one entry node"
 
 # A reason class is identified by phrases, *any* of which in one of the
 # validator's errors places that error in the class; each phrase is specific to
@@ -154,6 +155,7 @@ REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     # A port names exactly one variant, and every variant of a labelled sum has one.
     REASON_SUM_ROLE: ("duplicate variant role", "has no port to leave on"),
     REASON_VARIANT: ("whole-output edge never fires", "but no edge consumes it"),
+    REASON_ENTRY: ("are reached by no edge", "does not take the boundary input"),
     REASON_CROSS_GRAPH: (
         "declared output",
         "terminal output types",
@@ -311,6 +313,16 @@ CORPUS: tuple[Case, ...] = (
         "The same swallowed violation by another spelling: `ModerateContent`'s violation "
         "variant loses its role, so no port carries it and variant completeness, which "
         "sweeps roles, never saw it. The type parser rejects a partly labelled sum.",
+        found_by_review=True,
+    ),
+    Case(
+        "unreached_audit_node",
+        "mutation",
+        REJECTED,
+        REASON_ENTRY,
+        "A second node takes the boundary input and no edge reaches it. The runtime "
+        "chose its entry by file order, so one of the two was skipped silently; a graph "
+        "runs from exactly one entry node, which every other node is reached from.",
         found_by_review=True,
     ),
     Case(
