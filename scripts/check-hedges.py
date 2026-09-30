@@ -97,7 +97,7 @@ PINS = (
         "sec:concrete-graph",
         "concrete-graph/schema-proviso",
         "holds only _provided",
-        "the schema guarantee holds only _provided the schema excludes unbounded "
+        "the schema guarantee holds only _provided the schema excludes "
         "free text in positions flowing to privileged nodes_",
     ),
     (

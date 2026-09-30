@@ -185,6 +185,24 @@ def hide_branch_behind_whole_edge(graph: dict) -> dict:
     return g
 
 
+def hide_branch_behind_unlabelled_variant(graph: dict) -> dict:
+    """Drop one variant's role in a labelled sum.
+
+    `ModerateContent` declares `ok: ModeratedQuery | PolicyViolation | escalation:
+    EscalationRequest` and its `violation` edge is removed. Variant completeness
+    swept the roles, so the unlabelled variant was never checked; the unported edge
+    that could carry it is refused for a labelled sum; and the runtime, finding no
+    edge for it at a node that is not a terminal, dropped it — the policy violation
+    `hide_branch_behind_whole_edge` swallowed, spelled differently. A sum is labelled
+    throughout or not at all."""
+    g = copy.deepcopy(graph)
+    for node in g["nodes"]:
+        if node["name"] == "ModerateContent":
+            node["output"] = "ok: ModeratedQuery | PolicyViolation | escalation: EscalationRequest"
+    g["data_edges"] = [e for e in g["data_edges"] if e["from"] != "ModerateContent.violation"]
+    return g
+
+
 def mislabel_subgraph_output(platform: dict) -> dict:
     """Make a sub-graph node lie about what it emits at its boundary.
 
@@ -237,6 +255,7 @@ UNSAFE_VARIANTS = {
     "route_tool_into_inference_slot": route_tool_into_inference_slot,
     "launder_via_duplicate_role": launder_via_duplicate_role,
     "hide_branch_behind_whole_edge": hide_branch_behind_whole_edge,
+    "hide_branch_behind_unlabelled_variant": hide_branch_behind_unlabelled_variant,
     "mislabel_subgraph_output": mislabel_subgraph_output,
     "unevaluatable_contract": unevaluatable_contract,
 }

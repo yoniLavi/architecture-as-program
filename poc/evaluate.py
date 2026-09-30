@@ -151,7 +151,8 @@ REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     # The lattice's own messages only: the node-body check and the edge check.
     REASON_TRUST_LATTICE: ("raises trust without", "trust-lattice violation"),
     REASON_SINK: ("holds a tool-scoped LLMClient",),
-    REASON_SUM_ROLE: ("duplicate variant role",),
+    # A port names exactly one variant, and every variant of a labelled sum has one.
+    REASON_SUM_ROLE: ("duplicate variant role", "has no port to leave on"),
     REASON_VARIANT: ("whole-output edge never fires", "but no edge consumes it"),
     REASON_CROSS_GRAPH: (
         "declared output",
@@ -300,6 +301,16 @@ CORPUS: tuple[Case, ...] = (
         "and the violation and escalation edges are removed. The runtime routes by role, "
         "so the edge never fires and a policy violation is swallowed silently; the "
         "validator once read it as covering every variant.",
+        found_by_review=True,
+    ),
+    Case(
+        "hide_branch_behind_unlabelled_variant",
+        "mutation",
+        REJECTED,
+        REASON_SUM_ROLE,
+        "The same swallowed violation by another spelling: `ModerateContent`'s violation "
+        "variant loses its role, so no port carries it and variant completeness, which "
+        "sweeps roles, never saw it. The type parser rejects a partly labelled sum.",
         found_by_review=True,
     ),
     Case(

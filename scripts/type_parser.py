@@ -156,6 +156,16 @@ class _Parser:
                 f"duplicate variant role(s) {duplicated} in {self.src!r}; "
                 f"a port must name one variant"
             )
+        # A sum is labelled throughout or not at all. An unlabelled variant in a
+        # labelled sum has no port to leave on, and the unported edge that could
+        # carry it is refused, so variant completeness never saw it and the runtime
+        # dropped it — adversarial review swallowed a policy violation this way.
+        unlabelled = [v for v in variants if not v.role]
+        if roles and unlabelled:
+            raise ParseError(
+                f"sum mixes labelled and unlabelled variants in {self.src!r}; "
+                f"a variant without a role has no port to leave on"
+            )
         return TSum(tuple(variants))
 
     def _parse_variant(self) -> TVariant:

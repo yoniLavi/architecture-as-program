@@ -7,10 +7,12 @@ Covers the `signal-graph-runtime` spec requirements:
 
 from __future__ import annotations
 
+import pytest
+
 from poc.demo import ADVERSARIAL, BENIGN, STORES
 from poc.graph import assemble, load_graph_dict
 from poc.llm import StubLLM
-from poc.runtime import execute
+from poc.runtime import ExecutionError, execute
 from poc.values import (
     ConversationContext,
     CustomerQuery,
@@ -139,3 +141,14 @@ def test_free_text_residual_is_real_and_acknowledged():
     ctx = result.received["GenerateResponse"]
     assert isinstance(ctx, ConversationContext)
     assert "ignore all previous instructions" in ctx.question.lower()
+
+
+def test_a_value_no_edge_carries_is_refused_not_dropped():
+    """Defence in depth behind variant completeness. With the `violation` edge cut
+    from an assembled graph (bypassing validation), a flagged message used to end
+    the run at `ModerateContent` with no terminal and no error — a policy violation
+    swallowed silently (round J, 30 September 2026). It is now refused."""
+    graph = assemble(load_graph_dict("customer-support"), backend=StubLLM(), stores=STORES)
+    graph.edges = [e for e in graph.edges if e.src_port != "violation"]
+    with pytest.raises(ExecutionError, match="no edge carries"):
+        execute(graph, CustomerRequest(session_id="user-session", body="about self-harm"))

@@ -108,6 +108,13 @@
       `hide_branch_behind_whole_edge` pinned. The inspector screenshots regenerated (the paper
       figure showed three cases), with long case names wrapping at underscores. The corpus
       records which cases review found (`found_by_review`, interpolated in §4.2 and §7.1)
+- [x] 6.24 A partly labelled sum hid its unlabelled variant from variant completeness, and the
+      runtime dropped it silently; the parser rejects such a sum
+      (`hide_branch_behind_unlabelled_variant` pinned) and the runtime refuses a value no edge
+      carries. The user-level authorisation row moved from *Partial* to *Not attempted* (no
+      authority decision consults the principal); rotation's scope stated beside its row; the
+      schema proviso's hedge drops "unbounded" (the bounded question field carries the residual),
+      re-seeding its pin
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

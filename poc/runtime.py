@@ -463,12 +463,24 @@ def execute(
         # A binder is a delegate for everything downstream of it: it acts on the
         # principal's behalf, and says so in the graph rather than in its body.
         downstream = (*acting_as, node_name) if node.binds_principal else acting_as
+        routed = False
         for e in edges:
             if isinstance(output, Variant):
                 if e.src_port == output.role:
                     pending.append((e.dst_node, output.value, downstream))
+                    routed = True
             else:
                 if e.src_port is None:
                     pending.append((e.dst_node, output, downstream))
+                    routed = True
+        # A node with out-edges is not a terminal, so a value no edge carries would
+        # vanish with no error. Validation should make this unreachable; refusing it
+        # here means a gap in validation fails loudly instead of silently.
+        if not routed:
+            role = output.role if isinstance(output, Variant) else None
+            raise ExecutionError(
+                f"node {node_name!r} emitted {'variant ' + repr(role) if role else 'a value'} "
+                f"that no edge carries"
+            )
 
     return result

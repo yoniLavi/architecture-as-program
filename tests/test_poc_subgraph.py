@@ -529,3 +529,20 @@ def test_the_output_side_of_composition_is_checked():
     errors = validate_graph_dicts([narrowed, child])
     assert any("declared output" in e and "terminal output types" in e for e in errors)
     assert not any("type mismatch" in e for e in errors)
+
+
+def test_a_labelled_boundary_output_is_rejected():
+    """A boundary value is a terminal's output, never a routed variant, so role
+    labels on a sub-graph node's output would give the parent ports that never
+    fire. Nothing tested this until round J (30 September 2026) removed the check
+    and the whole suite stayed green."""
+    child = load_graph_dict("customer-support")
+    parent = copy.deepcopy(load_graph_dict("support-platform"))
+    labelled = "reply: DeliveryConfirmation | escalated: EscalationTicket"
+    for n in parent["nodes"]:
+        if n["name"] in ("CustomerSupport", "AgentDashboard", "BillingService"):
+            n["output"] = labelled
+        if n["name"] == "RecordAudit":
+            n["inputs"][0] = labelled
+    errors = validate_graph_dicts([parent, child])
+    assert any("labelled boundary output" in e for e in errors)

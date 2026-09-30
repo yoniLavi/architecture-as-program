@@ -114,6 +114,15 @@ class TestSumTypes(unittest.TestCase):
         with self.assertRaises(ParseError):
             parse_type("ok: ConversationContext | ok: Untrusted<RawMessage>")
 
+    def test_a_partly_labelled_sum_is_rejected(self):
+        """An unlabelled variant in a labelled sum has no port to leave on
+        (round J, 30 September 2026: variant completeness swept roles and never
+        saw it, and the runtime dropped it)."""
+        with self.assertRaises(ParseError):
+            parse_type("ok: ModeratedQuery | PolicyViolation | escalation: EscalationRequest")
+        # Wholly unlabelled sums are still a sum.
+        self.assertIsInstance(parse_type("AlphaPayload | BetaPayload"), TSum)
+
     def test_two_variants(self):
         t = parse_type("ok: AgentResponse | error: LLMError")
         self.assertEqual(
