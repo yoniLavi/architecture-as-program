@@ -7,6 +7,20 @@ updates. Zenodo pitfalls hit while publishing Paper 1 (the preview-pointer bug, 
 drafts discarding metadata edits) are recorded in the agent memory, and step 3 below
 avoids both.
 
+> **Amended 30 September 2026 by `merge-and-condense-papers`.** Paper 3 is merged into
+> Paper 2, and the steps below still govern the upload, with these changes:
+> - Step 2's DOI stamp is done (`58211c8`). Its `lavi_confinement_2026` bib step is moot,
+>   because that entry was deleted: it was only Paper 3's citation of Paper 2.
+> - The title is unchanged. The **description** is the *new* abstract, which now also
+>   reports the accounting of Paper 1's predictions. Consider adding the keyword
+>   *pre-registration*.
+> - Related identifiers: **Continues** Paper 1 is the only relation to it (the author's
+>   decision; *Reviews* was declined as a likely misreading).
+> - Step 4's "Paper 3 can now publish" no longer applies.
+> - The pre-flight spot-checks still hold after renumbering: §4.1 names
+>   `hostile_ungranted`, §4.3 is the overhead table, and §6.2 carries CAmkES. The PDF
+>   also shows the outcomes table in §5, with 19 rows.
+
 ## 1. Pre-flight (local)
 
 - [ ] `git status` is clean and `main` holds the commits of this change.
