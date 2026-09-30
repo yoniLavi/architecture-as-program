@@ -85,7 +85,14 @@ def test_commenting_out_a_pinned_passage_fails_the_check(sources):
     paper, _section, name, _hedge, _fragment = pin("concrete-graph/schema-proviso")
     lines = sources[paper].splitlines()
     at = next(i for i, line in enumerate(lines) if "_provided the schema excludes" in line)
-    for commented in ("// " + lines[at], "/* " + lines[at] + " */"):
+    for commented in (
+        "// " + lines[at],
+        "/* " + lines[at] + " */",
+        # Attached to a word, and nested (round N): Typst hides both.
+        "Claim./* " + lines[at] + " */",
+        "Claim.// " + lines[at],
+        "/* note /* inner */ " + lines[at] + " */",
+    ):
         mutated = dict(sources)
         mutated[paper] = "\n".join([*lines[:at], commented, *lines[at + 1 :]])
         violations = check_hedges.find_violations(mutated)

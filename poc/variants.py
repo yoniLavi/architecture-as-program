@@ -27,6 +27,11 @@ def _prune_unreached(g: dict) -> dict:
                 frontier.append(e["to"])
     g["nodes"] = [n for n in g["nodes"] if n["name"] in reached]
     g["data_edges"] = [e for e in edges if e["from"].split(".")[0] in reached]
+    layout = g.get("layout", {})
+    if "positions" in layout:
+        layout["positions"] = {k: v for k, v in layout["positions"].items() if k in reached}
+    for zone in layout.get("zones", {}).values():
+        zone["nodes"] = [n for n in zone.get("nodes", []) if n in reached]
     held = {i for n in g["nodes"] for i in n["inputs"]}
     unused = [c for c in g["capabilities"] if c not in held]
     g["capabilities"] = [c for c in g["capabilities"] if c not in unused]

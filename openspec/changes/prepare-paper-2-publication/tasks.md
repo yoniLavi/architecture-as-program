@@ -143,6 +143,11 @@
       after three mutations were found also leaving a node unreached; they are rewired to
       isolate their fault. The hedge guard ignores Typst comments, so a pinned passage cannot
       survive only inside one. §3.2.1 says the derivation compares interface names
+- [x] 6.29 Round N (no major finding on either side; the review loop stops here): the hedge
+      guard scans Typst comments properly (attached and nested); pruned mutations drop their
+      layout entries, and an error no reason class claims now fails the evaluation; §4.2 marks
+      where the review-found cases end; §6.2 says capDL's proof is refinement; §1.1 says which
+      half of "by construction" is constructed; §4.4 names the misleading reply
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

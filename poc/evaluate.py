@@ -367,8 +367,10 @@ class Outcome:
     actual: str
     reason: str | None
     detail: str
-    # Every reason class the rejection carried, pinned or not.
+    # Every reason class the rejection carried, pinned or not, and how many of its
+    # errors no class claims.
     present: frozenset[str] = frozenset()
+    unclassified: int = 0
 
     @property
     def diverged(self) -> bool:
@@ -381,6 +383,13 @@ def reasons_in(errors: list[str]) -> frozenset[str]:
         r
         for r, phrases in REASON_SIGNATURES.items()
         if any(p in e for e in errors for p in phrases)
+    )
+
+
+def _unclassified(errors: list[str]) -> int:
+    """How many errors no reason class's signature matches."""
+    return sum(
+        not any(p in e for phrases in REASON_SIGNATURES.values() for p in phrases) for e in errors
     )
 
 
@@ -430,6 +439,7 @@ def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
                     classify(errors, case.reason),
                     " ".join(errors[0].split()),
                     reasons_in(errors),
+                    _unclassified(errors),
                 )
             )
             continue
@@ -447,6 +457,7 @@ def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
                     classify(e.errors, case.reason),
                     " ".join(e.errors),
                     reasons_in(e.errors),
+                    _unclassified(e.errors),
                 )
             )
     return outcomes
@@ -464,6 +475,13 @@ def check(outcomes: list[Outcome]) -> list[str]:
             problems.append(
                 f"{o.case.name}: expected to be caught by {o.case.reason!r}, "
                 f"was caught by {o.reason!r} ({o.detail})"
+            )
+        elif o.unclassified:
+            # An error no reason class claims is a fault the isolation check below
+            # cannot see (round N: pruned mutations kept stale layout entries).
+            problems.append(
+                f"{o.case.name}: {o.unclassified} error(s) belong to no reason class; "
+                f"the mutation no longer isolates its fault"
             )
         elif stray := {r for r in o.present if r != o.case.reason and r not in o.case.also}:
             # A case isolates its fault: a second class it did not declare means the

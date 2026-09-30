@@ -263,16 +263,43 @@ PINS = (
 
 _HEADING = re.compile(r"^=+\s.*<(?P<label>sec:[A-Za-z0-9_-]+)>\s*$")
 
-# Typst comments, which render nothing: a pinned passage turned into a comment,
-# with an unhedged sentence written after it, once left the guard green while the
-# rendered paper lost the hedge (round M, 30 September 2026). A comment opens at a
-# line start or after whitespace, so `https://` and `graphs/*.json` are kept.
-_BLOCK_COMMENT = re.compile(r"(?:^|(?<=\s))/\*.*?\*/", re.DOTALL | re.MULTILINE)
-_LINE_COMMENT = re.compile(r"(?:^|(?<=\s))//.*$", re.MULTILINE)
-
 
 def strip_comments(source: str) -> str:
-    return _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", source))
+    """Remove Typst comments, which render nothing.
+
+    A pinned passage turned into a comment, with an unhedged sentence written after
+    it, once left the guard green while the rendered paper lost the hedge (round M,
+    30 September 2026). Typst opens a comment anywhere outside raw text — attached
+    to a word, too — and nests block comments, so this scans rather than matches:
+    backtick raw text is kept verbatim (`graphs/*.json`), and `//` after a colon is
+    a URL, not a comment. It is still a source scan: `#hide[...]` or a false `#if`
+    defeats it, which is why the guard claims no more than its pins."""
+    out: list[str] = []
+    i, n, depth, raw = 0, len(source), 0, False
+    while i < n:
+        two = source[i : i + 2]
+        if depth:
+            if two == "/*":
+                depth, i = depth + 1, i + 2
+            elif two == "*/":
+                depth, i = depth - 1, i + 2
+            else:
+                if source[i] == "\n":
+                    out.append("\n")  # keep line structure for heading detection
+                i += 1
+            continue
+        if source[i] == "`":
+            raw = not raw
+        elif not raw and two == "/*":
+            depth, i = 1, i + 2
+            continue
+        elif not raw and two == "//" and (i == 0 or source[i - 1] != ":"):
+            while i < n and source[i] != "\n":
+                i += 1
+            continue
+        out.append(source[i])
+        i += 1
+    return "".join(out)
 
 
 def normalise(text: str) -> str:
