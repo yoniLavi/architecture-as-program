@@ -42,9 +42,14 @@ Words are prose only, measured on 30 September 2026 (target in brackets).
 - [x] 3.1 `make clean && make build` green, including hedges, citations, freeze
 - [x] 3.2 Words per section reported against the budget, with any miss explained (total
       ~10,000 against ~12,000; see 1.x)
-- [ ] 3.3 A whole-paper read (`/review-proposal 2`) and fixes to what it finds
+- [x] 3.3 A whole-paper read (`/review-proposal 2`, run by an independent reviewer against
+      the pre-merge texts) and fixes to what it finds. Must-fix: the merge had spread Paper
+      3's "published and frozen before building" to five sites, but `poc/` dates from 14 July
+      and Paper 1 was published on 21 July, so only the June *freeze* precedes the build. All
+      five are corrected, and the protocol now says the publication revision came after
+      building began. All should-fix and most nice-to-have items applied
 - [ ] 3.4 Author's end-to-end read
-- [ ] 3.5 `openspec validate merge-and-condense-papers --strict`
+- [x] 3.5 `openspec validate merge-and-condense-papers --strict`
 
 ## 4. Publication (author's step)
 
