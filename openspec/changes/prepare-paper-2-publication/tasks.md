@@ -115,6 +115,14 @@
       authority decision consults the principal); rotation's scope stated beside its row; the
       schema proviso's hedge drops "unbounded" (the bounded question field carries the residual),
       re-seeding its pin
+- [x] 6.25 §5 checked against Paper 1's text (round K): §1 no longer says the vision did not
+      predict the derivation (it deferred it to a Phase 3 proof); the reworded "declared
+      distribution" row restored to the vision's "complete and sole description" (Partial);
+      rows added for predictions the table omitted (compilation preserves signatures,
+      graduated migration, injection ill-typed, OS compartments, property-based testing;
+      snapshotting joined to replay); the ambient-authority correction restated as the
+      substrate's failure, not the sentence's, and the aggregation correction as the alias
+      convention's; Fuchsia's component framework cited in §6.2
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

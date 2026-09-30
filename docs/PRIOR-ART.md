@@ -368,6 +368,16 @@ where derive-and-check does something generate-and-prove cannot.
   epoch-bound revocable handles, relevant to §3.4 if revocation is revisited);
   Type-Directed Privilege Separation (arXiv:2509.25926).
 
+### 15. Fuchsia's component framework — found by review, 30 September 2026
+
+A cold review flagged Fuchsia as the nearest non-WASM relative of the lead claim.
+Checked on fuchsia.dev: component manifests declare `use`/`offer`/`expose`, and the
+Scrutiny static analyser fails the build when it cannot trace a capability route
+from source to consumer. **Taken:** one sentence in §6.2 beside CAmkES. The
+difference we defend: Scrutiny checks routes *between manifests*; the derivation
+checks the *graph against the binary's imports*. Genode's session routing is the
+same family and was not checked or cited.
+
 ---
 
 ## Open verification debts
