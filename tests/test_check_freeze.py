@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -100,3 +101,39 @@ def test_a_marker_listing_nothing_fails(paper):
     marker_path.write_text(json.dumps(marker))
     problems = check_freeze.published_problems(paper)
     assert any("lists no artifacts" in p for p in problems)
+
+
+# The source half. A history rewrite once left FREEZE_REF naming a commit no fresh
+# clone had, and the guard skipped itself there without failing.
+
+
+def _is_shallow() -> bool:
+    out = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    return out.returncode != 0 or out.stdout.strip() == "true"
+
+
+def test_the_marker_and_the_guard_name_the_same_commit():
+    marker = json.loads((PAPER / "PUBLISHED.json").read_text())
+    assert marker["source_commit"] == check_freeze.FREEZE_REF
+
+
+@pytest.mark.skipif(_is_shallow(), reason="a shallow checkout cannot see the freeze commit")
+def test_the_freeze_commit_is_reachable_from_head():
+    reachable = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", check_freeze.FREEZE_REF, "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    assert reachable.returncode == 0
+
+
+@pytest.mark.skipif(_is_shallow(), reason="a shallow checkout skips by design")
+def test_an_unreachable_freeze_commit_fails_in_a_full_clone(monkeypatch, capsys):
+    monkeypatch.setattr(check_freeze, "FREEZE_REF", "0" * 40)
+    assert check_freeze.main() == 1
+    assert "not reachable from HEAD" in capsys.readouterr().err

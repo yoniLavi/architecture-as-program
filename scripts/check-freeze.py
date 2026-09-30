@@ -8,24 +8,29 @@ if its sources are not quietly rewritten. This check compares each frozen file
 against its content at the freeze commit and fails if any has drifted.
 
 The freeze reference moved with the paper's single sanctioned publication
-revision. The paper was originally frozen at 59898cc~1 (the last pre-poc
-commit). In July 2026 it received the revision's preparation step (typos,
-phrasing, and publication front matter, with no substantive claim changed) and
-was re-frozen; on 21 July 2026 the revision concluded at the actual publication
-event — the Zenodo DOI and licence stamped onto the title block, plus a
-Figure 1 legibility fix — and the paper was re-frozen at the published commit
-named below. The frozen paths and the freeze ref are the same on both sides of
-the comparison. See papers/01-vision/ERRATA.md and the paper-corpus spec for
-the rule that permits one such revision and its concluding step.
+revision. The paper was originally frozen at 7acf585~1 (b28593a, the last
+pre-poc commit; named 59898cc~1 before a history rewrite gave every commit from
+then on a new identifier with an identical tree). In July 2026 it received the
+revision's preparation step (typos, phrasing, and publication front matter,
+with no substantive claim changed) and was re-frozen; on 21 July 2026 the
+revision concluded at the actual publication event — the Zenodo DOI and licence
+stamped onto the title block, plus a Figure 1 legibility fix — and the paper was
+re-frozen at the published commit named below. The frozen paths and the freeze
+ref are the same on both sides of the comparison. See papers/01-vision/ERRATA.md
+and the paper-corpus spec for the rule that permits one such revision and its
+concluding step.
 
 Corrections to a frozen paper are otherwise recorded in its ERRATA.md, never by
 editing the frozen text — so any diff here is a mistake, and the build should
 fail.
 
-If the freeze commit is unavailable (e.g. a shallow CI checkout with no history),
-the check prints a warning and passes, rather than failing a build that simply
-cannot see the reference. The pre-commit hook, which runs against a full clone,
-is the effective guard.
+If the freeze commit is unavailable in a *shallow* checkout, the check prints a
+warning and passes, rather than failing a build that simply cannot see the
+reference. In a full clone it fails instead, and it also fails if the freeze
+commit is not an ancestor of HEAD: after the history rewrite the old identifier
+survived only as a dangling object in the author's clone and was absent from
+every fresh clone, so the guard skipped itself everywhere else and nothing said
+so. The pre-commit hook and CI (`fetch-depth: 0`) run against full clones.
 
 Freezing the *sources* is not enough once a paper is published. Its PDF,
 Markdown, HTML and figures were regenerated on every build through shared inputs
@@ -46,9 +51,10 @@ from pathlib import Path
 
 # The freeze point: the published commit of Paper 1 — the concluding step of its
 # one-time publication revision (Zenodo DOI + licence stamp, Figure 1 legibility
-# fix). Previously 0137aea (the preprint preparation step); originally
-# "59898cc~1", the last commit before poc/ existed.
-FREEZE_REF = "c4ae487c4dc232ca763333fb0bbe79f34c621c0a"
+# fix). Previously 9ae2380 (the preprint preparation step); originally
+# "7acf585~1", the last commit before poc/ existed. Before the history rewrite
+# these were c4ae487, 0137aea and 59898cc~1 (same trees, now unreachable).
+FREEZE_REF = "5a551e00c8c8e9be8220287dc6d63373573a8367"
 
 # Frozen files in the corpus. At the published-preprint freeze commit the paper
 # already lives under papers/01-vision/, so a file's current path and its path at
@@ -129,19 +135,45 @@ def main() -> int:
         )
         return 1
 
-    # Probe once: if the freeze commit itself is not present, skip gracefully.
+    # Probe once. A shallow checkout may simply not see the freeze commit, so it
+    # skips; a full clone must both hold it and reach it from HEAD, or the guard
+    # would be checking against a commit no fresh clone has.
     probe = subprocess.run(
         ["git", "cat-file", "-e", f"{FREEZE_REF}:papers/01-vision/proposal.typ"],
         cwd=root,
         capture_output=True,
     )
-    if probe.returncode != 0:
+    reachable = (
+        probe.returncode == 0
+        and subprocess.run(
+            ["git", "merge-base", "--is-ancestor", FREEZE_REF, "HEAD"],
+            cwd=root,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+    if not reachable:
+        shallow = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        if shallow.returncode != 0 or shallow.stdout.strip() == "true":
+            print(
+                f"check-freeze: freeze commit {FREEZE_REF} unavailable "
+                "(shallow checkout?); skipping frozen-paper guard.",
+                file=sys.stderr,
+            )
+            return 0
         print(
-            f"check-freeze: freeze commit {FREEZE_REF} unavailable "
-            "(shallow checkout?); skipping frozen-paper guard.",
+            f"ERROR: freeze commit {FREEZE_REF} is not reachable from HEAD in a full\n"
+            "clone, so a fresh clone could not run this guard. If history was\n"
+            "rewritten, re-point FREEZE_REF (and PUBLISHED.json's source_commit) at\n"
+            "the commit with the same tree.",
             file=sys.stderr,
         )
-        return 0
+        return 1
 
     drifted = []
     for current, frozen in FROZEN_FILES.items():

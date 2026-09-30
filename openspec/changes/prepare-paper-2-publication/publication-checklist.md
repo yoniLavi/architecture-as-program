@@ -18,7 +18,7 @@ avoids both.
 >   decision; *Reviews* was declined as a likely misreading).
 > - Step 4's "Paper 3 can now publish" no longer applies.
 > - **Before step 1:** the author's end-to-end read of the merged paper, carried over from
->   `merge-and-condense-papers` (archived 30 September after four review rounds; see its
+>   `merge-and-condense-papers` (archived 30 September after five review rounds; see its
 >   `tasks.md`). One decision from those rounds is left to that read: whether §5.2's
 >   "trust was one rule, not two" is still a correction *building forced*, given that the
 >   pre-freeze validator's separate rules already caught the laundering graph, or a

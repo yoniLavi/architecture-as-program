@@ -76,11 +76,19 @@ Words are prose only, measured on 30 September 2026 (target in brackets).
       node carries one (the generated body predates the contract language, and a
       tier-equality test is what shows interchangeability). Also the conclusion's
       sub-graph sentence regained its host-tier qualifier
+- [x] 3.3d A fifth round (paper only; the corpus round before it found nothing must-fix).
+      One must-fix, in the repo rather than the prose: a history rewrite after 21 July had
+      left the freeze guard's `FREEZE_REF` (and `PUBLISHED.json`'s `source_commit`) naming
+      a commit no fresh clone holds, so the source check skipped itself everywhere but the
+      author's clone, and §5.1's description of it was untrue for any reader. Re-pointed
+      at the same-tree commits (`5a551e0`; `7acf585~1` for the pre-build state), recorded
+      in `ERRATA.md`, and the guard now fails rather than skips when a full clone cannot
+      reach its reference (three new tests). Nothing else must-fix: returns had diminished
 - [x] 3.5 `openspec validate merge-and-condense-papers --strict`
 
 ## 4. Handed off at archive (30 September 2026)
 
-This change was archived once the paper was written and four review rounds had run.
+This change was archived once the paper was written and five review rounds had run.
 Its open steps moved to `prepare-paper-2-publication` (its tasks 7.1–7.3), which stays open
 until upload:
 

@@ -1,7 +1,8 @@
 # Errata — Paper 1 (The Founding Vision)
 
 This paper is **frozen**. Its pinned inputs (`graphs/`, `diagrams/`) reproduce
-the repository's state at commit `59898cc~1` — the last state before the
+the repository's state at commit `7acf585~1` (`b28593a`; see *Commit identifiers*
+below) — the last state before the
 executable runtime demonstrator (`poc/`) was introduced. The document dates
 itself *June 2026*, and its content is faithful to that date: the founding
 vision genuinely existed in that form. A build check
@@ -67,3 +68,21 @@ built**:
 
 `scripts/check-freeze.py` fails the build if any served file drifts from its
 recorded checksum.
+
+## Commit identifiers
+
+**30 September 2026 — the freeze references re-pointed after a history rewrite.** Not
+a correction to the paper, whose text and served files are unchanged. At some point
+after 21 July the repository's history was rewritten, giving every commit from 14 July
+onwards (the first `poc/` commit and after) a new identifier with an identical tree, so the identifiers this record and
+the guard used stopped resolving in any fresh clone. The freeze guard then skipped
+itself there without failing. The references now name the reachable commits with the
+same trees:
+
+| Before | Now | What it is |
+|---|---|---|
+| `59898cc~1` | `7acf585~1` (both are `b28593a`, which the rewrite left alone) | the last state before `poc/` |
+| `0137aea` | `9ae2380` | the preprint preparation step |
+| `c4ae487` | `5a551e0` | the published commit (`FREEZE_REF`, `source_commit`) |
+
+The guard now fails, instead of skipping, when a full clone cannot reach its reference.

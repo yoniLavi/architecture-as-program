@@ -400,7 +400,7 @@ Enforcement is unforgeable at the WASM boundary, not at the memory level, and on
 
 = Predictions and outcomes <sec:outcomes>
 
-The vision's frozen text @lavi_architecture_2026 predates the runtime and tiers of @sec:implementation, though an early form of its validator already ran; @sec:design restates it with the corrections building forced. This section reports what the artifact did to each of its predictions.
+The vision's frozen text @lavi_architecture_2026 predates the runtime and tiers of @sec:implementation, though an early form of the validator of @sec:validator already ran; @sec:design restates it with the corrections building forced. This section reports what the artifact did to each of its predictions.
 
 == The protocol <sec:protocol>
 
