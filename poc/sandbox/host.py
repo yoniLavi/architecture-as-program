@@ -31,7 +31,7 @@ it was not granted", and it now fails naming the *interface*, not a bare symbol.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -183,17 +183,29 @@ def wasi_imports(component_name: str) -> list[str]:
     suite, because "the list is empty" is the claim; deleting the function would
     turn a checked property back into prose.
 
-    Note what "ambient" means here, because the `Clock` capability sharpened it:
-    an ambient import is one the graph did not grant. A node whose `with` clause
-    names `Clock` imports `wasi:clocks/wall-clock` — a wasi-namespaced interface —
-    and this function still reports it clean, because that import is a *granted
-    capability*, derived from the signature like any other. The same import on a
-    node whose clause does not name `Clock` would be reported here, and the
-    derivation test would fail it. The boundary between capability and ambient
-    authority is the `with` clause, not the package namespace.
+    This is the vocabulary-level check: it reports imports outside the whole
+    capability vocabulary — the WASI functions an adapter would add — and so it
+    cannot see a vocabulary interface a particular node was not granted. A
+    `wasi:clocks/wall-clock` import is in the vocabulary (the `Clock` capability),
+    so this function reports it clean on *any* node. Whether a node was granted
+    it is the per-node question `ungranted_imports` answers against its `with`
+    clause, and the derivation gate enforces.
     """
-    granted = CAPABILITY_INTERFACES | {TYPES}
-    return [i for i in component_imports(component_name) if i not in granted]
+    vocabulary = CAPABILITY_INTERFACES | {TYPES}
+    return [i for i in component_imports(component_name) if i not in vocabulary]
+
+
+def ungranted_imports(component_name: str, granted: Iterable[str]) -> list[str]:
+    """The imports of a component that its node's `with` clause did not grant.
+
+    This is what "ambient" means once `Clock` is a capability: an import the
+    graph did not grant, whatever its package namespace. A node whose clause
+    names `Clock` imports `wasi:clocks/wall-clock` and is clean here; the same
+    import on a node whose clause does not name it is reported. `granted` is the
+    node's derived interface set (`interfaces.expected_imports`); the shared type
+    vocabulary is always allowed, because it declares no functions."""
+    allowed = set(granted) | {TYPES}
+    return [i for i in component_imports(component_name) if i not in allowed]
 
 
 class Sandbox:

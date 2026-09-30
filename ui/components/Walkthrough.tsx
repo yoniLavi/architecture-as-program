@@ -120,8 +120,9 @@ export default function Walkthrough({ scenario, step, onStep, onExit }: Props) {
               {side.out_of_scope_call_refused ? "✓" : "✗"}
             </span>
             <span>
-              An attempted <code>exfiltrate</code> tool call outside the <code>{"{lookup}"}</code>{" "}
-              scope was refused by the handle itself.
+              When the model is fooled into demanding <code>exfiltrate</code>, the call outside
+              the <code>{"{lookup}"}</code> scope is refused in the run: on the host tier by the
+              handle, on the confined tier because no interface for it exists.
             </span>
           </div>
         </>

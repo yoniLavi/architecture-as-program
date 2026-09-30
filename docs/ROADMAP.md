@@ -19,7 +19,7 @@ One change is open:
 
 `merge-and-condense-papers` is written, reviewed, and archived (30 September). Paper 1 is marked
 published and served from its stored artifacts (`mark-published-papers`, archived 30 September).
-`make build` is green at 354 tests + 21 subtests.
+`make build` is green at 355 tests + 21 subtests.
 
 **Next, in order of value:**
 

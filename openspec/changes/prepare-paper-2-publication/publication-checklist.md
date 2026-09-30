@@ -4,13 +4,15 @@ Prepared 28 September 2026 for the author's upload. This file prepares the recor
 and nothing more. **Publishing is the author's step, taken with an explicit go.** It
 supersedes `archive/2026-08-01-split-demonstrator-paper/zenodo-metadata.md`, which it
 updates. Zenodo pitfalls hit while publishing Paper 1 (the preview-pointer bug, and
-drafts discarding metadata edits) are recorded in the agent memory, and step 3 below
-avoids both.
+drafts discarding metadata edits) are recorded in the agent memory. Step 2.3 below
+avoids the first. Only one thing avoids the second: **never discard the Zenodo draft**.
+It holds the reserved DOI, and discarding it loses the metadata entered so far.
 
 > **Amended 30 September 2026 by `merge-and-condense-papers`.** Paper 3 is merged into
 > Paper 2, and the steps below still govern the upload, with these changes:
-> - Steps 2.1–2.2 are done: the DOI is reserved and stamped (`58211c8`); only 2.3 remains. Its `lavi_confinement_2026` bib step is moot,
->   because that entry was deleted: it was only Paper 3's citation of Paper 2.
+> - Steps 2.1–2.2 are done: the DOI is reserved and stamped (`58211c8`); only 2.3
+>   remains. Its `lavi_confinement_2026` bib step is moot, because that entry was
+>   deleted: it was only Paper 3's citation of Paper 2.
 > - The title is unchanged. The **description** is the *new* abstract, which now also
 >   reports the accounting of Paper 1's predictions. Consider adding the keyword
 >   *pre-registration*.
@@ -30,6 +32,9 @@ avoids both.
 ## 1. Pre-flight (local)
 
 - [ ] `git status` is clean and `main` holds the commits of this change.
+- [ ] **Push `main`** (outward-facing, so the author's go). The record's *Is supplemented
+      by* link and the GitHub Pages copies must show the commit the PDF reports, and
+      `main` is otherwise ahead of `origin/main`.
 - [ ] **`make clean && make build`, not only `make build`.** Make skips targets whose
       inputs have not changed, so an older `dist/` can survive a toolchain upgrade
       unnoticed. That happened on 28 September: every paper's Markdown carried a
@@ -38,7 +43,8 @@ avoids both.
       refuse a contended run).
 - [ ] Open `dist/papers/02-demonstrator/lavi-2026-confinement-by-construction.pdf` and
       check the following:
-  - the date line reads *September 2026*
+  - the date line reads *September 2026* (if the upload slips into October, update the
+    date line in `proposal.typ` and rebuild first)
   - the abstract's crossing cost reads *tens of microseconds* (a magnitude, not a
     per-run figure)
   - §4.1 names `hostile_ungranted` as the negative control
@@ -50,14 +56,12 @@ avoids both.
 This is the order that worked for Paper 1. The DOI is in the PDF, so it has to be known
 before the final build.
 
-1. On Zenodo, create a **new upload** (not a new version of Paper 1: they are separate
-   works) and click **Reserve DOI**.
-2. Stamp it. This is a one-commit change, and Claude can make it given the DOI:
-   - In `papers/02-demonstrator/proposal.typ`, below the date line, add a line in
-     the same form as Paper 1's:
-     `Preprint · #link("https://doi.org/<DOI>")[doi:<DOI>] · CC BY 4.0`
-   - ~~In `citations.bib`, complete `lavi_confinement_2026`~~ — moot since the merge:
-     that entry was deleted, because only Paper 3 cited it.
+1. ~~On Zenodo, create a new upload and click Reserve DOI.~~ **Done**: DOI
+   10.5281/zenodo.23057135 is reserved on the existing draft. Reuse that draft; do not
+   create a new upload.
+2. ~~Stamp it.~~ **Done** in `58211c8`: the title block carries the DOI line, and the
+   `lavi_confinement_2026` bib step is moot (that entry was deleted, because only Paper
+   3 cited it).
 3. `make clean && make build` again, then upload the freshly built
    `lavi-2026-confinement-by-construction.pdf`. Set it as the preview file *before* the
    first publish, so the preview-pointer bug has nothing to trip on.
@@ -73,7 +77,9 @@ before the final build.
 - **Language:** English
 - **Version:** 1.0.0. Paper 2 is a *living* paper, so later revisions become new
   versions of this record under the same concept DOI.
-- **Description:** the abstract, verbatim from the built PDF. It now states the
+- **Description:** the abstract, verbatim, copied from
+  `dist/papers/02-demonstrator/proposal.md` rather than the PDF (a PDF copy brings its
+  line breaks and hyphenation with it). It now states the
   crossing cost as a magnitude, so it will stay true across rebuilds.
 - **Keywords:** capability-based security; object capabilities; WebAssembly Component
   Model; software architecture; functional reactive programming; information-flow
@@ -93,7 +99,7 @@ the PDF reports. Pushing a tag is outward-facing too, so it is the author's call
 ## 4. After publishing
 
 - [ ] Paper 1's record is untouched. Its single publication revision is spent.
-- [ ] Commit the DOI stamp (step 2) if it was not committed before the upload.
+- ~~Commit the DOI stamp (step 2).~~ Done before upload, in `58211c8`.
 - [ ] Archive this change: `openspec archive prepare-paper-2-publication`.
 - ~~Paper 3 can now publish.~~ Moot since the merge: there is no Paper 3.
 

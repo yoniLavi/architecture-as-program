@@ -91,7 +91,8 @@ nonetheless **present**, so "no ambient authority" was a fact about the *host's 
 misconfigured host would have granted them for real.
 
 Building for `wasm32-unknown-unknown` and converting to a component with **no WASI adapter** removes
-them. `wasi_imports()` returns `[]`, and the hostile-ambient component imports *nothing whatsoever*.
+them. `wasi_imports()` returns `[]`, and the hostile-ambient component imports only the function-free type
+vocabulary.
 Confinement became a property of **the artifact** rather than of how it happens to be run. (A
 `wasm32-wasip2` build would reintroduce the problem in new clothes: std would link `wasi:cli/*` and
 `wasi:io/*` into the import set.)

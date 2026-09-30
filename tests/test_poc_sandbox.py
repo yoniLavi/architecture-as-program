@@ -67,6 +67,7 @@ from poc.sandbox import (
     component_imports,
     expected_imports,
     record,
+    ungranted_imports,
     wasi_imports,
     wasm_path,
 )
@@ -205,7 +206,7 @@ def test_no_component_imports_any_wasi_function(component):
     assert wasi_imports(component) == []
 
 
-def test_the_hostile_component_imports_nothing_whatsoever():
+def test_the_hostile_component_imports_only_the_type_vocabulary():
     """The hostile-ambient node's world declares no capabilities, so its import set
     holds nothing but the shared type vocabulary — which declares records and enums
     and no functions, and so grants no authority. There is literally nothing for it
@@ -345,11 +346,23 @@ def _clocked_sandbox(clock: Clock) -> Sandbox:
 
 def test_clock_holder_imports_exactly_the_granted_wasi_interface():
     """Scenario: a granted clock appears in the import set. The clock-holding
-    component imports exactly `wasi:clocks/wall-clock` — and `wasi_imports`, which
-    counts *ungranted* wasi imports, still reports it clean: the boundary between
-    capability and ambient authority is the `with` clause, not the namespace."""
+    component imports exactly `wasi:clocks/wall-clock`, and the per-node check
+    reports it clean because the clock is granted: the boundary between capability
+    and ambient authority is the `with` clause, not the namespace."""
     assert capability_imports("hostile_clocked") == [CLOCK]
     assert wasi_imports("hostile_clocked") == []
+    assert ungranted_imports("hostile_clocked", [CLOCK]) == []
+
+
+def test_an_ungranted_clock_is_reported_by_the_per_node_check():
+    """The failure path. `wasi_imports` is vocabulary-level and cannot see a clock
+    (the clock *is* vocabulary), so the ambient figures are taken per node, against
+    the `with` clause. Held to a clause that does not grant `Clock` — ParseMessage's
+    — the same binary's clock import is reported."""
+    parse_clause = expected_imports(load_graph_dict("customer-support"), "ParseMessage")
+    assert CLOCK not in parse_clause
+    assert ungranted_imports("hostile_clocked", parse_clause) == [CLOCK]
+    assert ungranted_imports("node_parse_message", parse_clause) == []
 
 
 def test_nodes_without_a_clock_import_no_clock_interface():

@@ -35,6 +35,7 @@ from .host import (
     capability_imports,
     component_imports,
     record,
+    ungranted_imports,
     wasi_imports,
     wasm_path,
 )
@@ -77,6 +78,7 @@ __all__ = [
     "interface_for",
     "interfaces_for_node",
     "record",
+    "ungranted_imports",
     "wasi_imports",
     "wasm_path",
 ]
