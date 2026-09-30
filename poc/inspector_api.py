@@ -186,7 +186,7 @@ def run_case(payload: dict) -> tuple[int, dict]:
         return 422, {
             "rejected": True,
             "case": case.name,
-            "reason_class": classify(errors),
+            "reason_class": classify(errors, case.reason),
             "errors": errors,
         }
 
@@ -209,7 +209,7 @@ def run_case(payload: dict) -> tuple[int, dict]:
         return 422, {
             "rejected": True,
             "case": case.name,
-            "reason_class": classify(e.errors),
+            "reason_class": classify(e.errors, case.reason),
             "errors": e.errors,
         }
 

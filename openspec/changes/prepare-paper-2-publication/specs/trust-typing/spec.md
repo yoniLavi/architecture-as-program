@@ -37,7 +37,9 @@ The type system SHALL permit raising trust only at a node explicitly declared as
 SHALL treat discharge as producing a distinct output type rather than as silently dropping a label. A
 node not declared as a discharger SHALL NOT emit a higher-trust output than its input. A node holding a
 tool-scoped `LLMClient<[...]>` SHALL NOT be declared a discharger, and SHALL NOT consume `Untrusted<_>`
-input: untrusted data reaches a tool-capable node only after an upstream discharger.
+input: untrusted data reaches a tool-capable node only after an upstream discharger. Because narrowing is
+checked but not enforced, a parent SHALL NOT route a tool-scoped client into a sub-graph's inference-only
+slot, where the node holding it would escape this rule.
 
 #### Scenario: Only a declared discharger may lower trust
 - **WHEN** a node consumes an `Untrusted<_>` input and emits a non-`Untrusted` output (raising the
@@ -57,7 +59,9 @@ without transiting a declared discharger — as a violation of the lattice order
 independently of edge typing. Widening a consumer's declared input to the untrusted type SHALL NOT
 launder trust. A node's output SHALL be checked per variant, since each variant leaves on its own port,
 and an input SHALL count as untrusted when `Untrusted<_>` appears anywhere inside it; a sub-graph's
-boundary output SHALL keep trust in its comparison with the child's terminals.
+boundary output SHALL keep trust in its comparison with the child's terminals. Laundering through an
+undeclared node is a lattice violation; laundering by declaring a tool-capable consumer a discharger is
+caught by the sink rule beside the lattice (see "Trust discharge is a declared, typed transformation").
 
 #### Scenario: Widening the consumer's input does not launder trust
 - **WHEN** a graph is "repaired" by widening a tool-capable node's input to `Untrusted<_>` so every
@@ -71,15 +75,16 @@ boundary output SHALL keep trust in its comparison with the child's terminals.
 - **THEN** the graph is rejected on the clean variant, as the same lattice violation
 
 ### Requirement: Principal scope narrows monotonically
-A principal-bound capability SHALL never widen wherever it is routed, including across a sub-graph
+A run's principal SHALL never widen wherever the run is routed, including across a sub-graph
 composition boundary. The runtime achieves this structurally: a sub-graph is assembled with its
 parent's principal and has no way to supply another, and only a node declared `binds_principal` may
-extend the chain of parties acting on its behalf. *Narrowing* a principal — by intersection over a fixed
+extend the chain of parties acting on its behalf. No capability instance is bound to the principal — it
+is recorded and propagated only — and binding one SHALL NOT be described as implemented until it is. *Narrowing* a principal — by intersection over a fixed
 set of dimensions, so the principals a node can act as stay enumerable from the graph — is the recorded
 design and SHALL NOT be described as implemented until it is: today a node cannot attenuate the principal
 it was given, and the validator cannot say statically which principals a node could act as.
 
 #### Scenario: Narrowing across a composition boundary cannot widen
-- **WHEN** a parent routes a principal-bound capability into a sub-graph
+- **WHEN** a parent runs a sub-graph under a principal
 - **THEN** the sub-graph acts for exactly the parent's principal, since it is assembled with it
 - **AND** no path exists for the sub-graph to supply a wider one

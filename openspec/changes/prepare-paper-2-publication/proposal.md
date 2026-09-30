@@ -73,7 +73,11 @@ polishing further.
   `scripts/type_parser.py` and `scripts/graph_validator.py` (the trust lattice per variant,
   deep, and at composition boundaries; unique graph names; no self-named node),
   `poc/runtime.py` (caller-supplied sub-graphs validated, sub-graph `requires` checked),
-  `poc/variants.py` (`launder_trust_via_variant`), and `scripts/emit-grammar.py`. Section
+  `poc/variants.py` (`launder_trust_via_variant`), and `scripts/emit-grammar.py`; then the
+  sink rule, capabilities-not-data and the tool-into-inference check (`graph_validator.py`,
+  `type_parser.py`), contract paths (`poc/contracts.py`), reason classes pinned by presence
+  (`poc/evaluate.py`, `poc/inspector_api.py`), four more corpus cases, `poc/trace.py` and
+  `poc/trace-schema.json` (journal wording), `bench.py`, and a `caps.wit` comment. Section
   numbers in "Why" and "What Changes" are Paper 2's pre-merge numbering
 - Affected papers: `papers/02-demonstrator/proposal.typ`, and `papers/03-method/proposal.typ`
   (since merged into Paper 2 and deleted; see `archive/2026-09-30-merge-and-condense-papers`)

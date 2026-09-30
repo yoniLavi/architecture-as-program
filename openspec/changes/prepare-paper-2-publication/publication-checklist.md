@@ -64,7 +64,9 @@ before the final build.
    `lavi_confinement_2026` bib step is moot (that entry was deleted, because only Paper
    3 cited it).
 3. `make clean && make build` again, on an idle machine. Confirm `git status` is clean, so
-   the PDF was built from a committed tree, then **push `main`** (outward-facing, so the
+   the PDF was built from a committed tree, then **push `main` and the tag
+   `paper-3-before-merge`** (`git push origin main paper-3-before-merge`; the tag is not yet
+   on origin, and the paper's docs point readers to it) (outward-facing, so the
    author's go): the record's *Is supplemented by* link and the GitHub Pages copies must
    show the commit the PDF was built from, and `main` is otherwise ahead of
    `origin/main`. Confirm the Pages workflow goes green after the push (its last run was

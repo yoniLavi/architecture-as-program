@@ -122,6 +122,23 @@ def delegate_via_edge(graph: dict) -> dict:
     return g
 
 
+def route_tool_into_inference_slot(platform: dict) -> dict:
+    """Route the platform's tool-scoped client into `CustomerSupport`'s
+    inference-only slot.
+
+    `LLMClient<[lookup]>` is assignable where `LLMClient<inference>` is expected
+    (narrowing), and the handle is routed whole. The child's `ParseMessage` —
+    declared inference-only, and a discharger consuming `Untrusted<_>` — would then
+    hold a tool client the sink rule, which reads declared clauses, never saw."""
+    g = copy.deepcopy(platform)
+    for node in g["nodes"]:
+        if node["name"] == "CustomerSupport":
+            node["inputs"] = [
+                "LLMClient<[lookup]>" if i == "LLMClient<inference>" else i for i in node["inputs"]
+            ]
+    return g
+
+
 def mislabel_subgraph_output(platform: dict) -> dict:
     """Make a sub-graph node lie about what it emits at its boundary.
 
@@ -171,6 +188,7 @@ UNSAFE_VARIANTS = {
     "launder_trust_by_declaration": launder_trust_by_declaration,
     "untrusted_into_tool_node": untrusted_into_tool_node,
     "delegate_via_edge": delegate_via_edge,
+    "route_tool_into_inference_slot": route_tool_into_inference_slot,
     "mislabel_subgraph_output": mislabel_subgraph_output,
     "unevaluatable_contract": unevaluatable_contract,
 }
@@ -181,4 +199,4 @@ UNSAFE_VARIANTS = {
 # — so a single-graph rejection test does not apply to them. The evaluation corpus
 # (`poc/evaluate.py`) and `tests/test_poc_subgraph.py` cover them with the child
 # graph present.
-CROSS_GRAPH_VARIANTS = frozenset({"mislabel_subgraph_output"})
+CROSS_GRAPH_VARIANTS = frozenset({"mislabel_subgraph_output", "route_tool_into_inference_slot"})

@@ -27,7 +27,7 @@ Three design commitments, each load-bearing:
   there.
 
   What the call layer is not: sufficient for replay. Durable-execution systems that
-  replay (Golem journals precisely this at a component's WIT boundary) also record
+  replay (Golem journals calls at a component's WIT boundary) also record
   argument and return *values*, which nothing here captures. This layer is the
   ordering and multiplicity replay would need, not the data.
 
@@ -104,8 +104,11 @@ class Call:
     interface crossed, the instance it landed on, the operation reached for, and
     the position in this node's call sequence.
 
-    This is the layer the durable-execution systems record (Golem journals exactly
-    this at a component's WIT boundary) and the layer replay would need. It is
+    This is the *kind* of layer the durable-execution systems record (Golem journals
+    calls at a component's WIT boundary) and replay would need — but it records
+    accesses to a capability *handle*, which on the confined tier are the host
+    adapter's accesses in serving a crossing, not the WIT calls one-for-one (a
+    `tool-llm` crossing journals as two). It is
     deliberately *not* tier-comparable: the host tier calls a capability once where
     a confined component loops internally, under different operation names, and
     that difference is real rather than noise to be suppressed. `Crossing` above is

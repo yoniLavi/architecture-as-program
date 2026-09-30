@@ -36,7 +36,11 @@ build rather than be reported as a denial. Specifically:
   guest's report), so that a widened scope, which fails for another reason, is reported;
 - the tier table SHALL be pinned in the build: a confined escape, or a host cell that stops escaping, fails
   it;
-- the ambient-import figures SHALL be computed against each node's own `with` clause.
+- the ambient-import figures SHALL be computed against each node's own `with` clause;
+- each reason class SHALL be identified by its own check's message, and a case SHALL pin the class that
+  must be *present* among its rejection's classes, so a second check firing on the same graph cannot mask
+  a first that stopped firing (the sink rule once satisfied the lattice's signature, and the lattice could
+  be removed with every laundering case still green).
 
 #### Scenario: A denial for the wrong reason fails the build
 - **WHEN** a confined escape probe is denied with a detail other than its discriminating one (for example,

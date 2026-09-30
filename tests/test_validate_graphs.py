@@ -912,6 +912,32 @@ class TestTheSinkRule(unittest.TestCase):
         self.assertTrue(any("cannot be its own discharger" in e for e in errors), errors)
 
 
+class TestNoToolClientIntoAnInferenceSlot(unittest.TestCase):
+    def test_a_tool_client_routed_into_an_inference_slot_is_rejected(self):
+        """Narrowing accepts `LLMClient<[lookup]>` for `LLMClient<inference>`, and
+        the handle is routed whole, so the child node would hold a tool client
+        the sink rule never saw."""
+        child = {
+            "name": "Svc",
+            "parameters": ["Req", "LLMClient<inference>"],
+            "capabilities": ["LLMClient<inference>"],
+            "nodes": [
+                {"name": "Parse", "inputs": ["Req", "LLMClient<inference>"], "output": "Done"}
+            ],
+            "data_edges": [],
+        }
+        parent = {
+            "name": "Plat",
+            "parameters": ["Req", "LLMClient<[lookup]>"],
+            "capabilities": ["LLMClient<[lookup]>"],
+            "nodes": [{"name": "Svc", "inputs": ["Req", "LLMClient<[lookup]>"], "output": "Done"}],
+            "data_edges": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            errors = validate_files(_write({"c.json": child, "p.json": parent}, Path(td)))
+        self.assertTrue(any("escape the sink rule" in e for e in errors), errors)
+
+
 class TestContractPaths(unittest.TestCase):
     def test_a_dunder_path_is_outside_the_vocabulary(self):
         from graph_validator import _contract_syntax_error

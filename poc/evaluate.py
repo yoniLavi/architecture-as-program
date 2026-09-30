@@ -135,16 +135,25 @@ REASON_TRUST_LATTICE = "trust lattice"
 REASON_CROSS_GRAPH = "cross-graph signature"
 REASON_CONTRACT = "contract"
 REASON_CAPABILITY_DATA = "capability as data"
+REASON_SINK = "sink rule"
 
-# A reason class is identified by substrings that must all appear in the
-# validator's errors. The classes are disjoint on the current corpus — a
-# laundering rejection carries no "type mismatch", and an output-side composition
-# fault carries neither — and `classify` treats a case matching more than one (or
-# none) as a divergence rather than guessing.
+# A reason class is identified by phrases, *any* of which in one of the
+# validator's errors places that error in the class; each phrase is specific to
+# the check that emits it. A rejection can carry several classes — `launder_trust`
+# breaks both the lattice and the sink rule — so a case pins the class that must be
+# *present*, not the only one. What matters is that each class is identified by
+# its own check's message: when the sink rule's text also satisfied the lattice's
+# signature, removing the lattice entirely left every laundering case green.
 REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     REASON_EDGE_TYPE: ("type mismatch",),
-    REASON_TRUST_LATTICE: ("upward coercion", "laundering", "discharges_trust"),
-    REASON_CROSS_GRAPH: ("declared output", "terminal output types"),
+    # The lattice's own messages only: the node-body check and the edge check.
+    REASON_TRUST_LATTICE: ("raises trust without", "trust-lattice violation"),
+    REASON_SINK: ("holds a tool-scoped LLMClient",),
+    REASON_CROSS_GRAPH: (
+        "declared output",
+        "terminal output types",
+        "do not satisfy that graph's parameters",
+    ),
     # A contract outside the closed vocabulary is caught before anything runs, and
     # is pinned to its own class so it cannot silently start being caught as a
     # different fault — the same reason laundering is pinned to the trust lattice
@@ -224,9 +233,10 @@ CORPUS: tuple[Case, ...] = (
         "launder_trust_by_declaration",
         "mutation",
         REJECTED,
-        REASON_TRUST_LATTICE,
-        "`launder_trust` excused by declaring the tool-capable consumer a discharger. A "
-        "node holding a tool-scoped client cannot be its own discharger.",
+        REASON_SINK,
+        "`launder_trust` excused by declaring the tool-capable consumer a discharger. The "
+        "lattice accepts a declared discharger; the sink rule does not let a node holding "
+        "a tool-scoped client be one.",
     ),
     Case(
         "delegate_via_edge",
@@ -241,10 +251,21 @@ CORPUS: tuple[Case, ...] = (
         "untrusted_into_tool_node",
         "mutation",
         REJECTED,
-        REASON_TRUST_LATTICE,
+        REASON_SINK,
         "Raw untrusted input into the tool-capable node, labelled consistently so no node "
         "raises trust. The lattice alone constrains raising trust, not consuming it; the "
         "sink rule keeps untrusted data off a tool-capable node.",
+    ),
+    Case(
+        "route_tool_into_inference_slot",
+        "mutation",
+        REJECTED,
+        REASON_SINK,
+        "The platform routes its tool-scoped client into `CustomerSupport`'s "
+        "inference-only slot. Narrowing is checked, not enforced, so the child's "
+        "discharger would hold a tool client the sink rule never saw.",
+        base="support-platform",
+        with_graphs=("customer-support",),
     ),
     Case(
         "mislabel_subgraph_output",
@@ -288,11 +309,23 @@ class Outcome:
         return self.actual != self.case.expected or self.reason != self.case.reason
 
 
-def classify(errors: list[str]) -> str | None:
-    """The reason class a rejection falls into, or None if it matches no single class."""
-    blob = " ".join(errors)
-    matched = [r for r, sig in REASON_SIGNATURES.items() if all(s in blob for s in sig)]
-    return matched[0] if len(matched) == 1 else None
+def reasons_in(errors: list[str]) -> frozenset[str]:
+    """Every reason class some error in `errors` belongs to."""
+    return frozenset(
+        r
+        for r, phrases in REASON_SIGNATURES.items()
+        if any(p in e for e in errors for p in phrases)
+    )
+
+
+def classify(errors: list[str], pinned: str | None = None) -> str | None:
+    """The reason class to report for a rejection: the pinned class if it is
+    present among the errors' classes, else the single class present, else None
+    (no class, or several with none pinned — a divergence, not a guess)."""
+    present = reasons_in(errors)
+    if pinned is not None and pinned in present:
+        return pinned
+    return next(iter(present)) if len(present) == 1 else None
 
 
 def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
@@ -324,7 +357,9 @@ def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
         else:
             errors = validate_graph_dict(graph)
         if errors:
-            outcomes.append(Outcome(case, REJECTED, classify(errors), " ".join(errors[0].split())))
+            outcomes.append(
+                Outcome(case, REJECTED, classify(errors, case.reason), " ".join(errors[0].split()))
+            )
             continue
 
         # Validation passed; assembly is the gate the runtime actually goes through,
@@ -333,7 +368,9 @@ def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
             assemble(graph, backend=StubLLM(), stores=STORES)
             outcomes.append(Outcome(case, ACCEPTED, None, "assembles and is runnable"))
         except AssemblyError as e:
-            outcomes.append(Outcome(case, REJECTED, classify(e.errors), " ".join(e.errors)))
+            outcomes.append(
+                Outcome(case, REJECTED, classify(e.errors, case.reason), " ".join(e.errors))
+            )
     return outcomes
 
 
@@ -1265,7 +1302,7 @@ def render(
         f"{_tick(not injection.is_untrusted)} |"
     )
     lines.append(
-        f"| a fooled model's out-of-scope tool call was refused, in the run | "
+        f"| a fooled model's out-of-scope call took the error branch | "
         f"{injection.out_of_scope_call_refused} | "
         f"{_tick(injection.out_of_scope_call_refused)} |"
     )

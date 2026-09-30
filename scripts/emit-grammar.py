@@ -257,6 +257,24 @@ def render_card(canonical_types: list[str]) -> str:
         "upward coercion); see Paper 2 §3.1."
     )
     lines.append("")
+    lines.append(
+        "Beside the order, a sink rule: a node holding a tool-scoped "
+        "`LLMClient<[...]>` may neither consume `Untrusted<_>` nor declare "
+        "`discharges_trust`, and a tool-scoped client may not be routed into a "
+        "sub-graph's inference-only slot."
+    )
+    lines.append("")
+
+    lines.append("## Capabilities are not data")
+    lines.append("")
+    lines.append(
+        "A capability type may appear only in a graph's `capabilities` and in a "
+        "node's `with` inputs. In a data input, an output, or a boundary parameter "
+        "not declared as a capability — including under a type constructor or in "
+        "a sum variant — it is rejected: a handle is never passed along an edge. An "
+        "entry in `capabilities` that is not a capability kind is rejected too."
+    )
+    lines.append("")
 
     lines.append("## Variant-completeness")
     lines.append("")

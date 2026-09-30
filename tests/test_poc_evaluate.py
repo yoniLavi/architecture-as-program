@@ -346,6 +346,18 @@ def test_the_refusal_pin_sees_a_widened_host_scope(monkeypatch):
     assert run_injection(set()).out_of_scope_call_refused is False
 
 
+def test_the_lattice_pin_fails_if_the_lattice_is_removed(monkeypatch):
+    """The sink rule also fires on the laundering cases, so a pin that accepted any
+    trust-ish message stayed green with the lattice gone (round G, 30 Sep 2026).
+    Each class is now identified by its own check's message, so removing the
+    lattice must diverge rather than be masked."""
+    import graph_validator
+
+    monkeypatch.setattr(graph_validator, "trust_flows_to", lambda _p, _r: True)
+    problems = check(run_corpus())
+    assert any(p.startswith("launder_trust:") for p in problems)
+
+
 def test_the_escape_pin_fires_both_ways():
     from poc.evaluate import Escape, check_escapes
 

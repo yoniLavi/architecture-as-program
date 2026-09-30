@@ -39,13 +39,17 @@ existing `graph_validator` — it does not re-implement type checking. The fault
 | `bypass_pipeline` — wire raw untrusted input straight into the tool-capable node | edge type-compatibility (`Untrusted<RawMessage>` ≠ `ConversationContext`) |
 | `launder_trust` — "fix" that by widening the tool-capable node's input type | trust propagation (consumes `Untrusted<_>`, emits clean, never declares `discharges_trust`) |
 | `launder_trust_via_variant` — the same, with one output variant marked `Untrusted<_>` | trust propagation, per variant (one untrusted variant does not license a clean sibling) |
+| `launder_trust_by_declaration` — excuse it by declaring the consumer a discharger | the sink rule (a tool-capable node cannot be its own discharger) |
+| `untrusted_into_tool_node` — keep every output untrusted, so no node raises trust | the sink rule (a tool-capable node may not consume `Untrusted<_>`) |
+| `route_tool_into_inference_slot` — route a tool client into a sub-graph's inference slot | the sink rule, at composition |
 
-The rest (`mislabel_subgraph_output`, caught by the cross-graph output check, and
-`unevaluatable_contract`, by the contract vocabulary) are listed with their reason classes in
-`dist/evaluation.md`.
+The rest (`delegate_via_edge`, caught as a capability in a data position;
+`mislabel_subgraph_output`, by the cross-graph output check; `unevaluatable_contract`, by the
+contract vocabulary) are listed with their reason classes in `dist/evaluation.md`.
 
-`launder_trust` (and its disguise) is the one that matters. It type-checks on the edge; only the
-trust rule catches it.
+`launder_trust` (and its disguise) is the one that matters. It type-checks on the edge; the trust
+lattice catches it (the sink rule does too, and the harness pins the lattice's own error so the
+second cannot mask the first).
 Trust cannot be laundered by relabelling the consumer.
 
 **2. Capability scoping is enforced by the handle's surface** (`poc/handles.py`). `InferenceLLM`

@@ -70,9 +70,10 @@ def demo_assembly_rejection(graph: dict) -> None:
             assemble(make_variant(base), backend=StubLLM(), stores=STORES)
             print(f"  ✗ {name}: ASSEMBLED — this should not happen!")
         except AssemblyError as e:
+            print(f"  ✓ {name} rejected:")
             for err in e.errors:
-                detail = " ".join(err.split())
-                print(f"  ✓ {name} rejected:\n      {detail}\n")
+                print(f"      {' '.join(err.split())}")
+            print()
 
 
 def demo_capability_confinement() -> None:

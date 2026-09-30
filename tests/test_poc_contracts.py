@@ -53,6 +53,19 @@ def test_a_predicate_outside_the_vocabulary_is_rejected():
             parse(bad)
 
 
+def test_a_path_cannot_reflect_into_the_host():
+    """Paths resolve through `getattr`, so a segment beginning with an underscore
+    would reach the host language (`__class__.__init__.__globals__` did, before
+    30 September 2026). Every segment must begin with a letter."""
+    for bad in (
+        "__class__.__init__.__globals__.__name__ == 'poc.values'",
+        "len(__class__.__init__.__globals__.__builtins__) > 100",
+        "intent._private == 'x'",
+    ):
+        with pytest.raises(ContractError):
+            parse(bad)
+
+
 def test_a_missing_field_is_false_not_an_error_once_parsed():
     """Distinct from the above: a *well-formed* predicate over a field the value
     lacks is simply unsatisfied. Only unparseable text is an error."""

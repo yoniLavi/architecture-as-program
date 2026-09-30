@@ -92,6 +92,11 @@
 - [x] 6.19 The principal is recorded, not bound: six paper sites corrected and three hedge pins
       re-seeded deliberately (they had overshot in the overstating direction on 5 August)
 - [x] 6.20 The trust-typing spec's direction corrected (discharge *raises* trust)
+- [x] 6.21 The sink rule's bypass by narrowing closed (no tool client into an inference-only
+      slot; `route_tool_into_inference_slot` pinned); reason classes identified by their own
+      check's message and pinned by presence, so the sink rule cannot mask the lattice (a
+      test removes the lattice and the pin fails); the prompt-injection row moved to
+      *Partial* under §5.1's definition (the vision counted retrieved content as untrusted)
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

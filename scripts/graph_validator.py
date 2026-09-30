@@ -514,15 +514,20 @@ def _holds_tool_scoped_llm(node: dict, caps: list[str]) -> bool:
             ast = parse_type(inp)
         except ParseError:
             continue
-        if (
-            isinstance(ast, TApp)
-            and ast.head == "LLMClient"
-            and ast.args
-            and isinstance(ast.args[0], TList)
-            and ast.args[0].items
-        ):
+        if _is_tool_scoped(ast):
             return True
     return False
+
+
+def _is_tool_scoped(ast: Type) -> bool:
+    """True if `ast` is an `LLMClient<[...]>` with a non-empty tool list."""
+    return (
+        isinstance(ast, TApp)
+        and ast.head == "LLMClient"
+        and bool(ast.args)
+        and isinstance(ast.args[0], TList)
+        and bool(ast.args[0].items)
+    )
 
 
 def _validate_layout(
@@ -690,6 +695,16 @@ def _validate_cross_graph(
                         f"position {i}: provided capability {p!r} is not "
                         f"assignable to expected {e!r} under the subtyping "
                         f"rules"
+                    )
+                elif _is_tool_scoped(pa) and not _is_tool_scoped(ea):
+                    # Narrowing is checked, not enforced: the handle is routed
+                    # whole. A tool client routed into an inference-only slot
+                    # would make every child node holding that slot a node that
+                    # holds a tool-scoped LLMClient the sink rule never saw.
+                    mismatches.append(
+                        f"position {i}: provided {p!r} is tool-scoped but {e!r} is "
+                        f"inference-only; routed unattenuated, it would make a child "
+                        f"node that holds a tool-scoped LLMClient escape the sink rule"
                     )
 
             if mismatches:
