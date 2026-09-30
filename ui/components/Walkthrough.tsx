@@ -122,7 +122,7 @@ export default function Walkthrough({ scenario, step, onStep, onExit }: Props) {
             <span>
               When the model is fooled into demanding <code>exfiltrate</code>, the call outside
               the <code>{"{lookup}"}</code> scope is refused in the run: on the host tier by the
-              handle, on the confined tier because no interface for it exists.
+              handle; on the confined tier the body reports it, having no interface to act on it.
             </span>
           </div>
         </>
@@ -147,7 +147,8 @@ export default function Walkthrough({ scenario, step, onStep, onExit }: Props) {
           <p>
             So the guarantee is <b>attenuation, not elimination</b>: the model can still be{" "}
             <em>influenced</em> by that text; it cannot call anything outside{" "}
-            <code>{"{lookup}"}</code>, because the handle refuses. Blast radius drops from
+            <code>{"{lookup}"}</code>: on the host tier the handle refuses, and on the confined
+            tier the component imports no interface for any other tool. Blast radius drops from
             arbitrary tool execution to a bad lookup query.
           </p>
           <p className="note">

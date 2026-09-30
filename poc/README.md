@@ -8,6 +8,9 @@ Where the existing `scripts/` toolchain proves the *static* layer (edge typing, 
 propagation, capability narrowing), this proves the *executable* layer: that capabilities can
 actually be injected, that a node cannot exceed the authority its signature declares, and that
 the unsafe wirings the proposal calls "ill-typed" really are rejected before anything runs.
+Assembly runs the validator over the graph *and* every graph it executes as a sub-graph, so a
+composition the cross-graph checks reject never runs. One limit: capability narrowing is checked
+there, not enforced — a parent's wider handle is routed to a sub-graph unattenuated.
 
 ## Run it
 
@@ -76,8 +79,9 @@ interfaces its component imports.** Here confinement is enforced, not modelled:
   unexposed (strictly stronger than the host tier's missing method);
 - a component that declares a capability it was not granted **cannot instantiate at all**, and the
   refusal *names the interface* it was denied;
-- **there is no ambient authority to reach for at all.** The components import *no* WASI functions —
-  not filesystem, socket, environment, or clock. See below; this is the strongest claim here.
+- **there is no ambient authority to reach for at all.** The components import no WASI function
+  their `with` clause did not grant — no filesystem, socket, or environment function, and a clock
+  only where the clause names `Clock` (checked per node by `ungranted_imports`). See below; this is the strongest claim here.
 - a value that does not match an interface's WIT type is a **boundary error**, not a byte
   reinterpreted as something else.
 

@@ -19,7 +19,7 @@ One change is open:
 
 `merge-and-condense-papers` is written, reviewed, and archived (30 September). Paper 1 is marked
 published and served from its stored artifacts (`mark-published-papers`, archived 30 September).
-`make build` is green at 355 tests + 21 subtests.
+`make build` is green at 357 tests + 21 subtests.
 
 **Next, in order of value:**
 
@@ -116,7 +116,8 @@ graph is self-hosting and cute, but has no untrusted input, so it would leave th
 |---|---|---|
 | **Node-local state** | Model state as a capability (`StateHandle<'seen', read-write>`), not as a stateful combinator or a feedback edge | Needs no new language surface, and all six analyses plus the confinement property apply unchanged. Reporting *"we did not need a stateful combinator"* is a genuine simplification of the agenda's three-way open question — and if it proves insufficient, that is equally reportable |
 | **Fan-in / aggregation** | A restricted fold over a homogeneous list; the runtime today *refuses* multi-terminal runs | The highest-value item. It is the first real test of the trust lattice's stated monotonicity condition: a node's output label must be a monotone function of the **meet** of its input labels. The paper asserts that condition and never exercises it. One tainted item in twenty must taint the digest |
-| **I/O capability kinds** | ~~`HTTPClient<allowlist>`, `Clock`, `Notifier<channel>` as typed WIT interfaces~~ — **done** (`add-io-capability-kinds`): seven kinds derive with no special case, `wasi:clocks/wall-clock` granted directly, allowlist narrowing by set inclusion, hostile cases pinned | Directly widened the paper's strongest result — the import set derived from the `with` clause and checked against the binary. The clock demonstration replaced the "imports *no* clock" boast with a worked grant |
+| **I/O capability kinds** | ~~`HTTPClient<allowlist>`, `Clock`, `Notifier<channel>` as typed WIT interfaces~~ — **done** (`add-io-capability-kinds`): seven kinds derive with no special case, `wasi:clocks/wall-clock` granted directly, allowlist narrowing by set inclusion (checked at assembly, not enforced — see the next row), hostile cases pinned | Directly widened the paper's strongest result — the import set derived from the `with` clause and checked against the binary. The clock demonstration replaced the "imports *no* clock" boast with a worked grant |
+| **Attenuation at the routing point** | When a parent routes a wider handle to a sub-graph, wrap it in a facade limited to the child's declared scope (mode, tool set, allowlist, store), keeping the caretaker so revocation still reaches it | Strengthens the *current* paper: capability narrowing is checked at assembly but not enforced, so a routed handle's scope is the parent's (Paper 2 §5.1, §7.6). Enforcing it would let the *Partial* "a node cannot exceed its declared capabilities" drop its routed-scope qualifier. A new runtime capability, so it needs its own change |
 | **A driver boundary** | A scheduler that ticks the graph | Small. Today the graph is driven by a test harness; a real service is driven by the world |
 | **A contract language** | ~~Deliberately minimal~~ — **done** (`poc/contracts.py`): closed vocabulary, blame, corpus-pinned. What remains is the *generative* mode: derive a Hypothesis strategy from a precondition and fuzz each node body off the execution path | Prerequisite for the generation experiment below — a generated body needs something to be checked *against* beyond "it compiled". The runtime half exists; the generative half is M3 |
 | **Agent-generated node bodies** | The experiment (below) | The thesis's central untested claim |

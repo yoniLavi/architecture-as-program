@@ -609,5 +609,15 @@ def test_the_data_carries_the_negative_control():
     assert payload["agreeing"] == payload["total"] == len(DERIVED_NODES)
 
 
+def test_every_registered_port_has_a_derivation_row():
+    """§4.1 says the derivation covers every ported node rather than a chosen
+    example. `DERIVED_NODES` is hand-listed, so hold it to the registry of nodes the
+    confined tier actually runs: a port added without a derivation row fails here."""
+    from poc.sandbox.nodes import SANDBOX_REGISTRY
+
+    derived = {node for graph, node, _ in DERIVED_NODES if graph == "customer-support"}
+    assert derived == set(SANDBOX_REGISTRY)
+
+
 def test_main_is_importable_without_running():
     assert callable(main)

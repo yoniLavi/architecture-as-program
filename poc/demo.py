@@ -18,7 +18,8 @@ from .llm import AnthropicBackend, LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
 from .sandbox import INFERENCE_LLM, SandboxError
 from .sandbox import available as sandbox_available
-from .sandbox.host import Sandbox, capability_imports, wasi_imports
+from .sandbox.host import Sandbox, capability_imports, ungranted_imports
+from .sandbox.interfaces import expected_imports
 from .values import ConversationContext, CustomerQuery, CustomerRequest, Untrusted
 from .variants import UNSAFE_VARIANTS
 
@@ -136,7 +137,8 @@ def demo_residual(graph: dict, backend, sandbox=()) -> None:
     print(f"\n    adversarial text still present in ConversationContext.question? {leaked}")
     print("\n  So the guarantee is attenuation, not elimination:")
     print("    • the tool-capable LLM can be *influenced* by that text;")
-    print("    • it cannot call anything outside {lookup} — the handle refuses;")
+    print("    • it cannot call anything outside {lookup} — on the host tier the handle")
+    print("      refuses; on the confined tier no interface for another tool exists;")
     print("    • the inference-only nodes cannot act on it at all.")
     print("  Blast radius drops from 'arbitrary tool execution' to 'a bad lookup query'.")
     print("\n  The sandbox tier does NOT close this residual: it stops ambient-authority")
@@ -191,7 +193,10 @@ def demo_sandbox_hostile() -> None:
     except SandboxError:
         print("  ungranted tool    host: could import one  component: WON'T INSTANTIATE")
 
-    ambient = wasi_imports("node_parse_message")
+    ambient = ungranted_imports(
+        "node_parse_message",
+        expected_imports(load_graph_dict("customer-support"), "ParseMessage"),
+    )
     print("\n  On the component tier the capability is absent, not merely unexposed: an")
     print("  inference-only node has no tool *import*, not just no tool *method*. And")
     print("  there is no ambient authority to reach for — the confined node's import")

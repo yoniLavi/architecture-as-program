@@ -218,9 +218,11 @@ def check(predicates: tuple[Predicate, ...], value: object, *, node: str, kind: 
 def unresolvable_paths(predicates: tuple[Predicate, ...], sample: object) -> list[str]:
     """Paths that do not resolve against a representative value.
 
-    Used at assembly, where the value classes are in hand, to reject a contract
-    that could never be evaluated — the graph validator cannot do this, having no
-    field schema for a declared type name."""
+    Intended for assembly, to reject a contract that could never be evaluated —
+    the graph validator cannot, having no field schema for a declared type name.
+    It is **not yet called**: assembly holds type names, not representative
+    values, so a precondition naming a field the input lacks is false at run time
+    and blamed on the wiring (pinned in `tests/test_poc_contracts.py`)."""
     missing = []
     for predicate in predicates:
         for path in predicate.paths:

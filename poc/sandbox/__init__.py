@@ -13,9 +13,10 @@ Two claims, both asserted in `tests/test_poc_sandbox.py` rather than in prose:
 
 * **There is no ambient authority to reach for.** The components are built for
   `wasm32-unknown-unknown` and converted with no WASI adapter, so the import set
-  contains *no* filesystem, socket, environment or clock function at all — not
-  even the powerless stubs a `wasm32-wasip1` module links. `wasi_imports()`
-  returns the empty list.
+  contains *no* filesystem, socket, or environment function at all — not even
+  the powerless stubs a `wasm32-wasip1` module links — and a clock only where
+  the node's clause grants `Clock`. `wasi_imports()` returns the empty list;
+  `ungranted_imports()` checks the clock case per node.
 
 The boundary is typed: the host and a node exchange WIT records, enums and
 variants, so a value of the wrong shape is a boundary error (`SandboxTypeError`)

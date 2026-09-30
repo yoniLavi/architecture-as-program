@@ -135,8 +135,10 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
         if "binds_principal" in n and not isinstance(n["binds_principal"], bool):
             errors.append(f"{path.name}: node {nname!r} `binds_principal` must be boolean")
             continue
-        # Contracts are checked for *parseability* here and for resolvable field
-        # paths at assembly. The split is forced by what each layer can know: this
+        # Contracts are checked for *parseability* here. Resolvable field paths are
+        # not yet checked anywhere before a run (poc/contracts.py
+        # `unresolvable_paths` is not called). The split is forced by what each
+        # layer can know: this
         # validator is dependency-free and holds no field schema for a declared type
         # name, so it can tell a malformed predicate from a well-formed one but not
         # a real field from an imagined one.

@@ -63,8 +63,13 @@ polishing further.
 
 ## Impact
 
-- Affected specs: `evaluation`, `paper-corpus`
-- Affected code: `poc/evaluate.py`, `tests/test_poc_evaluate.py`
+- Affected specs: `evaluation`, `paper-corpus`; and, from the review rounds of 30 September
+  after the merge, `signal-graph-runtime` (assembly validates a composition; the import-set
+  requirement names the type vocabulary and per-node clocks) and `trust-typing` (the wiring
+  requirement states its order against the flows-to convention, renamed from "flow-sensitive")
+- Affected code: `poc/evaluate.py`, `tests/test_poc_evaluate.py`; and, from those rounds,
+  `poc/graph.py` (cross-graph validation at assembly), `poc/sandbox/host.py`
+  (`ungranted_imports`), `poc/demo.py`, and the inspector's walkthrough copy
 - Affected papers: `papers/02-demonstrator/proposal.typ`, `papers/03-method/proposal.typ`
 - Affected docs: `citations.bib`, `docs/PRIOR-ART.md`, `docs/ROADMAP.md`, `AGENTS.md`
 - Paper 1 is untouched (frozen, errata-only); nothing here is an erratum to it — its

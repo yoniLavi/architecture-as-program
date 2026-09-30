@@ -32,9 +32,6 @@ It holds the reserved DOI, and discarding it loses the metadata entered so far.
 ## 1. Pre-flight (local)
 
 - [ ] `git status` is clean and `main` holds the commits of this change.
-- [ ] **Push `main`** (outward-facing, so the author's go). The record's *Is supplemented
-      by* link and the GitHub Pages copies must show the commit the PDF reports, and
-      `main` is otherwise ahead of `origin/main`.
 - [ ] **`make clean && make build`, not only `make build`.** Make skips targets whose
       inputs have not changed, so an older `dist/` can survive a toolchain upgrade
       unnoticed. That happened on 28 September: every paper's Markdown carried a
@@ -44,7 +41,7 @@ It holds the reserved DOI, and discarding it loses the metadata entered so far.
 - [ ] Open `dist/papers/02-demonstrator/lavi-2026-confinement-by-construction.pdf` and
       check the following:
   - the date line reads *September 2026* (if the upload slips into October, update the
-    date line in `proposal.typ` and rebuild first)
+    date line in `proposal.typ`, commit it, and rebuild first)
   - the abstract's crossing cost reads *tens of microseconds* (a magnitude, not a
     per-run figure)
   - §4.1 names `hostile_ungranted` as the negative control
@@ -62,7 +59,11 @@ before the final build.
 2. ~~Stamp it.~~ **Done** in `58211c8`: the title block carries the DOI line, and the
    `lavi_confinement_2026` bib step is moot (that entry was deleted, because only Paper
    3 cited it).
-3. `make clean && make build` again, then upload the freshly built
+3. `make clean && make build` again, on an idle machine. Confirm `git status` is clean, so
+   the PDF was built from a committed tree, then **push `main`** (outward-facing, so the
+   author's go): the record's *Is supplemented by* link and the GitHub Pages copies must
+   show the commit the PDF was built from, and `main` is otherwise ahead of
+   `origin/main`. Then upload the freshly built
    `lavi-2026-confinement-by-construction.pdf`. Set it as the preview file *before* the
    first publish, so the preview-pointer bug has nothing to trip on.
 
@@ -78,8 +79,8 @@ before the final build.
 - **Version:** 1.0.0. Paper 2 is a *living* paper, so later revisions become new
   versions of this record under the same concept DOI.
 - **Description:** the abstract, verbatim, copied from
-  `dist/papers/02-demonstrator/proposal.md` rather than the PDF (a PDF copy brings its
-  line breaks and hyphenation with it). It now states the
+  `dist/papers/02-demonstrator/proposal.html` opened in a browser (a PDF copy brings its
+  line breaks and hyphenation; the `.md` brings pandoc markup such as `---` and `*`). It now states the
   crossing cost as a magnitude, so it will stay true across rebuilds.
 - **Keywords:** capability-based security; object capabilities; WebAssembly Component
   Model; software architecture; functional reactive programming; information-flow

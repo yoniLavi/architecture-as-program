@@ -52,6 +52,21 @@
       Papers 2 and 3 set, so Paper 1's outputs are byte-identical to a build from the pre-change
       commit (checked for the Markdown, the HTML, and the PDF text)
 
+## 6b. Found by the review rounds after the merge (30 September 2026)
+
+- [x] 6.4 The injection refusal was a host-tier probe outside the reported run; it is now read
+      from a run with a fooled model, on each tier, and pinned
+- [x] 6.5 The tier table's host column was mostly literals and its confined denials could not
+      have read otherwise; every host cell is now an attempt, and each confined denial is pinned
+      to its discriminating error
+- [x] 6.6 Assembly validated a graph alone, so the runtime executed compositions the
+      cross-graph checks reject; it now validates a graph with every graph it executes
+- [x] 6.7 `ungranted_imports` checks ambient imports against each node's clause; `wasi_imports`
+      could not see a clock
+- [x] 6.8 Capability narrowing disclosed as checked, not enforced (attenuation at the routing
+      point is recorded in the ROADMAP as the next change for this paper)
+- [x] 6.9 Spec deltas for `signal-graph-runtime`, `trust-typing`, and `evaluation`
+
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 
 - [ ] 7.1 Author's end-to-end read of the merged paper

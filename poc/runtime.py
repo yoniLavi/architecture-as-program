@@ -182,7 +182,9 @@ def _route_handles(
     Positions are keyed by the *child's* parameter string, not the parent's input
     string: the two can legitimately differ where the parent supplies a handle with
     more authority than the sub-graph asks for (capability narrowing, which the
-    cross-graph validator has already checked). The handle itself is resolved
+    cross-graph validator has already checked at assembly). The wider handle is
+    routed as is, *not* attenuated to the child's declared scope: narrowing is
+    checked, not enforced. The handle itself is resolved
     through `handle_for`, so a parent that declared a distinct identity for this
     node routes *that instance* across the boundary — which is what gives the
     assembly-time identity routing an executable consequence."""

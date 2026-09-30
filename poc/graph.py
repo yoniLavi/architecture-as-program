@@ -229,6 +229,21 @@ def validate_graph_dicts(graphs: list[dict]) -> list[str]:
         return validate_files(paths)
 
 
+def _referenced_graphs(graph: dict) -> list[dict]:
+    """Every canonical graph `graph` reaches through sub-graph nodes, transitively
+    — the same name-keyed resolution the runtime uses to execute them."""
+    index = graphs_by_name()
+    found: dict[str, dict] = {}
+    pending = [graph]
+    while pending:
+        for node in pending.pop().get("nodes", []):
+            name = node.get("name")
+            if name in index and name not in found and name != graph.get("name"):
+                found[name] = index[name]
+                pending.append(index[name])
+    return list(found.values())
+
+
 def load_graph_dict(name_or_path: str | Path) -> dict:
     """Load a graph JSON by canonical name (e.g. 'customer-support') or path."""
     path = Path(name_or_path)
@@ -334,8 +349,9 @@ def assemble(
     the two authorities are granted independently (an instance may be one, both, or
     neither), and un-named instances (type-only and plain-identity) are provisioned
     bare, exactly as before. This is the narrow, host-tier form of Technical Note
-    A's revocation-and-rotation item; the redeployment form and the sandbox tier
-    remain open.
+    A's revocation-and-rotation item. Revocation is tested on the confined tier;
+    rotation reaches it through the same caretaker but is untested there; the
+    redeployment form remains open.
 
     `handles` supplies already-provisioned capability handles by capability type,
     instead of minting new ones from `backend`/`stores`. This is what makes a
@@ -348,6 +364,15 @@ def assemble(
     errors = validate_graph_dict(graph)
     if errors:
         raise AssemblyError(errors)
+    # A graph validated alone leaves the cross-graph layer silent: a sub-graph
+    # node's signature, capability narrowing, and boundary output are checked only
+    # against the graphs it references. Validate it together with every graph it
+    # will execute, so the runtime cannot run a composition the validator rejects.
+    referenced = _referenced_graphs(graph)
+    if referenced:
+        errors = validate_graph_dicts([graph, *referenced])
+        if errors:
+            raise AssemblyError(errors)
 
     sandbox_nodes = set(sandbox)
     stores = stores or {}
