@@ -24,7 +24,7 @@ export default function DetailPanel({ doc, corpusCase, selectedNode, nodeTrace, 
         <h2>{doc.name}</h2>
         {corpusCase && corpusCase.kind === "mutation" && (
           <p className="note">
-            Unsafe mutation <code>{corpusCase.name}</code>: {corpusCase.note}
+            Faulty case <code>{corpusCase.name}</code>: {corpusCase.note}
           </p>
         )}
         <h3>Boundary parameters</h3>

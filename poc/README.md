@@ -8,7 +8,8 @@ Where the existing `scripts/` toolchain proves the *static* layer (edge typing, 
 propagation, capability narrowing), this proves the *executable* layer: that capabilities can
 actually be injected, that a node cannot exceed the authority its signature declares, and that
 the unsafe wirings the proposal calls "ill-typed" really are rejected before anything runs.
-Assembly runs the validator over the graph *and* every graph it executes as a sub-graph, so a
+Assembly runs the validator over the graph *and* every canonical graph it reaches as a sub-graph,
+and the runtime re-checks a parent against a caller-supplied child before running it, so a
 composition the cross-graph checks reject never runs. One limit: capability narrowing is checked
 there, not enforced — a parent's wider handle is routed to a sub-graph unattenuated.
 
@@ -43,7 +44,8 @@ The rest (`mislabel_subgraph_output`, caught by the cross-graph output check, an
 `unevaluatable_contract`, by the contract vocabulary) are listed with their reason classes in
 `dist/evaluation.md`.
 
-The second is the one that matters. It type-checks on the edge; only the trust rule catches it.
+`launder_trust` (and its disguise) is the one that matters. It type-checks on the edge; only the
+trust rule catches it.
 Trust cannot be laundered by relabelling the consumer.
 
 **2. Capability scoping is enforced by the handle's surface** (`poc/handles.py`). `InferenceLLM`
@@ -109,7 +111,7 @@ Confinement became a property of **the artifact** rather than of how it happens 
 #### The boundary cannot drift from the graph
 
 `sandbox/interfaces.py` **derives** each node's expected interface set from its `with` clause in
-`graphs/customer-support.json`, parsing the capability types with the project's own `type_parser`.
+its graph (`graphs/customer-support.json`, and the unshipped feed-pulse graph for `Heartbeat`), parsing the capability types with the project's own `type_parser`.
 The test suite compares that against what the built component actually imports. A world that grants a
 node an interface its signature never asked for is a **test failure**, not a quiet over-grant.
 
@@ -159,9 +161,9 @@ loop was fixed at the same time (it now warms and takes the best of several roun
 single cold pass, which charged JIT warm-up to whichever measurement ran first and — since the
 per-crossing cost is a *difference* of two timings — could distort it by an order of magnitude). So
 the absolute numbers are **not** directly comparable to those previously reported for the flat-ABI
-tier. The claim they support is narrower and is the one that matters: typing the boundary did not
-move the per-crossing cost out of its order of magnitude (still tens of µs, well inside the
-proposal's <1ms envelope) even though every crossing now lifts and lowers typed values.
+tier. No like-for-like flat-ABI measurement exists, so the only supported claim is that the typed
+crossing sits inside the proposal's <1ms envelope — not what typing it cost. (The magnitude is
+reported by `dist/evaluation.md` from the run; it is not typed here.)
 
 ## Layout
 

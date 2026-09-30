@@ -74,6 +74,16 @@
 - [x] 6.12 The tier table is pinned in the build (`check_escapes`), its ungranted and HTTP
       denials discriminate, and the demo prints the same pinned table
 - [x] 6.13 The principal requirement stops claiming intersection-narrowing is implemented
+- [x] 6.14 Name collisions no longer skip the cross-graph checks: graph names must be unique
+      in a batch, a graph cannot contain a node of its own name, and a resolved sub-graph must
+      carry its node's name
+- [x] 6.15 The injection refusal pin requires each tier's own reason (a widened scope failed
+      for a different reason and still passed); pins for the tier table, the discriminating
+      denials and the refusal are shown firing in tests
+- [x] 6.16 The paper discloses that trust enters only where a node declares it: what a handle
+      returns is unlabelled, so indirect injection is invisible to the lattice (§7.4, §2.1,
+      §6.1)
+- [x] 6.17 The demo no longer reports the cross-graph case as a false failure
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

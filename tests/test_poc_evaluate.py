@@ -87,7 +87,7 @@ def test_pinned_corpus_verdicts_hold():
 
 def test_the_canonical_graphs_are_accepted():
     """Half the corpus exists to keep the other half honest: a validator that
-    rejected everything would catch both mutations and be worthless."""
+    rejected everything would catch every mutation and be worthless."""
     canonical = [o for o in run_corpus() if o.case.kind == "canonical"]
     assert canonical, "the corpus must contain the safe wirings, not only the unsafe ones"
     assert all(o.actual == ACCEPTED for o in canonical)
@@ -317,6 +317,59 @@ def test_the_trace_guard_fires_if_the_residual_vanishes():
     softened = replace(confined, adversarial_text_present=False)
     problems = check_traces(host, softened)
     assert any("residual" in p for p in problems)
+
+
+@sandboxed
+def test_the_refusal_pin_fires_if_it_stops_being_refused():
+    host = run_injection(set())
+    confined = run_injection(set(SANDBOXED_NODES))
+    problems = check_traces(replace(host, out_of_scope_call_refused=False), confined)
+    assert any("host-tier run" in p and "exfiltrate" in p for p in problems)
+
+
+@sandboxed
+def test_the_refusal_pin_sees_a_widened_host_scope(monkeypatch):
+    """Widen the tool-capable node's scope to admit `exfiltrate`: the host body
+    still fails, for want of an implementation, and names the tool — but not for
+    the handle's reason, so the pin reports it. A pin on the tool name alone did
+    not (round E, 30 September 2026)."""
+    import poc.evaluate as evaluate
+
+    original = evaluate.load_graph_dict
+
+    def widened(name):
+        g = original(name)
+        text = json.dumps(g).replace("LLMClient<[lookup]>", "LLMClient<[exfiltrate, lookup]>")
+        return json.loads(text)
+
+    monkeypatch.setattr(evaluate, "load_graph_dict", widened)
+    assert run_injection(set()).out_of_scope_call_refused is False
+
+
+def test_the_escape_pin_fires_both_ways():
+    from poc.evaluate import Escape, check_escapes
+
+    assert check_escapes([Escape("probe", True, False, "")]) == []
+    problems = check_escapes([Escape("probe", False, True, "")])
+    assert len(problems) == 2
+
+
+@sandboxed
+def test_a_denial_for_the_wrong_reason_fails_the_evaluation():
+    """A confined denial counts only for its discriminating detail; "connection
+    refused" would mean the guest reached the host and merely missed."""
+    from poc.evaluate import _confined_denied
+
+    class Verdict:
+        escaped = False
+        detail = "network denied: connection refused"
+
+    class FakeSandbox:
+        def call(self, _export):
+            return Verdict()
+
+    with pytest.raises(EvaluationError, match="discriminating"):
+        _confined_denied(FakeSandbox(), "escape-net", "not supported on this platform")
 
 
 @sandboxed

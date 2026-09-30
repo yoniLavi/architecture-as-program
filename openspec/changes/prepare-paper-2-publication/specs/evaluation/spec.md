@@ -29,7 +29,13 @@ build rather than be reported as a denial. Specifically:
 - each host-tier escape SHALL be an attempt the harness performs, not a literal;
 - a confined filesystem or socket denial SHALL count only when the guest reports the operation unsupported,
   and an environment denial only while the harness has set the variable being read;
-- an ungranted-capability denial SHALL count only for the capability failure, never for a resource failure;
+- an ungranted-capability denial SHALL count only for the capability failure, never for a resource failure,
+  and only when it names the interface the component was built to over-grant; an off-allowlist denial only
+  when it names the allowlist and the host;
+- the injection refusal SHALL carry each tier's own reason (the host handle's scope check; the confined
+  guest's report), so that a widened scope, which fails for another reason, is reported;
+- the tier table SHALL be pinned in the build: a confined escape, or a host cell that stops escaping, fails
+  it;
 - the ambient-import figures SHALL be computed against each node's own `with` clause.
 
 #### Scenario: A denial for the wrong reason fails the build
@@ -40,3 +46,38 @@ build rather than be reported as a denial. Specifically:
 #### Scenario: The injection refusal regresses on one tier
 - **WHEN** a fooled model's out-of-scope tool call is not refused in the run on either tier
 - **THEN** the evaluation fails, rather than rendering a cross in the paper's table
+
+## MODIFIED Requirements
+
+### Requirement: The overhead measurement is pinned to its order of magnitude
+The evaluation harness SHALL pin the measured per-crossing cost to a band, and SHALL refuse to write
+the evaluation artifact when a measurement falls outside it, rather than emitting a figure the papers'
+stated magnitude contradicts. Because the excursions this guards against are transient, the harness
+SHALL re-measure before treating one as real, and SHALL fail only on a sustained excursion.
+
+The band SHALL be enforced where the artifact is written and not inside the run itself. The evaluation's
+other pins guard properties of the code, which must hold wherever it runs; this one guards a measurement,
+whose usability is a fact about the machine that took it, and a caller that publishes no figure SHALL NOT
+be failed by a loaded machine.
+
+The band's ceiling SHALL be a decade boundary, so that no measurement the band admits names a magnitude
+above the one the papers state. The band admits the adjacent decade below as well, so the papers SHALL
+interpolate whichever magnitude a run names rather than state one in their own hand.
+
+#### Scenario: A contaminated measurement does not reach the artifact
+- **WHEN** the per-crossing cost measures outside the band on every attempt
+- **THEN** no evaluation artifact is written, and the failure names the band and says whether the
+  likely cause is a loaded machine or a genuine change in the cost
+
+#### Scenario: A transient excursion is retried rather than failing the build
+- **WHEN** one measurement falls outside the band and a subsequent one falls inside it
+- **THEN** the harness reports the measurement inside the band and the build proceeds
+
+#### Scenario: A run that publishes no figure is unaffected by the band
+- **WHEN** the evaluation is run by a test rather than to produce the artifact
+- **THEN** an out-of-band measurement does not fail it
+
+#### Scenario: Widening the band is a deliberate act
+- **WHEN** the measured cost has genuinely moved out of the pinned band
+- **THEN** the band is re-pinned deliberately, because the papers state the figure's magnitude and
+  widening the band edits a claim

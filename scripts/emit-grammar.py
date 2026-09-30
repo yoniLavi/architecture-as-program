@@ -244,15 +244,17 @@ def render_card(canonical_types: list[str]) -> str:
     lines.append("")
     lines.append(
         "A node whose data inputs contain an `Untrusted<_>` "
-        "application and whose output is not wrapped in `Untrusted<_>` "
+        "application anywhere (under a type constructor too), and any of "
+        "whose output variants is not untrusted, "
         'must declare `"discharges_trust": true` in its JSON '
-        "definition. The converse is also checked: a "
+        "definition. The output is checked per variant, so one "
+        "`Untrusted<_>` variant does not license a clean sibling. The "
+        "converse is also checked: a "
         "`discharges_trust: true` annotation without an `Untrusted<_>` "
         "input is rejected as stale. Trust discharge is therefore "
-        "always visible at the graph level; the `Untrusted<T>` ≰ `T` "
-        "rule is enforced structurally rather than by a coercion "
-        "lattice (see the demonstrator paper's research agenda for the "
-        "coercion-problem discussion)."
+        "always visible at the graph level. This is the node-body half "
+        "of the two-point trust lattice (`Untrusted ⊑ Trusted`, no "
+        "upward coercion); see Paper 2 §3.1."
     )
     lines.append("")
 

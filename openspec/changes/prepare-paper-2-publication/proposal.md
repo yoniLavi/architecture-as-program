@@ -69,7 +69,12 @@ polishing further.
   requirement states its order against the flows-to convention, renamed from "flow-sensitive")
 - Affected code: `poc/evaluate.py`, `tests/test_poc_evaluate.py`; and, from those rounds,
   `poc/graph.py` (cross-graph validation at assembly), `poc/sandbox/host.py`
-  (`ungranted_imports`), `poc/demo.py`, and the inspector's walkthrough copy
+  (`ungranted_imports`), `poc/demo.py`, and the inspector's walkthrough copy; then
+  `scripts/type_parser.py` and `scripts/graph_validator.py` (the trust lattice per variant,
+  deep, and at composition boundaries; unique graph names; no self-named node),
+  `poc/runtime.py` (caller-supplied sub-graphs validated, sub-graph `requires` checked),
+  `poc/variants.py` (`launder_trust_via_variant`), and `scripts/emit-grammar.py`. Section
+  numbers in "Why" and "What Changes" are Paper 2's pre-merge numbering
 - Affected papers: `papers/02-demonstrator/proposal.typ`, and `papers/03-method/proposal.typ`
   (since merged into Paper 2 and deleted; see `archive/2026-09-30-merge-and-condense-papers`)
 - Affected docs: `citations.bib`, `docs/PRIOR-ART.md`, `docs/ROADMAP.md`, `AGENTS.md`

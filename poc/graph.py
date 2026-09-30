@@ -227,8 +227,11 @@ def validate_graph_dicts(graphs: list[dict]) -> list[str]:
     when the referenced graph is in the same batch, which is what this provides."""
     with tempfile.TemporaryDirectory() as td:
         paths = []
-        for g in graphs:
-            p = Path(td) / f"{g.get('name', 'graph')}.json"
+        # Files are named by position, not by graph name: two graphs sharing a
+        # name must both reach the validator (which reports the collision), not
+        # have the second overwrite the first on disk.
+        for i, g in enumerate(graphs):
+            p = Path(td) / f"{i:02d}-{g.get('name', 'graph')}.json"
             p.write_text(json.dumps(g))
             paths.append(p)
         return validate_files(paths)
@@ -243,7 +246,10 @@ def _referenced_graphs(graph: dict) -> list[dict]:
     while pending:
         for node in pending.pop().get("nodes", []):
             name = node.get("name")
-            if name in index and name not in found and name != graph.get("name"):
+            # No exception for a node sharing the assembled graph's own name: the
+            # validator reports that (and a same-named canonical graph) rather
+            # than letting it skip the cross-graph checks.
+            if name in index and name not in found:
                 found[name] = index[name]
                 pending.append(index[name])
     return list(found.values())

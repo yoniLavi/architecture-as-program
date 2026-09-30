@@ -554,7 +554,16 @@ def _validate_cross_graph(
         path = graphs_path[gname]
         for n in g["nodes"]:
             ref = n["name"]
-            if ref not in graphs or ref == gname:
+            if ref == gname:
+                # A node named after its own graph would be a sub-graph of
+                # itself; skipping it would also skip every cross-graph check
+                # a same-named canonical graph should have triggered.
+                errors.append(
+                    f"{path.name}: node {ref!r} has the name of its own graph; a "
+                    f"graph cannot contain itself as a sub-graph"
+                )
+                continue
+            if ref not in graphs:
                 continue
             target = graphs[ref]
             provided = n["inputs"]
@@ -658,6 +667,15 @@ def validate_files(files: Iterable[Path]) -> list[str]:
             continue
 
         _validate_semantic(graph, f, errors)
+        if graph["name"] in graphs:
+            # Graphs are resolved by name, so two graphs sharing one would let
+            # the second silently replace the first and skip every cross-graph
+            # check against it.
+            errors.append(
+                f"{f.name}: graph name {graph['name']!r} is already declared by "
+                f"{graphs_path[graph['name']].name}; graph names must be unique"
+            )
+            continue
         graphs[graph["name"]] = graph
         graphs_path[graph["name"]] = f
 

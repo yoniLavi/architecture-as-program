@@ -236,8 +236,8 @@ def main() -> int:
     print(
         "\n  Reading: this tier lifts and lowers typed WIT values on every crossing,"
         "\n  where the retired flat ABI passed raw (ptr, len) bytes — and the crossing"
-        "\n  is still far inside the envelope. Typing the boundary did not cost the"
-        "\n  performance argument. The fixed price remains instantiation; pooling"
+        "\n  is inside the envelope. With no like-for-like flat-ABI measurement, this"
+        "\n  says nothing about what typing it cost. The fixed price remains instantiation; pooling"
         "\n  instances would amortise it."
     )
     return 0

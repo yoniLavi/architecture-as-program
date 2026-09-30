@@ -267,6 +267,15 @@ def _run_subgraph(
     # sub-graphs through its own mapping, so check the parent against the child
     # actually resolved before running it. The runtime must not execute a
     # composition the cross-graph analyses reject, whoever supplied the child.
+    if child.get("name") != node.name:
+        # The validator resolves a sub-graph by name; a child under another name
+        # would be checked against nothing (or against the parent itself).
+        raise AssemblyError(
+            [
+                f"sub-graph node {node.name!r} resolved to a graph named "
+                f"{child.get('name')!r}; a sub-graph must carry its node's name"
+            ]
+        )
     if parent.source:
         errors = validate_graph_dicts([parent.source, child])
         if errors:

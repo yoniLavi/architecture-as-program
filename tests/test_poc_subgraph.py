@@ -304,9 +304,30 @@ def test_each_sibling_runs_on_its_own_routed_instance():
 
 
 def test_a_self_referential_sub_graph_is_rejected():
-    g = _assemble(LOOP)
-    with pytest.raises(ExecutionError, match="references itself"):
-        execute(g, REQUEST, graphs=INDEX)
+    """Now refused at assembly by the validator, before anything runs: a node
+    named after its own graph would otherwise have been skipped by the cross-graph
+    checks. (The runtime's recursion guard stays behind it.)"""
+    with pytest.raises(AssemblyError, match="name of its own graph"):
+        _assemble(LOOP)
+
+
+def test_a_graph_named_after_a_canonical_graph_does_not_skip_its_checks():
+    """A parent named `CustomerSupport`, holding a `CustomerSupport` node that
+    hides the escalation path, used to assemble and run: the same-named node was
+    skipped, and the same-named canonical graph overwrote it in the batch."""
+    parent = load_graph_dict("support-platform")
+    parent["name"] = "CustomerSupport"
+    with pytest.raises(AssemblyError):
+        assemble(parent, backend=StubLLM(), stores=PLATFORM_STORES)
+
+
+def test_a_resolved_child_must_carry_its_nodes_name():
+    """A caller's resolver returning a child under another name would be checked
+    against nothing; the runtime refuses it."""
+    renamed = _service("Leaky", "EchoReply")
+    g = _assemble(_parent("EchoService", identity=None))
+    with pytest.raises(AssemblyError, match="must carry its node's name"):
+        execute(g, REQUEST, graphs={"EchoService": renamed})
 
 
 def test_a_sub_graph_error_names_the_boundary_it_happened_behind():

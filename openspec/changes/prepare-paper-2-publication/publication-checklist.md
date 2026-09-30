@@ -44,8 +44,10 @@ It holds the reserved DOI, and discarding it loses the metadata entered so far.
     date in both places in `papers/02-demonstrator/proposal.typ` — the document
     metadata `datetime(...)` near the top and the visible `September 2026` in the title
     block — commit it, and rebuild first)
-  - the abstract's crossing cost reads *tens of microseconds* (a magnitude, not a
-    per-run figure)
+  - the abstract's crossing cost reads a magnitude (tens, or single-digit,
+    microseconds), not a per-run figure
+  - Figure `fig:inspector`'s mutation list shows the same cases as `tab:corpus`. If not,
+    run `make ui-e2e` (needs Node) to regenerate `ui/screenshots/`, commit, and rebuild
   - §4.1 names `hostile_ungranted` as the negative control
   - §6.2 carries the CAmkES paragraph
 - [ ] The filename's year (2026) matches the publication year, so no rename is needed.
@@ -65,7 +67,9 @@ before the final build.
    the PDF was built from a committed tree, then **push `main`** (outward-facing, so the
    author's go): the record's *Is supplemented by* link and the GitHub Pages copies must
    show the commit the PDF was built from, and `main` is otherwise ahead of
-   `origin/main`. Then upload the freshly built
+   `origin/main`. Confirm the Pages workflow goes green after the push (its last run was
+   5 August); note the Pages copies are rebuilt on CI, so their §4.3 timings differ from
+   the uploaded PDF's. Then upload the freshly built
    `lavi-2026-confinement-by-construction.pdf`. Set it as the preview file *before* the
    first publish, so the preview-pointer bug has nothing to trip on.
 
@@ -83,7 +87,8 @@ before the final build.
 - **Description:** the abstract, verbatim, copied from
   `dist/papers/02-demonstrator/proposal.html` opened in a browser (a PDF copy brings its
   line breaks and hyphenation; the `.md` brings pandoc markup such as `---` and `*`). It now states the
-  crossing cost as a magnitude, so it will stay true across rebuilds.
+  crossing cost as a magnitude, so it stays true across rebuilds unless a run lands in
+  the decade below (the band admits both).
 - **Keywords:** capability-based security; object capabilities; WebAssembly Component
   Model; software architecture; functional reactive programming; information-flow
   control; prompt injection; LLM agents; architecture as code
@@ -103,7 +108,9 @@ the PDF reports. Pushing a tag is outward-facing too, so it is the author's call
 
 - [ ] Paper 1's record is untouched. Its single publication revision is spent.
 - ~~Commit the DOI stamp (step 2).~~ Done before upload, in `58211c8`.
-- [ ] Archive this change: `openspec archive prepare-paper-2-publication`.
+- [ ] Archive this change: tick tasks 7.1–7.3 in its `tasks.md`, run
+      `openspec archive prepare-paper-2-publication --yes`, then
+      `openspec validate --specs --strict`, and commit.
 - ~~Paper 3 can now publish.~~ Moot since the merge: there is no Paper 3.
 
 ## A note on Paper 1 that this surfaced

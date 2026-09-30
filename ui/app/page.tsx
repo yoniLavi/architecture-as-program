@@ -223,7 +223,7 @@ export default function Inspector() {
           </section>
 
           <section className="side-section">
-            <h2>Unsafe mutations (from the evaluation corpus)</h2>
+            <h2>Faulty cases (from the evaluation corpus)</h2>
             <div className="case-list">
               {mutationCases.map((c) => (
                 <button

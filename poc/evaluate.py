@@ -342,6 +342,13 @@ class InjectionResult:
     trace: GraphTrace
 
 
+# The reason each tier gives for refusing an out-of-scope tool: the host-tier
+# handle's scope check, and the confined guest's report of a request it has no
+# interface to act on.
+REFUSAL_HOST_HANDLE = "outside its LLMClient scope"
+REFUSAL_CONFINED = "outside this node's capability set"
+
+
 def run_injection(sandbox: set[str]) -> InjectionResult:
     """Drive the adversarial message through the graph and record what the
     tool-capable node actually received, and with what authority."""
@@ -374,11 +381,18 @@ def run_injection(sandbox: set[str]) -> InjectionResult:
         sandbox=sandbox,
     )
     fooled = execute(fooled_graph, CustomerRequest(session_id="user-session", body=ADVERSARIAL))
+    # Each tier's refusal must carry its *own* reason. Naming `exfiltrate` is not
+    # enough: were the handle's scope widened to admit it, the host body would
+    # still fail — for want of a tool implementation — and name `exfiltrate` too,
+    # so a pin on the tool name alone would stay green over a broken scope.
     error = fooled.received.get("HandleLLMError")
+    message = getattr(error, "message", "")
+    reason = REFUSAL_CONFINED if "GenerateResponse" in sandbox else REFUSAL_HOST_HANDLE
     refused = (
         "SendReply" not in fooled.order
         and error is not None
-        and "exfiltrate" in getattr(error, "message", "")
+        and "exfiltrate" in message
+        and reason in message
     )
 
     return InjectionResult(
@@ -1084,8 +1098,8 @@ def render(
     )
     lines.append("")
     lines.append(
-        "**Scope.** The corpus is *curated and illustrative*: it contains the unsafe "
-        "wirings we thought to write down, and the counts below say how many of those "
+        "**Scope.** The corpus is *curated and illustrative*: it contains the faulty "
+        "cases we thought to write down, and the counts below say how many of those "
         "were caught. That is evidence the graph-level analyses are implementable and "
         "catch the mistakes they target. It is **not** a soundness result — no claim is "
         "made that the corpus is exhaustive, nor that an uncaught class does not exist. "
@@ -1152,8 +1166,8 @@ def render(
         f"~{ENVELOPE_NODE_WORK_MS:.0f}ms of useful work, a per-crossing cost under "
         f"~{ENVELOPE_CROSSING_MS:.0f}ms keeps overhead below "
         f"~{ENVELOPE_MAX_OVERHEAD:.0%}. These are the numbers, whichever way they fall. "
-        "Every crossing here lifts and lowers typed WIT values, which is strictly more "
-        "work than the retired flat `(ptr, len)` ABI did."
+        "Every crossing here lifts and lowers typed WIT values where the retired flat "
+        "ABI passed `(ptr, len)` bytes; no like-for-like measurement compares the two."
     )
     lines.append("")
     lines.append("| measurement | value | notes |")
@@ -1277,7 +1291,7 @@ def render(
     lines.append("")
     clock_imports = capability_imports("hostile_clocked")
     lines.append(
-        f"The dual demonstration: a node whose `with` clause names `Clock` imports "
+        f"The dual demonstration: a component built to hold only a clock imports "
         f"exactly `{clock_imports[0]}` — the *upstream WASI interface*, granted as a "
         f"capability like any other — and its ambient import count (imports **not** "
         f"granted as capabilities) is still {len(_ambient('hostile_clocked', None, None))}. The "

@@ -20,7 +20,7 @@ from .sandbox import available as sandbox_available
 from .sandbox.host import capability_imports, ungranted_imports
 from .sandbox.interfaces import expected_imports
 from .values import ConversationContext, CustomerQuery, CustomerRequest, Untrusted
-from .variants import UNSAFE_VARIANTS
+from .variants import CROSS_GRAPH_VARIANTS, UNSAFE_VARIANTS
 
 # Nodes ported to the confined WASM tier — five of the six on the customer path,
 # leaving only the pure `ReceiveMessage` narrowing on the host tier. Used when the
@@ -63,8 +63,11 @@ def demo_assembly_rejection(graph: dict) -> None:
     print("runtime refuses to run it. The check is the project's graph validator.\n")
 
     for name, make_variant in UNSAFE_VARIANTS.items():
+        # A cross-graph mistake lives at a composition boundary, so it rewrites the
+        # composing graph; assembly validates that graph with the ones it runs.
+        base = load_graph_dict("support-platform") if name in CROSS_GRAPH_VARIANTS else graph
         try:
-            assemble(make_variant(graph), backend=StubLLM(), stores=STORES)
+            assemble(make_variant(base), backend=StubLLM(), stores=STORES)
             print(f"  ✗ {name}: ASSEMBLED — this should not happen!")
         except AssemblyError as e:
             for err in e.errors:
@@ -194,7 +197,7 @@ def main() -> int:
     use_sandbox = sandbox_available() and not args.no_sandbox
     sandbox = SANDBOXED_NODES if use_sandbox else set()
     tier_line = (
-        f"sandbox (WASM/WASI) for {sorted(SANDBOXED_NODES)}, host for the rest"
+        f"sandbox (WASM component) for {sorted(SANDBOXED_NODES)}, host for the rest"
         if use_sandbox
         else "host-discipline for every node"
         + ("" if sandbox_available() else " (wasmtime not installed)")

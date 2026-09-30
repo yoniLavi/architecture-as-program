@@ -72,7 +72,9 @@ def test_tool_llm_refuses_a_tool_outside_its_scope():
             return LLMResponse(tool_calls=(ToolCall("exfiltrate", {"to": "evil"}),))
 
     llm = ToolLLM(RogueBackend(), frozenset({"lookup"}))
-    with pytest.raises(CapabilityError, match="exfiltrate"):
+    # The scope check's own reason, not merely the tool's name: a widened scope
+    # would also fail here, for want of an implementation, naming the same tool.
+    with pytest.raises(CapabilityError, match=r"'exfiltrate' outside its LLMClient scope"):
         llm.respond(system="s", prompt="p", tools={"lookup": lambda query: "ok"})
 
 

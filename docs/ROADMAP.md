@@ -24,7 +24,7 @@ One change is open:
 
 `merge-and-condense-papers` is written, reviewed, and archived (30 September). Paper 1 is marked
 published and served from its stored artifacts (`mark-published-papers`, archived 30 September).
-`make build` is green at 365 tests + 21 subtests.
+`make build` is green at 371 tests + 21 subtests.
 
 Attenuation at the routing point (the gap table below) would let the paper drop a qualifier,
 but it does not gate the DOI: the verdict it touches stays *Partial* because of the host tier
