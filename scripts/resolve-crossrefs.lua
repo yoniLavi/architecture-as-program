@@ -42,7 +42,42 @@ local function number_anchors(doc)
   return numbers
 end
 
+-- Heading labels. Older pandoc put a typst heading's `<sec:x>` label on the
+-- Header's identifier; pandoc 3.11 instead emits the Header bare, followed by a
+-- paragraph holding nothing but an empty anchor Span("sec:x"). With no
+-- identifier on any heading, every @sec: reference fell back to its bare label
+-- ("§open" for "§7.6") in the Markdown and HTML while the PDF stayed right.
+-- Move the anchor back onto its heading, and drop the empty paragraph, so both
+-- shapes number the same way and the HTML gets real heading anchors.
+local function is_heading_anchor(block)
+  if block == nil or block.t ~= "Para" or #block.content ~= 1 then return nil end
+  local span = block.content[1]
+  if span.t ~= "Span" or #span.content ~= 0 then return nil end
+  local id = span.identifier or ""
+  if id:match("^sec:") then return id end
+  return nil
+end
+
+local function attach_heading_labels(blocks)
+  local out = pandoc.List()
+  local i = 1
+  while i <= #blocks do
+    local block = blocks[i]
+    local id = block.t == "Header" and (block.identifier or "") == "" and is_heading_anchor(blocks[i + 1])
+    if id then
+      block.identifier = id
+      out:insert(block)
+      i = i + 2
+    else
+      out:insert(block)
+      i = i + 1
+    end
+  end
+  return out
+end
+
 function Pandoc(doc)
+  doc.blocks = attach_heading_labels(doc.blocks)
   local anchor_numbers = number_anchors(doc)
 
   -- Pass 1: walk headings to build label → section number map
