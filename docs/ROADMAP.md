@@ -4,7 +4,7 @@
 
 **Publication waits on the author's end-to-end read of the merged paper.** In the final review
 before upload, the author found that Paper 2 cited the unpublished Paper 3 ten times, while
-Paper 3 cites Paper 2 for every figure, so the dependency ran both ways. The author decided to
+Paper 3 cited Paper 2 for every figure, so the dependency ran both ways. The author decided to
 merge the two into one condensed paper, on the principle *say more with fewer words*. The merge
 is written (`merge-and-condense-papers`): Paper 2 is now ~10,000 words with the accounting in
 §5, and `papers/03-method/` is deleted (tag `paper-3-before-merge`). What remains is the
@@ -38,7 +38,7 @@ published and served from its stored artifacts (`mark-published-papers`, archive
    allowlisted outbound HTTP, notification), is **implemented** (1 Aug 2026): the derivation now
    covers seven kinds / eight typed interfaces with no special case, `Clock` is granted as upstream
    `wasi:clocks/wall-clock` directly (the author-approved resolution of the recorded decision — the
-   honest demonstration of the §6.7 argument), and Paper 2 §3.2.1/§4.4 carry the widened evidence.
+   honest demonstration of the §3.2.1 argument), and Paper 2 §3.2.1/§4.1 carry the widened evidence.
    It was pulled ahead of Paper 2's publication deliberately, because it widens the current paper's
    lead result before the DOI rather than after. What remains of M1: node-local state as a
    capability, the scheduler driver, and the feed-triage graph itself.
@@ -64,9 +64,11 @@ The demonstrator establishes that graph-level capability analysis and confinemen
 not establish that anyone can *build software this way*, and two of the thesis's load-bearing claims are
 entirely untested by it:
 
-1. **"Code as compiled artifact."** Every node body in the demonstrator — Python and Rust alike — was written
-   by hand. The claim that AI agents generate node implementations from signatures and contracts, and that
-   those implementations are interchangeable, has no evidence behind it at all. The outcomes table says so:
+1. **"Code as compiled artifact."** Every node body in the demonstrator but one — Python and Rust alike — was
+   written in the ordinary directed loop; `ParseMessage` was generated once from its signature and contract
+   (prompts in `poc/generated/`), uncontrolled and unmeasured. The claim that AI agents generate node
+   implementations from signatures and contracts, and that those implementations are interchangeable, has
+   no evidence behind it at any useful scale. The outcomes table says so:
    *Agent tooling for the graph workflow — Not attempted.*
 2. **That the model survives a real program.** Nine nodes, one domain, no state, no concurrency, no fan-in, no
    persistence, driven by a test harness rather than by the world. A graph that cannot express "collect these

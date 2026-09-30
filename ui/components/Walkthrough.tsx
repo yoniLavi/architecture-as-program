@@ -6,7 +6,7 @@ import { trustRaisers } from "@/lib/graph";
 
 // The guided prompt-injection walkthrough. Every fact shown is read from the
 // scenario response (the same `run_injection` the evaluation harness pins);
-// the copy deliberately mirrors the paper's §4.3 language — attenuation, not
+// the copy deliberately mirrors the paper's §4.4 language — attenuation, not
 // elimination — and never claims more than the trace shows. In particular the
 // host tier is described as demonstrating the *shape* of confinement, never as
 // blocking anything.

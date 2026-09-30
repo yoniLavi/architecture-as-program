@@ -157,7 +157,7 @@ def test_the_seeded_pins_cover_the_design_section_of_paper_2():
 def test_tier_restricted_properties_are_pinned_on_both_paragraphs(sources):
     """A confined-tier-only property that reads as universal is an overclaim.
 
-    Both §2.5 paragraphs that carry one are pinned, so neither can lose its tier
+    Both §2.4 paragraphs that carry one are pinned, so neither can lose its tier
     restriction while the other keeps it.
     """
     tier_pins = [p for p in check_hedges.PINS if "only as an object discipline" in p[3]]

@@ -472,7 +472,7 @@ def test_kind_coverage_is_counted_from_the_rows_not_the_mapping_table():
 def test_the_shipped_baseline_counts_ported_nodes_not_declared_capabilities():
     """Scenario: the figure the coverage claim is contrasted *against*.
 
-    §4.5 reports the gate's coverage as a rise from a baseline, and a comparison
+    §4.1 reports the gate's coverage against a baseline, and a comparison
     is only as honest as its worse half. The baseline is the kinds the shipped
     graph's *ported* nodes carry — not the kinds that graph *declares*, which is
     one more, because `EventEmitter`'s only holder was never ported. Writing the

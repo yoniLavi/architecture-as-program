@@ -22,7 +22,8 @@ prose — a scope decision to raise with the author". The author has now made it
 
 At the right size, the method material strengthens the systems claim instead of
 competing with it. Two parts carry it: the outcomes table, with 19 predictions frozen
-before the executable demonstrator was built (an early validator predates the freeze),
+at their last state before the executable demonstrator was built (an early validator
+predates that state, and the freeze point was designated two days after building began),
 published a week after building began, and reported without revision, and the four design
 corrections that building forced. Together they show that the claims were not
 rationalised after the fact, which few systems papers can show.

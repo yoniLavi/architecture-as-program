@@ -9,7 +9,7 @@ hand-transcribed. It SHALL preserve the project's hedging discipline: a claim is
 where the artifact backs it.
 
 The demonstrator paper SHALL carry the corpus's predictions-and-outcomes accounting of the frozen vision, in
-condensed form: the protocol under which the vision was frozen before building, every prediction with its
+condensed form: the protocol under which the vision was frozen at its last pre-build state, every prediction with its
 verdict, and the design corrections the artifact forced. It SHALL position itself against the prior art for
 LLM-agent security, including capability- and provenance-based defences against prompt injection, wherever it
 claims prompt-injection attenuation.

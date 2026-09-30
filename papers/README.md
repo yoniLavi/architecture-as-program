@@ -60,7 +60,8 @@ in September 2026 (see `01-vision/ERRATA.md`).
 
 ### A note on the two symlinks in `01-vision/`
 
-The frozen `proposal.typ` is byte-identical to the freeze commit and so cannot be
+The frozen `proposal.typ` is byte-identical to its published commit (`FREEZE_REF` in
+`scripts/check-freeze.py`) and so cannot be
 edited to re-point its file references. Since Paper 1 is served rather than built,
 these now matter only if the frozen source is ever rendered again deliberately. Two
 committed symlinks make its original relative paths resolve correctly against the

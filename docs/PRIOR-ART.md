@@ -10,7 +10,8 @@ citations and, more importantly, behind the design decisions they informed.
 
 *Section numbers below refer to Paper 2 as it stood when each entry was written,
 before the 30 September 2026 merge with Paper 3 renumbered it. In the merged
-paper, §3.3.2 (the confined tier) is §3.2.1; §6.6 (WASM) is §6.3; §6.3 and §6.7
+paper, §3.3.2 (the confined tier) is §3.2.1; §3.4 (identity) is §3.3.1; §3.5 (the trace) is
+§3.3.4; §6.6 (WASM) is §6.3; §6.3 and §6.7
 (effects, adjacent traditions) are folded into §6.4; and §7.5 (open problems) is
 §7.6.*
 

@@ -59,11 +59,25 @@ Words are prose only, measured on 30 September 2026 (target in brackets).
       change's own proposal and design repeated the timeline error, AGENTS.md recorded the
       editor verdict as *partial* (it is *not attempted*), and the spec delta left "both
       living papers" in the capability-sweep requirement
-- [ ] 3.4 Author's end-to-end read
+- [x] 3.3b A third round. Must-fix: the freeze was *designated* on 16 July (`2d22c80`, which
+      added the guard), two days into building, after the same document had been amended in
+      place with building findings; "frozen before" and "could not be quietly amended" were
+      both false. The sites now say "frozen at its last state before the executable
+      demonstrator", and §7.5 states the designation and the in-place amendments. And
+      "every node body was written by hand" understated the artifact: `ParseMessage` was
+      generated once, in Python and Rust, from its signature and contract (`poc/generated/`);
+      §2's preamble, §5.1, §8 and the ROADMAP now say so. Stale section numbers in the UI, tests,
+      ROADMAP and PRIOR-ART fixed. Left to the author: whether Correction 2 is still a
+      correction building forced (see the publication checklist)
 - [x] 3.5 `openspec validate merge-and-condense-papers --strict`
 
-## 4. Publication (author's step)
+## 4. Handed off at archive (30 September 2026)
 
-- [ ] 4.1 Upload to the reserved DOI 10.5281/zenodo.23057135 per the checklist, with the
-      title and description updated, and *Continues* as the only relation to Paper 1
-- [ ] 4.2 Archive this change and `prepare-paper-2-publication`
+This change was archived once the paper was written and three review rounds had run.
+Its open steps moved to `prepare-paper-2-publication`, which stays open until upload:
+
+- 3.4, the author's end-to-end read: now the first item of that change's
+  `publication-checklist.md`
+- 4.1, the upload to the reserved DOI 10.5281/zenodo.23057135 with *Continues* as the only
+  relation to Paper 1: that checklist's steps
+- 4.2, archiving `prepare-paper-2-publication`: after the upload
