@@ -116,8 +116,8 @@ validate-graphs: test $(GRAPHS_SRC) scripts/validate-graphs.py scripts/graph_val
 	@$(PY) scripts/validate-graphs.py
 
 # Guard the frozen paper against silent edits: its sources must match the
-# freeze commit. Skips (with a warning) if the commit is unavailable, e.g. a
-# shallow CI checkout.
+# freeze commit. Skips (with a warning) only in a shallow checkout; in a full
+# clone it fails if the freeze commit is missing or not an ancestor of HEAD.
 check-freeze:
 	@$(PY) scripts/check-freeze.py
 

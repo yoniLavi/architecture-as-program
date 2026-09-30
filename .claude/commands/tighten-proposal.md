@@ -38,7 +38,7 @@ Focus exclusively on these dimensions:
 
 ### Surface quality
 - Typos, grammar, awkward phrasing, inconsistent terminology.
-- **Compression damage.** The paper was condensed from ~27,000 words. Look for sentences that no longer parse, pronouns and "which" clauses whose antecedent was cut, phrasing that became ambiguous ("three of the four correct security claims"), and cross-references that now point at a section that no longer holds what the sentence promises.
+- **Compression damage.** The paper was condensed from ~27,000 words. Look for sentences that no longer parse, pronouns and "which" clauses whose antecedent was cut, phrasing that became ambiguous (the merge once produced "three of the four correct security claims", when §5.2 still counted four corrections), and cross-references that now point at a section that no longer holds what the sentence promises.
 - Formatting issues in the Typst source.
 
 ## Phase 3: Recommendations

@@ -56,10 +56,8 @@ before the final build.
    - In `papers/02-demonstrator/proposal.typ`, below the date line, add a line in
      the same form as Paper 1's:
      `Preprint · #link("https://doi.org/<DOI>")[doi:<DOI>] · CC BY 4.0`
-   - In `citations.bib`, complete `lavi_confinement_2026` in the same form as
-     `lavi_architecture_2026`. Replace the "in preparation" note with
-     `month = sep`, `publisher = {Zenodo}`, `doi`, `url`, `note = {Preprint}`. This
-     also updates Paper 3's citation of it.
+   - ~~In `citations.bib`, complete `lavi_confinement_2026`~~ — moot since the merge:
+     that entry was deleted, because only Paper 3 cited it.
 3. `make clean && make build` again, then upload the freshly built
    `lavi-2026-confinement-by-construction.pdf`. Set it as the preview file *before* the
    first publish, so the preview-pointer bug has nothing to trip on.
@@ -97,9 +95,7 @@ the PDF reports. Pushing a tag is outward-facing too, so it is the author's call
 - [ ] Paper 1's record is untouched. Its single publication revision is spent.
 - [ ] Commit the DOI stamp (step 2) if it was not committed before the upload.
 - [ ] Archive this change: `openspec archive prepare-paper-2-publication`.
-- [ ] Paper 3 can now publish. Its `lavi_confinement_2026` citation resolves to the
-      DOI. It needs its own date check and a metadata block like this one, with
-      **References** / **Continues** pointing at both earlier DOIs.
+- ~~Paper 3 can now publish.~~ Moot since the merge: there is no Paper 3.
 
 ## A note on Paper 1 that this surfaced
 

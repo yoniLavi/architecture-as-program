@@ -383,7 +383,7 @@ where derive-and-check does something generate-and-prove cannot.
   arXiv:2604.14357 (Ching, Zhou, Zhang; v1 only): the lattice is **user-defined**,
   with labels as types ordered by a `FlowsTo` trait and a four-point diamond as the
   running example. It is evidence for an open lattice, not for two points, and is
-  now cited as such in Paper 2's lattice open problem (§7.6), beside W3C Trusted
+  now cited as such in Paper 2's lattice open problem (§7.6 of the merged paper), beside W3C Trusted
   Types and the shipped taint systems of §8 above.
 - **AgenticOS** (arXiv:2606.21129) — checked again September 2026: still v1 only,
   with no journal reference or venue, so it remains an unrefereed preprint and is

@@ -162,7 +162,7 @@ part of that change, not a later sweep.
 
 This requirement rests on review and no check enforces it, which is recorded here because it
 has already failed once undetected: the change that built principal binding left three passages
-of the demonstrator paper (§2.3, and §2.5 twice) calling the binding *undesigned*, and they were
+of the demonstrator paper (§2.3, and §2.5 twice, in its August 2026 numbering) calling the binding *undesigned*, and they were
 found four days later by a tightening pass that had no mandate to look for them. The evaluation
 harness guards only the *overstating* direction — a paper cannot claim what the artifact cannot
 do, because the harness runs the artifact — and there is no artifact against which to decide
