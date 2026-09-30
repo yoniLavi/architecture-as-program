@@ -2,9 +2,9 @@
 
 ## 0. Before writing
 
-- [ ] 0.1 Author settles the open questions in `design.md` (budget moves, title, Paper 3's
+- [x] 0.1 Author settles the open questions in `design.md` (budget moves, title, Paper 3's
       directory, Zenodo relations to Paper 1)
-- [ ] 0.2 Author approves the section budget
+- [x] 0.2 Author approves the section budget
 
 ## 1. The merged paper (`papers/02-demonstrator/proposal.typ`)
 

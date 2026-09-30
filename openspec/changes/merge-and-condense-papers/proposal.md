@@ -1,9 +1,7 @@
 # Merge Papers 2 and 3 into one condensed paper
 
-> **Status: scaffolded 30 September 2026, not started.** The author approved the
-> direction and the ~12,000-word target. The section-by-section cut list in `design.md`
-> is a *proposal*, and the author approves it before any prose is written. Pick this up in
-> a fresh session, starting from `design.md` §"Open questions for the author".
+> **Status: in progress.** Scaffolded 30 September 2026. The author settled the open
+> questions and approved the budget the same day (`design.md` §"Decisions").
 
 ## Why
 

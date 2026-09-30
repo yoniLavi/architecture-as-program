@@ -43,7 +43,19 @@ Word counts are from the 28 September build.
 - Paper 1 is cited, never edited.
 - No citation to unpublished work.
 
-## Open questions for the author (settle before writing)
+## Decisions (settled 30 September 2026)
+
+The author settled the four questions below and approved the budget as proposed:
+
+1. **Budget:** approved as it stands. Where "Also built" cannot keep a limit in its share,
+   it overruns and the miss is reported, rather than the hedge being cut.
+2. **Title:** kept. The slug `lavi-2026-confinement-by-construction` is unchanged.
+3. **Paper 3's directory:** deleted. Its text survives in git history, under the tag
+   `paper-3-before-merge`.
+4. **Zenodo relation to Paper 1:** *Continues* only. DataCite's *Reviews* usually marks a
+   peer review, and a harvester could misread it.
+
+## Open questions for the author (settled; see Decisions)
 
 1. **Budget moves.** Keep more of identity and revocation (a tested capability, 939 words
    now), or cut related work harder than ~1,500?
