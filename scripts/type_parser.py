@@ -145,6 +145,17 @@ class _Parser:
         while self._peek()[0] == "PIPE":
             self._consume("PIPE")
             variants.append(self._parse_variant())
+        # A role names a port, and a port must name one variant: a repeated role
+        # lets every variant sharing it leave on that port while the edge check,
+        # resolving the role, sees only the first — an adversarial review routed
+        # raw untrusted input to the tool-capable node through the second.
+        roles = [v.role for v in variants if v.role]
+        duplicated = sorted({r for r in roles if roles.count(r) > 1})
+        if duplicated:
+            raise ParseError(
+                f"duplicate variant role(s) {duplicated} in {self.src!r}; "
+                f"a port must name one variant"
+            )
         return TSum(tuple(variants))
 
     def _parse_variant(self) -> TVariant:

@@ -703,8 +703,8 @@ def _validate_cross_graph(
                     # holds a tool-scoped LLMClient the sink rule never saw.
                     mismatches.append(
                         f"position {i}: provided {p!r} is tool-scoped but {e!r} is "
-                        f"inference-only; routed unattenuated, it would make a child "
-                        f"node that holds a tool-scoped LLMClient escape the sink rule"
+                        f"inference-only; a tool client may not be routed into an "
+                        f"inference-only slot, out of the sink rule's sight"
                     )
 
             if mismatches:

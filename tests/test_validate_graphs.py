@@ -935,7 +935,7 @@ class TestNoToolClientIntoAnInferenceSlot(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as td:
             errors = validate_files(_write({"c.json": child, "p.json": parent}, Path(td)))
-        self.assertTrue(any("escape the sink rule" in e for e in errors), errors)
+        self.assertTrue(any("inference-only slot" in e for e in errors), errors)
 
 
 class TestContractPaths(unittest.TestCase):

@@ -97,6 +97,11 @@
       check's message and pinned by presence, so the sink rule cannot mask the lattice (a
       test removes the lattice and the pin fails); the prompt-injection row moved to
       *Partial* under §5.1's definition (the vision counted retrieved content as untrusted)
+- [x] 6.22 A repeated role label in a sum hid its second variant from the edge check, and raw
+      untrusted input reached the tool node; the parser now rejects it
+      (`launder_via_duplicate_role` pinned). The narrowing check's message no longer carries
+      the sink rule's phrase, so `route_tool_into_inference_slot` is attributed to the check
+      that catches it; a test removes the sink rule and its own pins fail
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

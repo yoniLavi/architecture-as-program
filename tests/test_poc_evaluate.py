@@ -358,6 +358,18 @@ def test_the_lattice_pin_fails_if_the_lattice_is_removed(monkeypatch):
     assert any(p.startswith("launder_trust:") for p in problems)
 
 
+def test_the_sink_pins_fail_if_the_sink_rule_is_removed(monkeypatch):
+    """The mirror of the lattice test: each sink case pins the sink rule's own
+    message, and no other check's text satisfies it (the narrowing check's once
+    did, round H)."""
+    import graph_validator
+
+    monkeypatch.setattr(graph_validator, "_holds_tool_scoped_llm", lambda _n, _c: False)
+    problems = check(run_corpus())
+    assert any(p.startswith("launder_trust_by_declaration:") for p in problems)
+    assert any(p.startswith("untrusted_into_tool_node:") for p in problems)
+
+
 def test_the_escape_pin_fires_both_ways():
     from poc.evaluate import Escape, check_escapes
 

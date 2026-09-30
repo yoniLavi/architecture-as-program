@@ -107,6 +107,13 @@ class TestApplication(unittest.TestCase):
 
 
 class TestSumTypes(unittest.TestCase):
+    def test_a_repeated_role_is_rejected(self):
+        """A role names a port, and a port must name one variant (round H,
+        30 September 2026: a repeated role hid a second variant from the edge
+        check)."""
+        with self.assertRaises(ParseError):
+            parse_type("ok: ConversationContext | ok: Untrusted<RawMessage>")
+
     def test_two_variants(self):
         t = parse_type("ok: AgentResponse | error: LLMError")
         self.assertEqual(

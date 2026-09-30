@@ -41,7 +41,8 @@ existing `graph_validator` — it does not re-implement type checking. The fault
 | `launder_trust_via_variant` — the same, with one output variant marked `Untrusted<_>` | trust propagation, per variant (one untrusted variant does not license a clean sibling) |
 | `launder_trust_by_declaration` — excuse it by declaring the consumer a discharger | the sink rule (a tool-capable node cannot be its own discharger) |
 | `untrusted_into_tool_node` — keep every output untrusted, so no node raises trust | the sink rule (a tool-capable node may not consume `Untrusted<_>`) |
-| `route_tool_into_inference_slot` — route a tool client into a sub-graph's inference slot | the sink rule, at composition |
+| `route_tool_into_inference_slot` — route a tool client into a sub-graph's inference slot | the cross-graph narrowing check, at composition (the sink rule would not see it) |
+| `launder_via_duplicate_role` — two variants under one role, the second untrusted | the parser: a port must name one variant |
 
 The rest (`delegate_via_edge`, caught as a capability in a data position;
 `mislabel_subgraph_output`, by the cross-graph output check; `unevaluatable_contract`, by the

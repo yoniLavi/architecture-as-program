@@ -57,7 +57,9 @@ slot, where the node holding it would escape this rule.
 The type system SHALL reject trust laundering — reaching a clean requirement from an untrusted source
 without transiting a declared discharger — as a violation of the lattice order, not by a rule checked
 independently of edge typing. Widening a consumer's declared input to the untrusted type SHALL NOT
-launder trust. A node's output SHALL be checked per variant, since each variant leaves on its own port,
+launder trust. A node's output SHALL be checked per variant, since each variant leaves on its own port, and a
+role SHALL name exactly one variant (a repeated role would let a second variant leave on a port the
+edge check resolved to the first),
 and an input SHALL count as untrusted when `Untrusted<_>` appears anywhere inside it; a sub-graph's
 boundary output SHALL keep trust in its comparison with the child's terminals. Laundering through an
 undeclared node is a lattice violation; laundering by declaring a tool-capable consumer a discharger is

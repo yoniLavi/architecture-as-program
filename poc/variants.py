@@ -136,6 +136,30 @@ def route_tool_into_inference_slot(platform: dict) -> dict:
             node["inputs"] = [
                 "LLMClient<[lookup]>" if i == "LLMClient<inference>" else i for i in node["inputs"]
             ]
+    # The platform's inference client is now held by no node; drop it, so the only
+    # fault left is the routing, not an unused capability.
+    still_used = any("LLMClient<inference>" in n["inputs"] for n in g["nodes"])
+    if not still_used:
+        g["parameters"] = [p for p in g["parameters"] if p != "LLMClient<inference>"]
+        g["capabilities"] = [c for c in g["capabilities"] if c != "LLMClient<inference>"]
+    return g
+
+
+def launder_via_duplicate_role(graph: dict) -> dict:
+    """Two variants under one role label.
+
+    `ReceiveMessage` declares `ok: ConversationContext | ok: Untrusted<RawMessage>`
+    and its `ok` port is wired straight to the tool-capable node. The runtime routes
+    by role, so both variants leave on that port, but the edge check resolved the
+    role to the first variant only — a clean `ConversationContext` — and the raw
+    untrusted message reached `GenerateResponse`. A port must name one variant, so
+    a repeated role is rejected when the type is parsed."""
+    g = copy.deepcopy(graph)
+    for node in g["nodes"]:
+        if node["name"] == "ReceiveMessage":
+            node["output"] = "ok: ConversationContext | ok: Untrusted<RawMessage>"
+    g["data_edges"] = [e for e in g["data_edges"] if e["from"] != "ReceiveMessage"]
+    g["data_edges"].append({"from": "ReceiveMessage.ok", "to": "GenerateResponse"})
     return g
 
 
@@ -189,6 +213,7 @@ UNSAFE_VARIANTS = {
     "untrusted_into_tool_node": untrusted_into_tool_node,
     "delegate_via_edge": delegate_via_edge,
     "route_tool_into_inference_slot": route_tool_into_inference_slot,
+    "launder_via_duplicate_role": launder_via_duplicate_role,
     "mislabel_subgraph_output": mislabel_subgraph_output,
     "unevaluatable_contract": unevaluatable_contract,
 }

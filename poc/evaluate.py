@@ -136,6 +136,7 @@ REASON_CROSS_GRAPH = "cross-graph signature"
 REASON_CONTRACT = "contract"
 REASON_CAPABILITY_DATA = "capability as data"
 REASON_SINK = "sink rule"
+REASON_SUM_ROLE = "one variant per port"
 
 # A reason class is identified by phrases, *any* of which in one of the
 # validator's errors places that error in the class; each phrase is specific to
@@ -149,6 +150,7 @@ REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     # The lattice's own messages only: the node-body check and the edge check.
     REASON_TRUST_LATTICE: ("raises trust without", "trust-lattice violation"),
     REASON_SINK: ("holds a tool-scoped LLMClient",),
+    REASON_SUM_ROLE: ("duplicate variant role",),
     REASON_CROSS_GRAPH: (
         "declared output",
         "terminal output types",
@@ -260,12 +262,22 @@ CORPUS: tuple[Case, ...] = (
         "route_tool_into_inference_slot",
         "mutation",
         REJECTED,
-        REASON_SINK,
+        REASON_CROSS_GRAPH,
         "The platform routes its tool-scoped client into `CustomerSupport`'s "
         "inference-only slot. Narrowing is checked, not enforced, so the child's "
-        "discharger would hold a tool client the sink rule never saw.",
+        "discharger would hold a tool client the sink rule never saw; the cross-graph "
+        "narrowing check refuses the routing.",
         base="support-platform",
         with_graphs=("customer-support",),
+    ),
+    Case(
+        "launder_via_duplicate_role",
+        "mutation",
+        REJECTED,
+        REASON_SUM_ROLE,
+        "Two variants under one role: the edge check resolved the role to the first, "
+        "clean variant while the runtime routed both, and raw untrusted input reached "
+        "the tool-capable node. A port must name one variant.",
     ),
     Case(
         "mislabel_subgraph_output",
