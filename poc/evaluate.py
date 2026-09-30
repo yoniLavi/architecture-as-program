@@ -436,8 +436,8 @@ def check_traces(host: InjectionResult, confined: InjectionResult) -> list[str]:
     if not confined.adversarial_text_present:
         problems.append(
             "confined-tier trace: adversarial text no longer reaches the tool-capable "
-            "node through the permitted field — the §4.3 residual has changed; verify "
-            "this is intended before re-pinning"
+            "node through the permitted field — the §4.4 residual (sec:eval-injection) "
+            "has changed; verify this is intended before re-pinning"
         )
 
     return problems

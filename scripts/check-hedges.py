@@ -41,6 +41,11 @@ otherwise written in the present tense, so a claim there reads as substantiated
 unless its mood is deliberately kept conditional. Paper 1 is frozen and guarded
 byte-for-byte by check-freeze.py instead.
 
+Section numbers in the comments below are as seeded, before the 30 September
+2026 merge renumbered Paper 2: §2.5 (security) is now §2.4, §3.4 (identity) is
+§3.3.1, and §4.3 (the injection residual) is §4.4. The pins themselves are keyed
+by label (`sec:...`), which the merge kept, so none needed re-seeding.
+
 Usage:  uv run python3 scripts/check-hedges.py
 """
 
