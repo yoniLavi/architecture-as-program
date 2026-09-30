@@ -191,6 +191,10 @@ class Case:
     # found it (30 September 2026) and the checks were changed to catch it: the
     # corpus's own record that it holds what someone thought to write down.
     found_by_review: bool = False
+    # Other reason classes the rejection is expected to carry beside the pinned one
+    # (`launder_trust` breaks the sink rule as well as the lattice). Any class not
+    # pinned or listed here fails the evaluation.
+    also: frozenset[str] = frozenset()
 
 
 CORPUS: tuple[Case, ...] = (
@@ -230,6 +234,7 @@ CORPUS: tuple[Case, ...] = (
         "The subtle mistake: widen the tool-capable node's input so the edge *does* "
         "type-check. Caught instead as upward coercion — trust cannot be laundered by "
         "relabelling the consumer.",
+        also=frozenset({REASON_SINK}),
     ),
     Case(
         "launder_trust_via_variant",
@@ -240,6 +245,7 @@ CORPUS: tuple[Case, ...] = (
         "the other leaving clean. Each variant leaves on its own port, so each must "
         "satisfy the lattice on its own.",
         found_by_review=True,
+        also=frozenset({REASON_SINK}),
     ),
     Case(
         "launder_trust_by_declaration",
@@ -299,8 +305,8 @@ CORPUS: tuple[Case, ...] = (
         "mutation",
         REJECTED,
         REASON_VARIANT,
-        "`NotifyUser` takes `ModerateContent`'s whole labelled sum on an unported edge, "
-        "and the violation and escalation edges are removed. The runtime routes by role, "
+        "`NotifyUser` takes `ModerateContent`'s whole labelled sum on an unported edge "
+        "in place of its violation edge. The runtime routes by role, "
         "so the edge never fires and a policy violation is swallowed silently; the "
         "validator once read it as covering every variant.",
         found_by_review=True,
@@ -361,6 +367,8 @@ class Outcome:
     actual: str
     reason: str | None
     detail: str
+    # Every reason class the rejection carried, pinned or not.
+    present: frozenset[str] = frozenset()
 
     @property
     def diverged(self) -> bool:
@@ -416,7 +424,13 @@ def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
             errors = validate_graph_dict(graph)
         if errors:
             outcomes.append(
-                Outcome(case, REJECTED, classify(errors, case.reason), " ".join(errors[0].split()))
+                Outcome(
+                    case,
+                    REJECTED,
+                    classify(errors, case.reason),
+                    " ".join(errors[0].split()),
+                    reasons_in(errors),
+                )
             )
             continue
 
@@ -427,7 +441,13 @@ def run_corpus(corpus: tuple[Case, ...] = CORPUS) -> list[Outcome]:
             outcomes.append(Outcome(case, ACCEPTED, None, "assembles and is runnable"))
         except AssemblyError as e:
             outcomes.append(
-                Outcome(case, REJECTED, classify(e.errors, case.reason), " ".join(e.errors))
+                Outcome(
+                    case,
+                    REJECTED,
+                    classify(e.errors, case.reason),
+                    " ".join(e.errors),
+                    reasons_in(e.errors),
+                )
             )
     return outcomes
 
@@ -444,6 +464,15 @@ def check(outcomes: list[Outcome]) -> list[str]:
             problems.append(
                 f"{o.case.name}: expected to be caught by {o.case.reason!r}, "
                 f"was caught by {o.reason!r} ({o.detail})"
+            )
+        elif stray := {r for r in o.present if r != o.case.reason and r not in o.case.also}:
+            # A case isolates its fault: a second class it did not declare means the
+            # mutation now also breaks something else, and would stay rejected if its
+            # own check stopped firing (round M, 30 September 2026: three mutations
+            # also left a node unreached once one entry was required).
+            problems.append(
+                f"{o.case.name}: also caught by {sorted(stray)}, which the case does not "
+                f"declare; the mutation no longer isolates its fault"
             )
     return problems
 

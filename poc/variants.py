@@ -11,6 +11,29 @@ from __future__ import annotations
 import copy
 
 
+def _prune_unreached(g: dict) -> dict:
+    """Drop the nodes a rewiring leaves unreached from the entry, their edges, and
+    any capability no remaining node holds — so a mutation carries only the fault
+    it is named for, not also a second entry or an unused capability."""
+    edges = g["data_edges"]
+    targets = {e["to"] for e in edges}
+    entries = [n["name"] for n in g["nodes"] if n["name"] not in targets]
+    reached, frontier = set(entries[:1]), list(entries[:1])
+    while frontier:
+        here = frontier.pop()
+        for e in edges:
+            if e["from"].split(".")[0] == here and e["to"] not in reached:
+                reached.add(e["to"])
+                frontier.append(e["to"])
+    g["nodes"] = [n for n in g["nodes"] if n["name"] in reached]
+    g["data_edges"] = [e for e in edges if e["from"].split(".")[0] in reached]
+    held = {i for n in g["nodes"] for i in n["inputs"]}
+    unused = [c for c in g["capabilities"] if c not in held]
+    g["capabilities"] = [c for c in g["capabilities"] if c not in unused]
+    g["parameters"] = [p for p in g["parameters"] if p not in unused]
+    return g
+
+
 def bypass_pipeline(graph: dict) -> dict:
     """Wire raw untrusted input straight into the tool-capable node.
 
@@ -160,15 +183,15 @@ def launder_via_duplicate_role(graph: dict) -> dict:
             node["output"] = "ok: ConversationContext | ok: Untrusted<RawMessage>"
     g["data_edges"] = [e for e in g["data_edges"] if e["from"] != "ReceiveMessage"]
     g["data_edges"].append({"from": "ReceiveMessage.ok", "to": "GenerateResponse"})
-    return g
+    return _prune_unreached(g)
 
 
 def hide_branch_behind_whole_edge(graph: dict) -> dict:
     """Consume a labelled sum on an unported edge.
 
     `NotifyUser` takes `ModerateContent`'s whole `ok | violation | escalation` sum on
-    an edge with no port, and the per-variant `violation` and `escalation` edges are
-    removed. The validator once read an unported edge as covering every variant;
+    an edge with no port, in place of its per-variant `violation` edge. The validator
+    once read an unported edge as covering every variant;
     the runtime routes a variant by its role and never sends one along it, so a
     policy violation was swallowed with no notification, no escalation, no error."""
     g = copy.deepcopy(graph)
@@ -176,11 +199,9 @@ def hide_branch_behind_whole_edge(graph: dict) -> dict:
     for node in g["nodes"]:
         if node["name"] == "NotifyUser":
             node["inputs"] = [whole if i == "PolicyViolation" else i for i in node["inputs"]]
-    g["data_edges"] = [
-        e
-        for e in g["data_edges"]
-        if e["from"] not in ("ModerateContent.violation", "ModerateContent.escalation")
-    ]
+    # Only the violation edge is replaced; escalation keeps its port, so every node
+    # stays reachable and the one fault is the edge that never fires.
+    g["data_edges"] = [e for e in g["data_edges"] if e["from"] != "ModerateContent.violation"]
     g["data_edges"].append({"from": "ModerateContent", "to": "NotifyUser"})
     return g
 
@@ -200,7 +221,7 @@ def hide_branch_behind_unlabelled_variant(graph: dict) -> dict:
         if node["name"] == "ModerateContent":
             node["output"] = "ok: ModeratedQuery | PolicyViolation | escalation: EscalationRequest"
     g["data_edges"] = [e for e in g["data_edges"] if e["from"] != "ModerateContent.violation"]
-    return g
+    return _prune_unreached(g)
 
 
 def unreached_audit_node(graph: dict) -> dict:

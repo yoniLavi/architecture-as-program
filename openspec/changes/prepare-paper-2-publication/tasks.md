@@ -137,6 +137,12 @@
       discharge"); the entry must take the boundary as its only data input; the HTTP
       allowlist refuses backslashes, userinfo, and non-HTTP schemes, and matches hosts
       case-insensitively
+- [x] 6.28 Round M: the laundering row moved to *Partial* (its restriction is the one that makes
+      the injection row Partial); §1.1 says the derivation fixes the *kinds* of authority. The
+      harness now fails a mutation that carries a reason class it does not declare (`also`),
+      after three mutations were found also leaving a node unreached; they are rewired to
+      isolate their fault. The hedge guard ignores Typst comments, so a pinned passage cannot
+      survive only inside one. §3.2.1 says the derivation compares interface names
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

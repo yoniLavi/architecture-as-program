@@ -263,6 +263,17 @@ PINS = (
 
 _HEADING = re.compile(r"^=+\s.*<(?P<label>sec:[A-Za-z0-9_-]+)>\s*$")
 
+# Typst comments, which render nothing: a pinned passage turned into a comment,
+# with an unhedged sentence written after it, once left the guard green while the
+# rendered paper lost the hedge (round M, 30 September 2026). A comment opens at a
+# line start or after whitespace, so `https://` and `graphs/*.json` are kept.
+_BLOCK_COMMENT = re.compile(r"(?:^|(?<=\s))/\*.*?\*/", re.DOTALL | re.MULTILINE)
+_LINE_COMMENT = re.compile(r"(?:^|(?<=\s))//.*$", re.MULTILINE)
+
+
+def strip_comments(source: str) -> str:
+    return _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", source))
+
 
 def normalise(text: str) -> str:
     """Collapse whitespace so a fragment matches across typst line breaks."""
@@ -280,7 +291,7 @@ def section_bodies(source: str) -> dict[str, str]:
     bodies: dict[str, str] = {}
     current: str | None = None
     lines: list[str] = []
-    for line in source.splitlines():
+    for line in strip_comments(source).splitlines():
         match = _HEADING.match(line)
         if match:
             if current is not None:

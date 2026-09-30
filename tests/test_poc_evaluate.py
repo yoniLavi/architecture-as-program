@@ -124,6 +124,14 @@ def test_a_wrong_reason_class_fails_the_evaluation():
     assert "caught by" in problems[0]
 
 
+def test_an_undeclared_second_reason_class_fails_the_evaluation():
+    """A mutation isolates its fault. `launder_trust` also breaks the sink rule and
+    declares it; without that declaration the extra class is a divergence."""
+    corrupted = _corpus_with("launder_trust", also=frozenset())
+    problems = check(run_corpus(corrupted))
+    assert any("does not declare" in p for p in problems), problems
+
+
 def test_an_unpinned_mutation_fails_the_evaluation():
     """A mutation added to the corpus without an expected verdict would otherwise be
     silently absent from the table while the counts still read as complete."""

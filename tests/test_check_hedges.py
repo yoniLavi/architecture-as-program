@@ -79,6 +79,25 @@ def test_deleting_a_hedge_fails_the_check(sources):
     assert any(v.startswith(name) for v in violations)
 
 
+def test_commenting_out_a_pinned_passage_fails_the_check(sources):
+    """A Typst comment renders nothing, so a pin kept only inside one protects
+    nothing (round M, 30 September 2026: it passed)."""
+    paper, _section, name, _hedge, _fragment = pin("concrete-graph/schema-proviso")
+    lines = sources[paper].splitlines()
+    at = next(i for i, line in enumerate(lines) if "_provided the schema excludes" in line)
+    for commented in ("// " + lines[at], "/* " + lines[at] + " */"):
+        mutated = dict(sources)
+        mutated[paper] = "\n".join([*lines[:at], commented, *lines[at + 1 :]])
+        violations = check_hedges.find_violations(mutated)
+        assert any(v.startswith(name) for v in violations), commented[:3]
+
+
+def test_urls_and_globs_are_not_comments():
+    text = "== S <sec:s>\nSee https://example.org and `graphs/*.json` here.\n"
+    assert "https://example.org" in check_hedges.section_bodies(text)["sec:s"]
+    assert "graphs/*.json" in check_hedges.section_bodies(text)["sec:s"]
+
+
 def test_every_pin_fails_when_its_own_hedge_is_removed(sources):
     """Not just the first pin: every one of them is load-bearing."""
     for paper, _section, name, hedge, fragment in check_hedges.PINS:
