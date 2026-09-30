@@ -1,24 +1,31 @@
 # Roadmap: from demonstrator to a useful toy
 
-## Start here: state as of 28 September 2026
+## Start here: state as of 30 September 2026
 
-**One active OpenSpec change: `prepare-paper-2-publication`**, implemented and awaiting the
-author's Zenodo upload (planned 29 September). After a two-month gap, a whole-project review
-found Paper 2 substantively ready and fixed what should not ship under a DOI. It scoped the
-"architecture models do not constrain" claim against seL4's CAmkES (a proved precedent the July
-survey missed), moved the abstract off a per-run figure, added a real over-granting binary as a
-pinned negative control on the derivation gate, and added three related-work comparators. It
-also resolved every verification debt. `make build` is green at 340 tests + 21 subtests.
-`docs/PRIOR-ART.md` §12–§14 has the September survey.
+**Publication is on hold for a merge. Start with `openspec/changes/merge-and-condense-papers/`.**
+In the final review before upload, the author found that Paper 2 cited the unpublished Paper 3
+ten times, while Paper 3 cites Paper 2 for every figure, so the dependency ran both ways. The
+author decided to merge the two papers into one condensed paper of ~12,000 words (from ~30,000),
+on the principle *say more with fewer words*. The change is scaffolded but not started. Its
+`design.md` holds a proposed section budget and four open questions (budget moves, title,
+Paper 3's directory, Zenodo relations) for the author to settle before any prose is written.
+
+Two changes are open:
+- **`prepare-paper-2-publication`** is implemented. It carries the CAmkES scoping, the magnitude
+  in the abstract, the negative control, the new comparators, and the DOI stamp (`58211c8`). Its
+  `publication-checklist.md` still governs the upload steps, with the title and description
+  updated for the merged paper. It is archived when the merged paper publishes.
+- **`merge-and-condense-papers`**: see above.
+
+Paper 1 is marked published and served from its stored artifacts (`mark-published-papers`,
+archived 30 September). `make build` is green at 348 tests + 21 subtests.
 
 **Next, in order of value:**
 
-1. **Publish Paper 2 to Zenodo**, following
-   `openspec/changes/prepare-paper-2-publication/publication-checklist.md`. Paper 2 takes a DOI first
-   because Paper 3 cites it, so do not publish in the reverse order. Publishing is outward-facing and
-   needs an explicit go from the author every time, not once. Then stamp the DOI (a follow-up
-   commit) and archive the change.
-2. **Publish Paper 3**, once its `lavi_confinement_2026` citation carries Paper 2's DOI.
+1. **Merge and condense**, per `merge-and-condense-papers`, timeboxed to about a week.
+2. **Publish the merged paper** to the reserved Zenodo DOI **10.5281/zenodo.23057135**, which is
+   already stamped in the title block. Publishing is outward-facing and needs an explicit go from
+   the author every time.
 3. **Recommended, not yet decided: pilot M3's generation experiment before the rest of M1.** The six
    ported nodes already have signatures, WIT interfaces, contracts and the import gate, so a small
    run of agent-written bodies against them needs none of the toy's plumbing. It answers the
