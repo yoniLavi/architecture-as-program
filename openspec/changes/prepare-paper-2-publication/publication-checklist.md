@@ -19,10 +19,10 @@ avoids both.
 > - Step 4's "Paper 3 can now publish" no longer applies.
 > - **Before step 1:** the author's end-to-end read of the merged paper, carried over from
 >   `merge-and-condense-papers` (archived 30 September after five review rounds; see its
->   `tasks.md`). One decision from those rounds is left to that read: whether §5.2's
->   "trust was one rule, not two" is still a correction *building forced*, given that the
->   pre-freeze validator's separate rules already caught the laundering graph, or a
->   simplification, which would make the corrections three.
+>   `tasks.md`). The three decisions those rounds left open were settled on the author's
+>   instruction on 30 September: the trust-lattice unification is a simplification, so
+>   the corrections are **three**; the contracts row stays *Partial*, with §3.3.3 now
+>   stating that no canonical graph attaches a contract; and the ordinal 3 is retired.
 > - The pre-flight spot-checks still hold after renumbering: §4.1 names
 >   `hostile_ungranted`, §4.3 is the overhead table, and §6.2 carries CAmkES. The PDF
 >   also shows the outcomes table in §5, with 19 rows.
