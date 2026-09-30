@@ -30,13 +30,18 @@ and do not depend on the model's quality either way.
 ## What it demonstrates
 
 **1. Unsafe wiring is rejected at assembly time.** The runtime delegates to the project's
-existing `graph_validator` — it does not re-implement type checking. Two unsafe rewirings
-(`poc/variants.py`), each rejected for a *different* reason:
+existing `graph_validator` — it does not re-implement type checking. The faulty cases
+(`poc/variants.py`) are each pinned to the analysis that must catch them; the trust cases:
 
 | Variant | Rejected by |
 |---|---|
 | `bypass_pipeline` — wire raw untrusted input straight into the tool-capable node | edge type-compatibility (`Untrusted<RawMessage>` ≠ `ConversationContext`) |
 | `launder_trust` — "fix" that by widening the tool-capable node's input type | trust propagation (consumes `Untrusted<_>`, emits clean, never declares `discharges_trust`) |
+| `launder_trust_via_variant` — the same, with one output variant marked `Untrusted<_>` | trust propagation, per variant (one untrusted variant does not license a clean sibling) |
+
+The rest (`mislabel_subgraph_output`, caught by the cross-graph output check, and
+`unevaluatable_contract`, by the contract vocabulary) are listed with their reason classes in
+`dist/evaluation.md`.
 
 The second is the one that matters. It type-checks on the edge; only the trust rule catches it.
 Trust cannot be laundered by relabelling the consumer.
@@ -113,8 +118,8 @@ is a WIT `enum`, so a node **cannot** return an intent outside the closed set �
 membership check to promise that; now the widening is not representable. And the model's reply is a
 WIT `variant` (`text` | `call`), so a malformed reply has no encoding.
 
-The two tiers **compose in one graph**: the security-critical nodes (`ParseMessage`,
-`GenerateResponse`) run as confined components while the rest run on the host tier — the proposal's
+The two tiers **compose in one graph**: every node on the customer path but the pure
+`ReceiveMessage` runs as a confined component, while the platform around them runs on the host tier — the proposal's
 incremental-migration path (opaque host node → confined node). `ParseMessage` is *regenerated in
 Rust* from the same signature and contract as the Python version (`sandbox/rust/node_parse_message/`,
 prompt in `generated/parse_message.wasm.prompt.md`): same contract, new language, unchanged graph.

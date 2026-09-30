@@ -16,9 +16,8 @@ from .graph import AssemblyError, assemble, load_graph_dict
 from .handles import CapabilityError, InferenceLLM, ToolLLM
 from .llm import AnthropicBackend, LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
-from .sandbox import INFERENCE_LLM, SandboxError
 from .sandbox import available as sandbox_available
-from .sandbox.host import Sandbox, capability_imports, ungranted_imports
+from .sandbox.host import capability_imports, ungranted_imports
 from .sandbox.interfaces import expected_imports
 from .values import ConversationContext, CustomerQuery, CustomerRequest, Untrusted
 from .variants import UNSAFE_VARIANTS
@@ -152,46 +151,17 @@ def demo_sandbox_hostile() -> None:
         print("  (skipped — wasmtime not installed; `uv sync --group poc` to enable)")
         return
 
-    import os
-    import socket
-    from pathlib import Path
+    # The same probes, with the same pins, as the evaluation harness: every host
+    # cell is an attempt, and each confined denial carries its discriminating
+    # error or the probe raises. Imported here, not at the top, because the
+    # harness imports this module.
+    from .evaluate import probe_escapes
 
-    print("  The same escape attempts, host tier vs component tier:\n")
-
-    def escaped(export: str) -> bool:
-        # The hostile component's world imports nothing at all, so it is granted
-        # nothing at all. Each export returns a typed `escape-verdict`.
-        return Sandbox("hostile_ambient").call(export).escaped
-
-    # Filesystem: a node granted no fs capability.
-    host_fs = bool(Path(__file__).read_text())
-    print(
-        f"  read a file       host: {'ESCAPES' if host_fs else '—':10}  component: "
-        f"{'ESCAPED!' if escaped('escape-fs') else 'DENIED'}"
-    )
-
-    # Network: ambient socket construction.
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.close()
-    print(
-        f"  open a socket     host: {'ESCAPES':10}  component: "
-        f"{'ESCAPED!' if escaped('escape-net') else 'DENIED'}"
-    )
-
-    # Environment: ambient env read.
-    host_env = os.environ.get("PATH") is not None
-    print(
-        f"  read an env var   host: {'ESCAPES' if host_env else '—':10}  component: "
-        f"{'ESCAPED!' if escaped('escape-env') else 'DENIED'}"
-    )
-
-    # Ungranted capability: a component whose world imports an interface it was
-    # never granted. Provisioned inference-only, it cannot even instantiate.
-    try:
-        Sandbox("hostile_ungranted", {INFERENCE_LLM: {"infer": lambda _s, _p, _t: "x"}})
-        print("  ungranted tool    host: (n/a)  component: INSTANTIATED — should not happen!")
-    except SandboxError:
-        print("  ungranted tool    host: could import one  component: WON'T INSTANTIATE")
+    print("  The same classes of escape, host tier vs component tier:\n")
+    for e in probe_escapes():
+        host = "ESCAPES" if e.host_escapes else "—"
+        confined = "ESCAPED!" if e.sandbox_escapes else "DENIED"
+        print(f"  {e.probe:34} host: {host:8}  component: {confined}")
 
     ambient = ungranted_imports(
         "node_parse_message",

@@ -15,11 +15,20 @@ One change is open:
 - **`prepare-paper-2-publication`** is implemented. It carries the CAmkES scoping, the magnitude
   in the abstract, the negative control, the new comparators, and the DOI stamp (`58211c8`). Its
   `publication-checklist.md` still governs the upload steps, with the title and description
-  updated for the merged paper. It is archived when the merged paper publishes.
+  updated for the merged paper. It is archived when the merged paper publishes. It also carries
+  what the review rounds after the merge fixed in the artifact: assembly validates a graph
+  together with every graph it executes, the trust lattice is checked per sum variant and
+  through type constructors (a disguised `launder_trust` passed before), the evaluation's
+  injection refusal and escape probes measure what they report and are pinned, and spec deltas
+  for `signal-graph-runtime`, `trust-typing` and `evaluation`.
 
 `merge-and-condense-papers` is written, reviewed, and archived (30 September). Paper 1 is marked
 published and served from its stored artifacts (`mark-published-papers`, archived 30 September).
-`make build` is green at 357 tests + 21 subtests.
+`make build` is green at 365 tests + 21 subtests.
+
+Attenuation at the routing point (the gap table below) would let the paper drop a qualifier,
+but it does not gate the DOI: the verdict it touches stays *Partial* because of the host tier
+either way. It is the first change for version 1.1 of the living paper.
 
 **Next, in order of value:**
 

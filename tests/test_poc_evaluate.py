@@ -413,9 +413,11 @@ def test_main_refuses_to_write_an_artifact_with_a_contaminated_figure(
     assert "outside its pinned band" in capsys.readouterr().err
 
 
-def test_every_measurement_the_band_admits_names_the_same_magnitude():
-    """The prose magnitude and the interpolated figure cannot disagree, because the
-    band's ceiling *is* a decade boundary and the band is half-open there."""
+def test_the_band_admits_two_adjacent_magnitudes_and_never_hundreds():
+    """The band's ceiling *is* a decade boundary and the band is half-open there, so
+    a passing measurement names single-digit or tens of microseconds — never the
+    decade above. The paper interpolates the magnitude, so it cannot disagree with
+    the figure either way."""
     admitted = {
         _magnitude(ms)
         for ms in (CROSSING_BAND_MIN_MS, 0.0231, 0.0999, CROSSING_BAND_MAX_MS * 0.999)

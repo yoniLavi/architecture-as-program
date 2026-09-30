@@ -33,7 +33,9 @@ from type_parser import (
     Trust,
     TSum,
     Type,
+    deep_trust_level,
     is_assignable,
+    output_variant_levels,
     parse_type,
     strip_trust,
     sum_roles,
@@ -144,8 +146,10 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
         # a real field from an imagined one.
         contract_error = _contract_syntax_error(n)
         if contract_error is not None:
+            # Record it and keep the node: dropping it would cascade into
+            # spurious "unknown node" errors on every edge that names it, and
+            # silently skip the node's other checks.
             errors.append(f"{path.name}: node {nname!r} {contract_error}")
-            continue
         node_map[nname] = n
 
     # A principal binder must hold authority to scope. Declaring the acting-on-
@@ -404,14 +408,19 @@ def _validate_node_trust_flow(
         if output_ast is None:
             continue
 
-        in_trust = trust_meet(trust_level(t) for t in input_asts)
-        out_trust = trust_level(output_ast)
+        # Inputs count `Untrusted<_>` anywhere inside them (under a type
+        # constructor too), and the output is checked per variant: each
+        # variant leaves on its own port, so a sum with one `Untrusted<_>`
+        # variant must not let its other variants leave trusted.
+        in_trust = trust_meet(deep_trust_level(t) for t in input_asts)
         discharges = bool(n.get("discharges_trust", False))
 
         # `raises_trust` is exactly the negation of the lattice flow
-        # condition on the node body: the output demands more trust than
-        # the inputs supply. Only a declared discharger may do this.
-        raises_trust = not trust_flows_to(in_trust, out_trust)
+        # condition on the node body: some output variant demands more
+        # trust than the inputs supply. Only a declared discharger may.
+        raises_trust = any(
+            not trust_flows_to(in_trust, level) for level in output_variant_levels(output_ast)
+        )
 
         if raises_trust and not discharges:
             errors.append(
@@ -453,19 +462,22 @@ def _validate_layout(
 
 
 def _type_members(ast: Type) -> set[str]:
-    """The set of data shapes a type denotes, trust stripped. A sum contributes
-    one member per variant; any other type contributes itself. Used to compare a
+    """The set of types a type denotes, trust *kept*. A sum contributes one
+    member per variant; any other type contributes itself. Used to compare a
     sub-graph node's declared output against the child graph's terminal types
     *structurally*, so `DeliveryConfirmation | EscalationTicket` is the same claim
-    however its variants are ordered or labelled."""
+    however its variants are ordered or labelled. Trust is part of the member: a
+    child terminal emitting `Untrusted<X>` must be declared as `Untrusted<X>` at
+    the boundary, or the parent would receive untrusted data labelled clean — the
+    same upward coercion the edge and node-body checks forbid inside one graph."""
     if isinstance(ast, TSum):
-        return {unparse(strip_trust(v.inner)) for v in ast.variants}
-    return {unparse(strip_trust(ast))}
+        return {unparse(v.inner) for v in ast.variants}
+    return {unparse(ast)}
 
 
 def _terminal_output_members(graph: dict) -> set[str]:
     """The union of the data shapes a graph can emit at its boundary: the output
-    types of its terminal nodes (those with no outgoing edge), trust stripped.
+    types of its terminal nodes (those with no outgoing edge), trust kept.
 
     This is what a sub-graph's declared boundary output must honestly describe.
     Exactly one terminal is reached per run, so the boundary value is always a

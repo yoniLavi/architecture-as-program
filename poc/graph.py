@@ -115,6 +115,11 @@ class AssembledGraph:
     # about principals is recorded and behaviour is exactly as before the feature
     # existed — the feature is opt-in at the call site, like the assembly scope.
     principal: str | None = None
+    # The graph dict this was assembled from, kept so that executing a sub-graph
+    # node can validate the parent *together with the child it actually resolved* —
+    # which may come from a caller-supplied resolver rather than the canonical index
+    # assembly checked against.
+    source: dict = field(default_factory=dict)
 
     def revoke(self, cap_type: str, identity: str) -> None:
         """Sever the named revocable capability instance. Afterwards every node
@@ -519,4 +524,5 @@ def assemble(
         rotators=rotators,
         identities={n: dict(caps) for n, caps in identities.items()},
         principal=principal,
+        source=graph,
     )

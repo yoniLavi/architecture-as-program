@@ -52,7 +52,7 @@ from .handles import (
     Clock,
     HTTPClient,
     Notifier,
-    ReadWriteDBHandle,
+    ReadDBHandle,
     WallTime,
     provision,
 )
@@ -209,6 +209,15 @@ CORPUS: tuple[Case, ...] = (
         "relabelling the consumer.",
     ),
     Case(
+        "launder_trust_via_variant",
+        "mutation",
+        REJECTED,
+        REASON_TRUST_LATTICE,
+        "`launder_trust` disguised by a sum type: one output variant marked untrusted, "
+        "the other leaving clean. Each variant leaves on its own port, so each must "
+        "satisfy the lattice on its own.",
+    ),
+    Case(
         "mislabel_subgraph_output",
         "mutation",
         REJECTED,
@@ -227,7 +236,7 @@ CORPUS: tuple[Case, ...] = (
         "mutation",
         REJECTED,
         REASON_CONTRACT,
-        "A different kind of fault from the three above: not an unsafe wiring but an "
+        "A different kind of fault from the mutations above: not an unsafe wiring but an "
         "unevaluatable specification. A node declares a precondition outside the closed "
         "contract vocabulary. It is pinned because the contract layer's value depends "
         "on the ceiling being real — a predicate that silently evaluated to false "
@@ -349,7 +358,8 @@ def run_injection(sandbox: set[str]) -> InjectionResult:
     # `error` branch and no reply is sent — so it is an outcome on whichever tier
     # ran the node, not a probe of the host-tier handle outside the graph. The
     # mechanisms differ: on the host tier the handle refuses; on the confined tier
-    # the component has no interface for any tool but `lookup`.
+    # the component has no interface for any tool but `lookup`, and the guest's own
+    # check reports the request as an error.
     class FooledBackend(StubLLM):
         def generate(self, request: LLMRequest) -> LLMResponse:
             if request.task == "respond":
@@ -627,6 +637,19 @@ def probe_escapes() -> list[Escape]:
             os.environ[ESCAPE_SECRET_VAR] = previous
 
 
+def check_escapes(escapes: list[Escape]) -> list[str]:
+    """Divergences of the tier table from its pins: every host cell escapes (the
+    recorded gap) and no confined cell does. Empty means the table holds. Without
+    this, a regression would be typeset as a cross in the paper rather than fail."""
+    problems = []
+    for e in escapes:
+        if not e.host_escapes:
+            problems.append(f"{e.probe}: the host-tier attempt no longer succeeds")
+        if e.sandbox_escapes:
+            problems.append(f"{e.probe}: ESCAPED on the confined tier")
+    return problems
+
+
 def _host_opens_a_socket() -> bool:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.close()
@@ -640,18 +663,21 @@ def _probe_escapes() -> list[Escape]:
     try:
         Sandbox("hostile_ungranted", {INFERENCE_LLM: {"infer": lambda _s, _p, _t: "x"}})
     except SandboxError as e:
-        # Only the capability failure counts. A resource failure lands in the
-        # same handler and must not be reported as a denied capability.
-        if "imports a capability it was not granted" not in str(e):
+        # Only the capability failure counts, and only for the interface the
+        # component was built to over-grant. The host labels every instantiation
+        # failure that is not a memory failure as an ungranted capability, so the
+        # label alone would also count a mis-linked *granted* interface.
+        ungranted = NEGATIVE_CONTROLS[0].over_granted[0]
+        if "imports a capability it was not granted" not in str(e) or ungranted not in str(e):
             raise
         ungranted_denied = True
 
-    # The host-tier body mints a handle its clause never granted: nothing in the
-    # object model stops it constructing authority directly.
-    minted = provision("DBHandle<'billing', read-write>", backend=StubLLM(), stores={})
-    assert isinstance(minted, ReadWriteDBHandle)
-    minted.write("exfiltrated", "record")
-    host_ungranted = minted.read("exfiltrated") == ["record"]
+    # The host-tier body mints a handle its clause never granted, over the data
+    # the run holds: nothing in the object model stops it constructing authority
+    # directly and reading a store it was never given.
+    minted = provision("DBHandle<'knowledge-base', read>", backend=StubLLM(), stores=STORES)
+    assert isinstance(minted, ReadDBHandle)
+    host_ungranted = minted.read("billing_question") == STORES["knowledge-base"]["billing_question"]
 
     # A clock-holding hostile component: one deliberately-granted WASI interface,
     # and the same ambient escape as the empty-handed one. The grant buys the
@@ -676,7 +702,10 @@ def _probe_escapes() -> list[Escape]:
             HTTPClient(allowlist=frozenset({"feeds.example.com"})),
             Notifier(channel="digest"),
         )
-    except CapabilityError:
+    except CapabilityError as e:
+        # The refusal must be the allowlist's, for this host.
+        if "outside its allowlist" not in str(e) or "evil.example" not in str(e):
+            raise
         offlist_refused = True
     minted_http = provision(
         "HTTPClient<['evil.example']>", backend=StubLLM(), stores={}, web={offlist: "ok"}
@@ -721,12 +750,19 @@ def _probe_escapes() -> list[Escape]:
             "not reopen the ambient world — the grant buys the clock and nothing else",
         ),
         Escape(
+            "read a file, holding a clock",
+            bool(Path(__file__).read_text()),
+            _confined_denied(clocked, "escape-fs", UNSUPPORTED),
+            "the clock grant does not reopen the filesystem either",
+        ),
+        Escape(
             "fetch outside the HTTP allowlist",
             host_offlist,
             not offlist_refused,
-            "the host body mints a handle for the host; the confined node holds the "
-            "operation, the allowlist lives in the handle, and the out-of-list request "
-            "is refused at the crossing",
+            "the host body mints a handle for the host (the PoC performs no network I/O, "
+            "so this shows minting only); the confined node's refusal is the handle's, "
+            "identical on either tier for a granted handle — what the confined tier adds "
+            "is that the body cannot mint another",
         ),
     ]
 
@@ -1099,7 +1135,7 @@ def render(
     rejected = sum(1 for o in mutations if o.actual == REJECTED)
     lines.append(
         f"**Summary.** {accepted}/{len(canonical)} safe wirings accepted; "
-        f"{rejected}/{len(mutations)} unsafe wirings rejected at assembly time, each by "
+        f"{rejected}/{len(mutations)} faulty cases rejected at assembly time, each by "
         f"its pinned reason class. Curated corpus — counts, not a soundness claim."
     )
     lines.append("")
@@ -1146,11 +1182,12 @@ def render(
     verdict = "within" if bench.within_envelope else "OUTSIDE"
     lines.append(
         f"**Verdict.** A crossing costs {us:.1f} µs — {verdict} the "
-        f"{ENVELOPE_CROSSING_MS:.0f} ms envelope, projecting to "
-        f"{bench.projected_overhead:.2%} overhead on a node doing "
-        f"{ENVELOPE_NODE_WORK_MS:.0f} ms of work. Typing the boundary did not cost the "
-        f"performance argument. The supported claim is an order of magnitude, not a "
-        f"precise figure."
+        f"{ENVELOPE_CROSSING_MS:.0f} ms envelope, so a single crossing is "
+        f"{bench.projected_overhead:.2%} of a node doing "
+        f"{ENVELOPE_NODE_WORK_MS:.0f} ms of work (a node's total adds instantiation and "
+        f"each of its crossings). The typed crossing sits inside the envelope; with no "
+        f"like-for-like flat-ABI measurement, nothing here says what typing it cost. The "
+        f"supported claim is an order of magnitude, not a precise figure."
     )
     lines.append("")
 
@@ -1167,9 +1204,10 @@ def render(
     tiers = ", ".join(f"`{n}`[{t}]" for n, t in injection.tiers.items())
     lines.append(f"- tiers: {tiers}")
     confined = sum(1 for t in injection.tiers.values() if t == "sandbox")
+    host_side = [n for n, t in injection.tiers.items() if t != "sandbox"]
     lines.append(
         f"- confined coverage: **{confined} of {len(injection.path)}** nodes on this path "
-        f"run as WASM components (only the pure narrowing node stays host-side); the "
+        f"run as WASM components (host-side: {', '.join(host_side) or 'none'}); the "
         f"per-node tier is reported above."
     )
     lines.append("")
@@ -1264,8 +1302,9 @@ def render(
     lines.append("")
     lines.append(
         "The demonstrator's central claim, held to the artifact. For each node ported to "
-        "the sandbox tier: the WIT interface set *derived* from its `with` clause in "
-        "`graphs/customer-support.json` (parsed with the project's own type parser, the "
+        "the sandbox tier: the WIT interface set *derived* from its `with` clause in its "
+        "graph (`graphs/customer-support.json`, or the unshipped feed-pulse graph for "
+        "the I/O row) (parsed with the project's own type parser, the "
         "same one the validator uses), against the set its built component *actually* "
         "imports. A world granting an interface the graph never asked for fails this "
         "comparison, and the build with it."
@@ -1416,6 +1455,16 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
             "in poc/evaluate.py is now wrong and should be updated deliberately."
         )
 
+    escapes = probe_escapes()
+    escape_problems = check_escapes(escapes)
+    if escape_problems:
+        raise EvaluationError(
+            "the tier table diverged from its pins:\n  "
+            + "\n  ".join(escape_problems)
+            + "\n\nNo artifact was written. A confined escape is a confinement failure; "
+            "a host cell that no longer escapes means the probe stopped measuring the gap."
+        )
+
     bench, _ = measure_within_band()
 
     return Evaluation(
@@ -1423,7 +1472,7 @@ def run(corpus: tuple[Case, ...] = CORPUS) -> Evaluation:
         bench=bench,
         injection=injection_confined,
         injection_host=injection_host,
-        escapes=probe_escapes(),
+        escapes=escapes,
         derivations=derivations,
         controls=controls,
     )

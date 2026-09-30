@@ -43,6 +43,28 @@ def launder_trust(graph: dict) -> dict:
     return g
 
 
+def launder_trust_via_variant(graph: dict) -> dict:
+    """`launder_trust`, disguised by a sum type.
+
+    The tool-capable node again accepts the raw `Untrusted<RawMessage>`, but now
+    marks *one* variant of its output `Untrusted<_>` (its `error` branch, relabelled
+    through `HandleLLMError`). A check that took the whole sum's trust as that of
+    its least-trusted variant saw an untrusted output and passed the node, while
+    its `ok` variant left on its own port as a clean `AgentResponse` — laundering
+    through the one variant nobody looked at. Each variant leaves on its own port,
+    so each is checked on its own, and the node is rejected as upward coercion."""
+    g = launder_trust(graph)
+    for node in g["nodes"]:
+        if node["name"] == "GenerateResponse":
+            node["output"] = "ok: AgentResponse | error: Untrusted<LLMError>"
+        if node["name"] == "HandleLLMError":
+            node["inputs"] = [
+                "Untrusted<LLMError>" if i == "LLMError" else i for i in node["inputs"]
+            ]
+            node["output"] = "Untrusted<DeliveryConfirmation>"
+    return g
+
+
 def mislabel_subgraph_output(platform: dict) -> dict:
     """Make a sub-graph node lie about what it emits at its boundary.
 
@@ -88,6 +110,7 @@ def unevaluatable_contract(graph: dict) -> dict:
 UNSAFE_VARIANTS = {
     "bypass_pipeline": bypass_pipeline,
     "launder_trust": launder_trust,
+    "launder_trust_via_variant": launder_trust_via_variant,
     "mislabel_subgraph_output": mislabel_subgraph_output,
     "unevaluatable_contract": unevaluatable_contract,
 }

@@ -68,7 +68,8 @@ make clean     # Remove dist/
 ```
 
 Outputs land under `dist/papers/<id>/`. Living papers build from the shared
-root artifact; the frozen paper builds only from its own pinned inputs.
+root artifact; the published frozen paper is served byte-for-byte from
+`papers/01-vision/published/`, never rebuilt.
 
 ### Pre-commit hooks
 
@@ -79,4 +80,4 @@ uv run pre-commit install
 ```
 
 The hooks run ruff, the graph validator, pytest, `make build`, citation hygiene,
-and the frozen-paper guard.
+the frozen-paper guard, and the hedge guard.

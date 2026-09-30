@@ -66,6 +66,14 @@
 - [x] 6.8 Capability narrowing disclosed as checked, not enforced (attenuation at the routing
       point is recorded in the ROADMAP as the next change for this paper)
 - [x] 6.9 Spec deltas for `signal-graph-runtime`, `trust-typing`, and `evaluation`
+- [x] 6.10 Trust laundering through a sum variant, through a type constructor, and across a
+      composition boundary: the lattice is now checked per variant, deeply, and with trust
+      kept at the boundary; `launder_trust_via_variant` pinned in the corpus
+- [x] 6.11 A caller-supplied sub-graph is validated against its parent before it runs; a
+      sub-graph node's `requires` is checked
+- [x] 6.12 The tier table is pinned in the build (`check_escapes`), its ungranted and HTTP
+      denials discriminate, and the demo prints the same pinned table
+- [x] 6.13 The principal requirement stops claiming intersection-narrowing is implemented
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

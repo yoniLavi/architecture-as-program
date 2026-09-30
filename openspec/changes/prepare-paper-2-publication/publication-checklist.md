@@ -41,7 +41,9 @@ It holds the reserved DOI, and discarding it loses the metadata entered so far.
 - [ ] Open `dist/papers/02-demonstrator/lavi-2026-confinement-by-construction.pdf` and
       check the following:
   - the date line reads *September 2026* (if the upload slips into October, update the
-    date line in `proposal.typ`, commit it, and rebuild first)
+    date in both places in `papers/02-demonstrator/proposal.typ` — the document
+    metadata `datetime(...)` near the top and the visible `September 2026` in the title
+    block — commit it, and rebuild first)
   - the abstract's crossing cost reads *tens of microseconds* (a magnitude, not a
     per-run figure)
   - §4.1 names `hostile_ungranted` as the negative control

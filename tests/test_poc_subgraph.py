@@ -38,6 +38,7 @@ import copy
 
 import pytest
 
+from poc.contracts import BLAME_CALLER, ContractViolation
 from poc.graph import TIER_GRAPH, AssemblyError, assemble, load_graph_dict, validate_graph_dicts
 from poc.handles import AppendDBHandle, ResponseChannel
 from poc.llm import StubLLM
@@ -231,14 +232,42 @@ def test_a_routed_identity_is_the_instance_the_sub_graph_uses():
 def test_a_sub_graph_cannot_provision_authority_of_its_own():
     """`execute` holds no backend, so a child can only exercise handles the parent
     routed to it. A sub-graph declaring a capability the parent does not supply
-    fails loudly rather than quietly minting one."""
+    fails loudly rather than quietly minting one — now before the child runs, by the
+    cross-graph check against the child actually resolved (the runtime's arity
+    check remains behind it as a backstop)."""
     child = _service("EchoService", "EchoReply")
     child["parameters"].append("EventEmitter<'support-queue'>")
     child["capabilities"].append("EventEmitter<'support-queue'>")
 
     g = _assemble(_parent("EchoService", identity=None))
-    with pytest.raises(ExecutionError, match="arity"):
+    with pytest.raises(AssemblyError, match="sub-graph"):
         execute(g, REQUEST, graphs={"EchoService": child})
+
+
+def test_a_caller_supplied_child_is_validated_against_its_parent():
+    """A caller may resolve sub-graphs through its own mapping instead of the
+    canonical index assembly checked against. The runtime validates the parent
+    together with the child it actually resolved, so a child whose boundary output
+    the parent misdescribes does not run."""
+    child = _service("EchoService", "EchoReply")
+    for n in child["nodes"]:
+        n["output"] = "EscalationTicket"
+    g = _assemble(_parent("EchoService", identity=None))
+    with pytest.raises(AssemblyError, match="declared output"):
+        execute(g, REQUEST, graphs={"EchoService": child})
+
+
+def test_a_sub_graph_nodes_precondition_is_checked():
+    """A `requires` on a sub-graph node is evaluated as a leaf's is, blaming the
+    wiring; before, only the leaf branch checked it and it was silently skipped."""
+    parent = _parent("EchoService", identity=None)
+    for n in parent["nodes"]:
+        if n["name"] == "EchoService":
+            n["requires"] = ["body == 'never'"]
+    g = _assemble(parent)
+    with pytest.raises(ContractViolation) as excinfo:
+        execute(g, REQUEST, graphs={"EchoService": _service("EchoService", "EchoReply")})
+    assert excinfo.value.blame == BLAME_CALLER
 
 
 # ── Sibling isolation ────────────────────────────────────────────────

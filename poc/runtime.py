@@ -33,9 +33,11 @@ from .graph import (
     TIER_GRAPH,
     TIER_SANDBOX,
     AssembledGraph,
+    AssemblyError,
     Node,
     assemble,
     graphs_by_name,
+    validate_graph_dicts,
 )
 from .nodes import REGISTRY
 from .sandbox.interfaces import UnmappedCapability, interface_for
@@ -261,6 +263,15 @@ def _run_subgraph(
             f"without bound"
         )
 
+    # Assembly checked the parent against the canonical graphs; a caller may resolve
+    # sub-graphs through its own mapping, so check the parent against the child
+    # actually resolved before running it. The runtime must not execute a
+    # composition the cross-graph analyses reject, whoever supplied the child.
+    if parent.source:
+        errors = validate_graph_dicts([parent.source, child])
+        if errors:
+            raise AssemblyError(errors)
+
     child_sandbox = sandbox.get(child["name"], ()) if sandbox else ()
     # The principal crosses the composition boundary with the routed handles: a
     # sub-graph acts on behalf of whoever the parent is acting for, and — like the
@@ -383,6 +394,13 @@ def execute(
         collector.current = entry
         started = time.perf_counter() if record_timing else 0.0
 
+        # Contracts bracket the body: preconditions before, postconditions after,
+        # each carrying blame so a violation names the side that broke the
+        # agreement rather than only the fact of breakage. The precondition is
+        # checked before either branch, so a sub-graph node's `requires` is
+        # evaluated exactly as a leaf's is.
+        contracts.check(node.requires, value, node=node_name, kind="requires")
+
         # A node whose name resolves to a graph *is* that graph; it needs no
         # registered implementation. Resolution is checked first so composition is
         # decided by the graph, not by whatever happens to be in the registry.
@@ -402,10 +420,6 @@ def execute(
                     f"no {node.tier}-tier implementation registered for node {node_name!r}"
                 )
             entry.tier = result.tiers[node_name] = node.tier
-            # Contracts bracket the body: preconditions before, postconditions
-            # after, each carrying blame so a violation names the side that broke
-            # the agreement rather than only the fact of breakage.
-            contracts.check(node.requires, value, node=node_name, kind="requires")
             output = impl(value, *_capability_handles(graph, node, collector))
 
         # Postconditions see the value the node actually emitted. A Variant is

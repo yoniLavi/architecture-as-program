@@ -12,7 +12,7 @@ one bibliography.
 
 | Paper | Directory | Status | Builds from |
 |---|---|---|---|
-| 1. The founding vision | `01-vision/` | **Frozen** (errata-only) | Its own pinned inputs |
+| 1. The founding vision | `01-vision/` | **Frozen** (errata-only), published | Served from its published files (`published/`), never rebuilt |
 | 2. *Confinement by Construction* | `02-demonstrator/` | Living | The shared root artifact |
 
 Paper 2 reports **what the artifact establishes** and owns the

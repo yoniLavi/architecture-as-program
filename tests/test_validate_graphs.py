@@ -749,5 +749,84 @@ class TestTrustLattice(unittest.TestCase):
             )
 
 
+class TestTrustLaunderingDisguised(unittest.TestCase):
+    """Three disguises of trust laundering that a top-level, whole-output view
+    of trust missed, found by an adversarial review on 30 September 2026. Each
+    is a flow the flat, one-graph form of the same wiring already rejected."""
+
+    def _single(self, node: dict, params: list[str]) -> list[str]:
+        graph = {
+            "name": "Pipeline",
+            "parameters": params,
+            "capabilities": [],
+            "nodes": [node],
+            "data_edges": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            return validate_files(_write({"pipeline.json": graph}, Path(td)))
+
+    def test_a_sum_with_one_untrusted_variant_does_not_launder_the_others(self):
+        """Each variant leaves on its own port, so each must satisfy the lattice:
+        one `Untrusted<_>` variant does not license a clean sibling."""
+        errors = self._single(
+            {
+                "name": "Act",
+                "inputs": ["Untrusted<Payload>"],
+                "output": "ok: Result | error: Untrusted<Failure>",
+            },
+            ["Untrusted<Payload>"],
+        )
+        self.assertTrue(any("raises trust" in e for e in errors), errors)
+
+    def test_untrusted_under_a_type_constructor_counts(self):
+        """`List<Untrusted<X>>` carries untrusted content; consuming it and
+        emitting a clean value without discharging is laundering."""
+        errors = self._single(
+            {"name": "Act", "inputs": ["List<Untrusted<Payload>>"], "output": "Result"},
+            ["List<Untrusted<Payload>>"],
+        )
+        self.assertTrue(any("raises trust" in e for e in errors), errors)
+
+    def test_an_all_untrusted_sum_still_passes(self):
+        errors = self._single(
+            {
+                "name": "Act",
+                "inputs": ["Untrusted<Payload>"],
+                "output": "ok: Untrusted<Result> | error: Untrusted<Failure>",
+            },
+            ["Untrusted<Payload>"],
+        )
+        # Variant completeness objects (a lone node's variants have no
+        # consumers); the trust lattice must not.
+        self.assertFalse(any("raises trust" in e for e in errors), errors)
+
+    def test_a_composition_boundary_does_not_strip_trust(self):
+        """A child terminal emitting `Untrusted<X>` must be declared as such at
+        the parent's sub-graph node; declaring it clean is upward coercion at
+        the boundary, and is rejected."""
+        child = {
+            "name": "FetchService",
+            "parameters": ["RawInput"],
+            "capabilities": [],
+            "nodes": [{"name": "Fetch", "inputs": ["RawInput"], "output": "Untrusted<Payload>"}],
+            "data_edges": [],
+        }
+        parent = {
+            "name": "Platform",
+            "parameters": ["RawInput"],
+            "capabilities": [],
+            "nodes": [
+                {"name": "FetchService", "inputs": ["RawInput"], "output": "Payload"},
+                {"name": "Act", "inputs": ["Payload"], "output": "Result"},
+            ],
+            "data_edges": [{"from": "FetchService", "to": "Act"}],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            errors = validate_files(
+                _write({"fetch.json": child, "platform.json": parent}, Path(td))
+            )
+        self.assertTrue(any("declared output does not match" in e for e in errors), errors)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -265,6 +265,40 @@ def trust_level(t: Type) -> Trust:
     return Trust.UNTRUSTED if contains_untrusted(t) else Trust.TRUSTED
 
 
+def deep_trust_level(t: Type) -> Trust:
+    """The trust level of a type counting `Untrusted<_>` *anywhere* inside
+    it — under a type constructor such as `List<Untrusted<X>>`, or in any
+    variant of a sum — not only at the top. A value that carries untrusted
+    content somewhere is untrusted as a whole for the purpose of a node
+    body's flow: consuming it and emitting a clean output is laundering."""
+
+    def _contains(u: Type) -> bool:
+        if is_untrusted(u):
+            return True
+        if isinstance(u, TApp):
+            return any(_contains(a) for a in u.args)
+        if isinstance(u, TSum):
+            return any(_contains(v.inner) for v in u.variants)
+        if isinstance(u, TVariant):
+            return _contains(u.inner)
+        if isinstance(u, TList):
+            return any(_contains(i) for i in u.items)
+        return False
+
+    return Trust.UNTRUSTED if _contains(t) else Trust.TRUSTED
+
+
+def output_variant_levels(t: Type) -> list[Trust]:
+    """The deep trust level of each thing a node may emit: one level per
+    variant of a sum, or the single level of any other type. A node emits
+    one variant at a time, and each variant leaves on its own port, so each
+    must satisfy the lattice on its own — a sum with one `Untrusted<_>`
+    variant does not license its other variants to leave trusted."""
+    if isinstance(t, TSum):
+        return [deep_trust_level(v.inner) for v in t.variants]
+    return [deep_trust_level(t)]
+
+
 def trust_meet(levels: Iterable[Trust]) -> Trust:
     """The lattice meet (greatest lower bound) of some levels — the
     *least* trusted among them, TRUSTED for the empty set (the meet

@@ -8,8 +8,8 @@ capability set. Each attack is asserted twice —
     node from `import os` / opening a socket / reading the environment), so the
     known gap is recorded as a test rather than as prose; and
   * on the **component tier**, where it **fails**, because the node runs as a WASM
-    component whose import set contains exactly its declared capability interfaces
-    and nothing else.
+    component whose import set contains exactly its declared capability interfaces,
+    beside the function-free type vocabulary, and nothing else.
 
 The previous (core-wasm) tier established that confinement result, and the rule
 for this port was that it must not regress: every escape denied then must be
@@ -158,22 +158,35 @@ def test_host_tier_escape_succeeds(attack):
 # ── The component tier denies every escape ─────────────────────────
 
 
+# A denial is evidence only for its discriminating reason. With no WASI adapter the
+# guest's standard library has no host function behind a file or socket operation,
+# so it reports the operation unsupported for *any* target; "not found" or
+# "connection refused" would mean it reached the host and merely missed.
+UNSUPPORTED = "not supported on this platform"
+
+
 def test_component_denies_filesystem_access():
     """Scenario: filesystem access is denied — there is no filesystem import."""
     escaped, detail = _component_escaped("escape-fs")
     assert not escaped, f"filesystem escape should fail, got: {detail}"
+    assert UNSUPPORTED in detail, detail
 
 
 def test_component_denies_network_egress():
     """Scenario: network egress is denied — there is no socket import."""
     escaped, detail = _component_escaped("escape-net")
     assert not escaped, f"network escape should fail, got: {detail}"
+    assert UNSUPPORTED in detail, detail
 
 
-def test_component_denies_environment_access():
-    """Scenario: ambient environment access is denied — there is no env import."""
+def test_component_denies_environment_access(monkeypatch):
+    """Scenario: ambient environment access is denied — there is no env import. The
+    variable is set in the host process, so "not found" is evidence rather than an
+    artifact of an unset variable."""
+    monkeypatch.setenv("SANDBOX_SECRET", "host-side-secret")
     escaped, detail = _component_escaped("escape-env")
     assert not escaped, f"environment escape should fail, got: {detail}"
+    assert "not found" in detail, detail
 
 
 def test_every_ambient_attack_is_denied_on_the_component_tier():
@@ -201,8 +214,9 @@ def test_no_component_imports_any_wasi_function(component):
     configuration rather than about the artifact.
 
     These components are built for `wasm32-unknown-unknown` and converted with no
-    WASI adapter. No filesystem, socket, environment or clock function appears among
-    their imports at all."""
+    WASI adapter. No filesystem, socket, or environment function appears among their
+    imports; a granted clock is in the capability vocabulary, so this check passes it,
+    and whether a node was granted it is checked per node by `ungranted_imports`."""
     assert wasi_imports(component) == []
 
 

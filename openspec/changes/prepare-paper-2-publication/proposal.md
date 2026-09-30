@@ -70,9 +70,11 @@ polishing further.
 - Affected code: `poc/evaluate.py`, `tests/test_poc_evaluate.py`; and, from those rounds,
   `poc/graph.py` (cross-graph validation at assembly), `poc/sandbox/host.py`
   (`ungranted_imports`), `poc/demo.py`, and the inspector's walkthrough copy
-- Affected papers: `papers/02-demonstrator/proposal.typ`, `papers/03-method/proposal.typ`
+- Affected papers: `papers/02-demonstrator/proposal.typ`, and `papers/03-method/proposal.typ`
+  (since merged into Paper 2 and deleted; see `archive/2026-09-30-merge-and-condense-papers`)
 - Affected docs: `citations.bib`, `docs/PRIOR-ART.md`, `docs/ROADMAP.md`, `AGENTS.md`
 - Paper 1 is untouched (frozen, errata-only); nothing here is an erratum to it — its
   vision-paper framing predates the CAmkES comparison and makes no survey claim about it.
-- Publishing is **not** part of this change. The author uploads to Zenodo; the DOI is
-  stamped into `citations.bib` and the title block in a follow-up commit.
+- Publishing is **not** part of this change. The author uploads to Zenodo. The DOI is
+  already stamped in the title block (`58211c8`); the bib entry it was to complete was
+  deleted with the merge.
