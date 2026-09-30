@@ -48,6 +48,12 @@
   #text(size: 11pt)[September 2026]
 ]
 
+#align(center)[
+  #text(size: 9pt)[
+    Preprint · #link("https://doi.org/10.5281/zenodo.23057135")[doi:10.5281/zenodo.23057135] · CC BY 4.0
+  ]
+]
+
 // The note below is one line on purpose: pandoc's typst reader drops the space at a
 // soft line break inside this block, and drops the block if a comment sits in it.
 #align(center)[
