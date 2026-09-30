@@ -76,7 +76,10 @@ _COMPARATORS = {
     "<": lambda a, b: a < b,
 }
 
-_PATH = r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
+# Each path segment starts with a letter: no leading underscore, so no private or
+# dunder attribute, and so no reflection into the host language through `getattr`
+# (`__class__.__init__.__globals__` passed before this was closed).
+_PATH = r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*"
 _OPS = "|".join(re.escape(op) for op in sorted(_COMPARATORS, key=len, reverse=True))
 
 # The whole grammar, as four closed forms. Keeping it expressible as four regexes

@@ -84,10 +84,18 @@
       returns is unlabelled, so indirect injection is invisible to the lattice (§7.4, §2.1,
       §6.1)
 - [x] 6.17 The demo no longer reports the cross-graph case as a false failure
+- [x] 6.18 A sink rule: a node holding a tool-scoped client may neither consume `Untrusted<_>`
+      nor be declared a discharger (both passed before); capabilities may not appear in data
+      positions (a handle passed along an edge passed before); contract paths cannot reach
+      dunders. Corpus cases `launder_trust_by_declaration`, `untrusted_into_tool_node`,
+      `delegate_via_edge` pinned
+- [x] 6.19 The principal is recorded, not bound: six paper sites corrected and three hedge pins
+      re-seeded deliberately (they had overshot in the overstating direction on 5 August)
+- [x] 6.20 The trust-typing spec's direction corrected (discharge *raises* trust)
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 
 - [ ] 7.1 Author's end-to-end read of the merged paper
 - [ ] 7.2 Upload per `publication-checklist.md`, with *Continues* as the only relation to
       Paper 1
-- [ ] 7.3 `openspec archive prepare-paper-2-publication`
+- [ ] 7.3 `openspec archive prepare-paper-2-publication --yes` (after ticking 7.1–7.2)

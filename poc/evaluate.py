@@ -134,6 +134,7 @@ REASON_EDGE_TYPE = "edge type-compatibility"
 REASON_TRUST_LATTICE = "trust lattice"
 REASON_CROSS_GRAPH = "cross-graph signature"
 REASON_CONTRACT = "contract"
+REASON_CAPABILITY_DATA = "capability as data"
 
 # A reason class is identified by substrings that must all appear in the
 # validator's errors. The classes are disjoint on the current corpus — a
@@ -149,6 +150,8 @@ REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     # different fault — the same reason laundering is pinned to the trust lattice
     # rather than to "rejected".
     REASON_CONTRACT: ("contract vocabulary",),
+    # A handle carried along an edge: the reference passing the graph gives up.
+    REASON_CAPABILITY_DATA: ("capability type in a data",),
 }
 
 
@@ -216,6 +219,32 @@ CORPUS: tuple[Case, ...] = (
         "`launder_trust` disguised by a sum type: one output variant marked untrusted, "
         "the other leaving clean. Each variant leaves on its own port, so each must "
         "satisfy the lattice on its own.",
+    ),
+    Case(
+        "launder_trust_by_declaration",
+        "mutation",
+        REJECTED,
+        REASON_TRUST_LATTICE,
+        "`launder_trust` excused by declaring the tool-capable consumer a discharger. A "
+        "node holding a tool-scoped client cannot be its own discharger.",
+    ),
+    Case(
+        "delegate_via_edge",
+        "mutation",
+        REJECTED,
+        REASON_CAPABILITY_DATA,
+        "A node returns the knowledge-base handle it holds, and a downstream node with no "
+        "`with` clause for it uses it: reference passing along an edge, the delegation "
+        "the graph gives up to keep its authority topology static.",
+    ),
+    Case(
+        "untrusted_into_tool_node",
+        "mutation",
+        REJECTED,
+        REASON_TRUST_LATTICE,
+        "Raw untrusted input into the tool-capable node, labelled consistently so no node "
+        "raises trust. The lattice alone constrains raising trust, not consuming it; the "
+        "sink rule keeps untrusted data off a tool-capable node.",
     ),
     Case(
         "mislabel_subgraph_output",
@@ -1284,7 +1313,8 @@ def render(
     lines.append(
         f"On the sandbox tier the capability is *absent, not merely unexposed*: an "
         f"inference-only node's import set holds only "
-        f"`{capability_imports('node_parse_message')[0]}`, with {len(ambient)} "
+        f"`{capability_imports('node_parse_message')[0]}` beside the function-free type "
+        f"vocabulary, with {len(ambient)} "
         f"filesystem/socket/environment/clock imports in it. Confinement is a property of "
         f"the artifact, not of how the host happened to configure it."
     )

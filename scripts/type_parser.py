@@ -265,6 +265,33 @@ def trust_level(t: Type) -> Trust:
     return Trust.UNTRUSTED if contains_untrusted(t) else Trust.TRUSTED
 
 
+# The capability kinds: the type heads that name authority rather than data. Kept
+# here, stdlib-only, so the validator can tell a capability from data without
+# importing the runtime; `poc/sandbox/interfaces.py` maps the same set onto WIT
+# interfaces, and a test holds the two equal.
+CAPABILITY_HEADS = frozenset(
+    {"LLMClient", "DBHandle", "ResponseChannel", "EventEmitter", "Clock", "HTTPClient", "Notifier"}
+)
+
+
+def contains_capability(t: Type) -> bool:
+    """True if a capability type appears anywhere in `t` — at the top, under a
+    type constructor, or in any variant. Capabilities are provisioned through
+    `with` clauses, never carried as data, so a data position holding one is
+    reference passing along an edge: exactly the delegation the graph gives up."""
+    if isinstance(t, TName):
+        return t.name in CAPABILITY_HEADS
+    if isinstance(t, TApp):
+        return t.head in CAPABILITY_HEADS or any(contains_capability(a) for a in t.args)
+    if isinstance(t, TSum):
+        return any(contains_capability(v.inner) for v in t.variants)
+    if isinstance(t, TVariant):
+        return contains_capability(t.inner)
+    if isinstance(t, TList):
+        return any(contains_capability(i) for i in t.items)
+    return False
+
+
 def deep_trust_level(t: Type) -> Trust:
     """The trust level of a type counting `Untrusted<_>` *anywhere* inside
     it — under a type constructor such as `List<Untrusted<X>>`, or in any

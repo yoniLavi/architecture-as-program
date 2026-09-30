@@ -75,13 +75,18 @@ PINS = (
     # they described the principal binding as undesigned after §3.4 built it.
     # A claim understating the artifact is drift too, and nothing else catches
     # it — the evaluation harness only guards the overstating direction.
+    # Re-seeded 30 September 2026, in the *other* direction: the 5 August
+    # correction said "bound at the instance", but an adversarial review showed
+    # the principal is recorded in the trace and bound to no handle (two runs for
+    # different principals exercise identical instances). Both directions of
+    # drift have now happened here, which is why this passage is pinned.
     (
         PAPER2,
         "sec:concrete-graph",
         "concrete-graph/user-scoped-untyped",
-        "not yet typed",
-        "bounding that further depends on user-scoped capabilities, which are "
-        "bound at the instance but not yet typed",
+        "neither binds nor types",
+        "bounding that further depends on user-scoped capabilities, which the "
+        "artifact neither binds nor types",
     ),
     # §2.3's schema caveat: the residual's statement at the running example's
     # altitude. Its primary home with evidence is §4.4; what must survive here
@@ -167,15 +172,17 @@ PINS = (
     # direction: §3.4 binds a principal, propagates the RFC 8693 delegation
     # chain, and tests both. What is open is the *typed* form. Seeding this pin
     # is what surfaced it, so the hedge now bounds the claim the artifact
-    # actually supports rather than a weaker one.
+    # actually supports rather than a weaker one. Re-seeded again 30 September
+    # 2026: that correction overshot — the principal is recorded per run and
+    # attached to no instance (see concrete-graph/user-scoped-untyped).
     (
         PAPER2,
         "sec:security",
         "privilege/principal-binding",
         "only as strong as",
         "for user-scoped operations the guarantee is only as strong as a "
-        "principal binding that lives on the instance rather than in the "
-        "capability's type",
+        "principal binding that the artifact records per run but attaches to no "
+        "capability instance and no type",
     ),
     # The tier split. A property that holds only on the confined tier must say
     # so, or it reads as universal when the host tier demonstrably escapes.
@@ -225,13 +232,16 @@ PINS = (
     # privilege/principal-binding: the mechanism is built, and it is the typing
     # of it that is open. Pinned because that boundary is easy to slide in
     # either direction — into claiming a static property, or back into claiming
-    # the mechanism is undesigned.
+    # the mechanism is undesigned. Re-seeded 30 September 2026: the binding
+    # itself does not exist — the principal is recorded and propagated, and no
+    # handle is scoped to it.
     (
         PAPER2,
         "sec:security",
         "prompt-injection/confused-deputy-untyped",
-        "but does not type",
-        "which @sec:identity binds and propagates but does not type",
+        "does not yet do",
+        "which @sec:identity does not yet do: it records and propagates the "
+        "principal but binds no handle to it",
     ),
     (
         PAPER2,

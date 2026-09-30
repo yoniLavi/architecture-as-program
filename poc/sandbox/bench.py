@@ -78,9 +78,8 @@ def _time(fn, repeats: int) -> float:
     cosmetic. The crossing cost below is a *difference* of two timings, so any
     warm-up cost that lands in one term and not the other is charged straight to
     the boundary. Timed cold, the first measurement absorbs wasmtime's JIT warm-up
-    and CPython's own; that alone was enough to inflate the reported per-crossing
-    figure by an order of magnitude and make it look as though typing the boundary
-    had cost a factor of ten. Taking the minimum of several warmed rounds keeps the
+    and CPython's own, which can distort a differenced figure by an order of
+    magnitude. Taking the minimum of several warmed rounds keeps the
     scheduler and the GC out of the number.
     """
     for _ in range(min(repeats, _WARMUP)):

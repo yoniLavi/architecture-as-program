@@ -44,7 +44,7 @@ build rather than be reported as a denial. Specifically:
 - **THEN** the evaluation fails, and no artifact is written
 
 #### Scenario: The injection refusal regresses on one tier
-- **WHEN** a fooled model's out-of-scope tool call is not refused in the run on either tier
+- **WHEN** a fooled model's out-of-scope tool call is not refused in the run on one of the tiers
 - **THEN** the evaluation fails, rather than rendering a cross in the paper's table
 
 ## MODIFIED Requirements
@@ -61,7 +61,7 @@ whose usability is a fact about the machine that took it, and a caller that publ
 be failed by a loaded machine.
 
 The band's ceiling SHALL be a decade boundary, so that no measurement the band admits names a magnitude
-above the one the papers state. The band admits the adjacent decade below as well, so the papers SHALL
+above the one the papers state. The band admits the upper half of the decade below as well, so the papers SHALL
 interpolate whichever magnitude a run names rather than state one in their own hand.
 
 #### Scenario: A contaminated measurement does not reach the artifact

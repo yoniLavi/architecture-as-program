@@ -29,10 +29,15 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from type_parser import (
+    CAPABILITY_HEADS,
     ParseError,
+    TApp,
+    TList,
+    TName,
     Trust,
     TSum,
     Type,
+    contains_capability,
     deep_trust_level,
     is_assignable,
     output_variant_levels,
@@ -151,6 +156,40 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
             # silently skip the node's other checks.
             errors.append(f"{path.name}: node {nname!r} {contract_error}")
         node_map[nname] = n
+
+    # Capabilities are provisioned through `with` clauses and never carried as
+    # data. A capability type in a data position — a boundary parameter not
+    # declared as a capability, a data input, or anywhere in an output — would be
+    # a handle passed along an edge: the reference passing the graph gives up to
+    # keep its authority topology statically analysable. A spelling variant of a
+    # declared capability lands here too, rather than silently becoming data.
+    for c in caps:
+        ast = _try_parse(c, f"capability {c!r}", path, errors)
+        if ast is not None and not (
+            (isinstance(ast, TApp) and ast.head in CAPABILITY_HEADS)
+            or (isinstance(ast, TName) and ast.name in CAPABILITY_HEADS)
+        ):
+            errors.append(f"{path.name}: {c!r} is listed as a capability but is not one")
+    for p in params:
+        if p in caps:
+            continue
+        ast = _try_parse(p, f"parameter {p!r}", path, errors)
+        if ast is not None and contains_capability(ast):
+            errors.append(
+                f"{path.name}: parameter {p!r} carries a capability type as data; "
+                f"capabilities are provisioned, not passed along edges"
+            )
+    for nname, n in node_map.items():
+        positions = [("input", i) for i in n["inputs"] if i not in caps]
+        positions.append(("output", n["output"]))
+        for role, src in positions:
+            ast = _try_parse(src, f"{role} of node {nname!r}", path, errors)
+            if ast is not None and contains_capability(ast):
+                errors.append(
+                    f"{path.name}: node {nname!r} has a capability type in a data "
+                    f"{role} ({src!r}); capabilities are provisioned through `with` "
+                    f"clauses, not passed along edges"
+                )
 
     # A principal binder must hold authority to scope. Declaring the acting-on-
     # behalf-of hop on a node that holds no capability is a marker with nothing to
@@ -438,6 +477,53 @@ def _validate_node_trust_flow(
                 f"the annotation is unused."
             )
 
+        # The sink rule. The lattice alone constrains *raising* trust, not
+        # *consuming* untrusted data: a tool-capable node could take
+        # `Untrusted<_>` input so long as its outputs stayed untrusted, or be
+        # declared a discharger itself. The design's claim is stronger — no
+        # untrusted source reaches a tool-capable LLM without transiting a
+        # discharging type — so a node holding a tool-scoped `LLMClient<[...]>`
+        # may neither consume `Untrusted<_>` nor be the discharger.
+        if _holds_tool_scoped_llm(n, caps):
+            if in_trust is Trust.UNTRUSTED:
+                errors.append(
+                    f"{path.name}: node {n['name']!r} holds a tool-scoped LLMClient "
+                    f"but consumes an `Untrusted<_>` input. Untrusted data may reach "
+                    f"a tool-capable node only after an upstream declared discharger "
+                    f'(`"discharges_trust": true`); anything else is upward coercion '
+                    f"into a privileged sink — trust laundering — which the wiring "
+                    f"forbids."
+                )
+            if discharges:
+                errors.append(
+                    f"{path.name}: node {n['name']!r} holds a tool-scoped LLMClient "
+                    f'and declares `"discharges_trust": true`. A tool-capable node '
+                    f"cannot be its own discharger: declaring it one would license the "
+                    f"upward coercion of its own input — trust laundering by "
+                    f"relabelling the consumer."
+                )
+
+
+def _holds_tool_scoped_llm(node: dict, caps: list[str]) -> bool:
+    """True if the node holds an `LLMClient<[...]>` whose scope is a non-empty
+    tool list — a model that can act, not only infer."""
+    for inp in node["inputs"]:
+        if inp not in caps:
+            continue
+        try:
+            ast = parse_type(inp)
+        except ParseError:
+            continue
+        if (
+            isinstance(ast, TApp)
+            and ast.head == "LLMClient"
+            and ast.args
+            and isinstance(ast.args[0], TList)
+            and ast.args[0].items
+        ):
+            return True
+    return False
+
 
 def _validate_layout(
     path: Path,
@@ -618,11 +704,15 @@ def _validate_cross_graph(
 # ── Public entry point ─────────────────────────────────────────────
 
 
+# A field path: dot-separated segments, each starting with a letter, so no
+# private or dunder attribute (mirrors `_PATH` in poc/contracts.py).
+_CONTRACT_PATH = r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*"
+
 _CONTRACT_FORMS = (
-    re.compile(r"^len\(\s*[A-Za-z_][\w.]*\s*\)\s*(==|!=|>=|<=|>|<)\s*-?\d+$"),
-    re.compile(r"^[A-Za-z_][\w.]*\s+in\s+\[.*\]$"),
-    re.compile(r"^present\(\s*[A-Za-z_][\w.]*\s*\)$"),
-    re.compile(r"^[A-Za-z_][\w.]*\s*(==|!=|>=|<=|>|<)\s*.+$"),
+    re.compile(rf"^len\(\s*{_CONTRACT_PATH}\s*\)\s*(==|!=|>=|<=|>|<)\s*-?\d+$"),
+    re.compile(rf"^{_CONTRACT_PATH}\s+in\s+\[.*\]$"),
+    re.compile(rf"^present\(\s*{_CONTRACT_PATH}\s*\)$"),
+    re.compile(rf"^{_CONTRACT_PATH}\s*(==|!=|>=|<=|>|<)\s*.+$"),
 )
 
 

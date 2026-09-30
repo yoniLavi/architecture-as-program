@@ -828,5 +828,98 @@ class TestTrustLaunderingDisguised(unittest.TestCase):
         self.assertTrue(any("declared output does not match" in e for e in errors), errors)
 
 
+class TestCapabilitiesAreNotData(unittest.TestCase):
+    """Capabilities are provisioned through `with` clauses, never passed along an
+    edge. Found by adversarial review on 30 September 2026: a node returning its
+    handle, wrapped or with a spelling variant, delegated it downstream."""
+
+    CAP = "DBHandle<'billing', read-write>"
+
+    def _graph(self, carried: str) -> dict:
+        return {
+            "name": "Deleg",
+            "parameters": ["Req", self.CAP],
+            "capabilities": [self.CAP],
+            "nodes": [
+                {"name": "Leak", "inputs": ["Req", self.CAP], "output": carried},
+                {"name": "Spend", "inputs": [carried], "output": "Done"},
+            ],
+            "data_edges": [{"from": "Leak", "to": "Spend"}],
+        }
+
+    def _errors(self, graph: dict) -> list[str]:
+        with tempfile.TemporaryDirectory() as td:
+            return validate_files(_write({"deleg.json": graph}, Path(td)))
+
+    def test_a_handle_on_an_edge_is_rejected(self):
+        for carried in (self.CAP, "Grant<DBHandle<'billing', read-write>>"):
+            errors = self._errors(self._graph(carried))
+            self.assertTrue(any("capability type in a data" in e for e in errors), errors)
+
+    def test_a_data_type_listed_as_a_capability_is_rejected(self):
+        graph = self._graph("Done")
+        graph["nodes"] = [{"name": "Leak", "inputs": ["Req"], "output": "Done"}]
+        graph["data_edges"] = []
+        graph["parameters"] = ["Req", "Payload"]
+        graph["capabilities"] = ["Payload"]
+        errors = self._errors(graph)
+        self.assertTrue(any("is not one" in e for e in errors), errors)
+
+    def test_the_heads_match_the_runtimes_capability_kinds(self):
+        from type_parser import CAPABILITY_HEADS
+
+        root = Path(__file__).resolve().parent.parent
+        text = (root / "poc" / "sandbox" / "interfaces.py").read_text()
+        for head in CAPABILITY_HEADS:
+            self.assertIn(f'"{head}"', text)
+
+
+class TestTheSinkRule(unittest.TestCase):
+    """A node holding a tool-scoped `LLMClient<[...]>` may not consume
+    `Untrusted<_>` nor be declared a discharger. The lattice alone constrains
+    raising trust, not consuming it."""
+
+    def _errors(self, node: dict) -> list[str]:
+        graph = {
+            "name": "Sink",
+            "parameters": ["Untrusted<Msg>", "LLMClient<[lookup]>"],
+            "capabilities": ["LLMClient<[lookup]>"],
+            "nodes": [node],
+            "data_edges": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            return validate_files(_write({"sink.json": graph}, Path(td)))
+
+    def test_untrusted_input_to_a_tool_node_is_rejected_even_if_outputs_stay_untrusted(self):
+        errors = self._errors(
+            {
+                "name": "Act",
+                "inputs": ["Untrusted<Msg>", "LLMClient<[lookup]>"],
+                "output": "Untrusted<Reply>",
+            }
+        )
+        self.assertTrue(any("holds a tool-scoped LLMClient" in e for e in errors), errors)
+
+    def test_a_tool_node_cannot_be_its_own_discharger(self):
+        errors = self._errors(
+            {
+                "name": "Act",
+                "inputs": ["Untrusted<Msg>", "LLMClient<[lookup]>"],
+                "output": "Reply",
+                "discharges_trust": True,
+            }
+        )
+        self.assertTrue(any("cannot be its own discharger" in e for e in errors), errors)
+
+
+class TestContractPaths(unittest.TestCase):
+    def test_a_dunder_path_is_outside_the_vocabulary(self):
+        from graph_validator import _contract_syntax_error
+
+        node = {"name": "N", "requires": ["__class__.__init__.__globals__.__name__ == 'x'"]}
+        self.assertIsNotNone(_contract_syntax_error(node))
+        self.assertIsNone(_contract_syntax_error({"name": "N", "requires": ["intent == 'x'"]}))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,40 @@ are fixed by declared types, so the check is not flow-sensitive in the informati
   with no discharger between them
 - **THEN** the edge is ill-typed on trust grounds, independently of whether the data types match
 
+### Requirement: Trust levels form a lattice with no upward coercion
+The type system SHALL model trust levels as elements of a lattice with a partial order, such that a
+more-trusted requirement cannot be satisfied by a less-trusted value. In particular `Untrusted<T>`
+SHALL NOT be a subtype of `T`: there is no coercion that raises trust. The only way to raise trust is
+an explicit, declared discharge (below).
+
+#### Scenario: Untrusted does not inhabit the clean type
+- **WHEN** a value of type `Untrusted<T>` is offered where `T` is required
+- **THEN** the type system rejects the substitution, because trust cannot be raised by coercion
+
+#### Scenario: A wider trust may satisfy a narrower requirement, never the reverse
+- **WHEN** the lattice orders two trust levels
+- **THEN** a value at the more-trusted level may be supplied where the less-trusted level is required,
+  and never the other way around
+
+### Requirement: Trust discharge is a declared, typed transformation
+The type system SHALL permit raising trust only at a node explicitly declared as a discharger, and
+SHALL treat discharge as producing a distinct output type rather than as silently dropping a label. A
+node not declared as a discharger SHALL NOT emit a higher-trust output than its input. A node holding a
+tool-scoped `LLMClient<[...]>` SHALL NOT be declared a discharger, and SHALL NOT consume `Untrusted<_>`
+input: untrusted data reaches a tool-capable node only after an upstream discharger.
+
+#### Scenario: Only a declared discharger may lower trust
+- **WHEN** a node consumes an `Untrusted<_>` input and emits a non-`Untrusted` output (raising the
+  data's trust; the scenario's title predates the lattice's orientation)
+- **THEN** the graph is well-typed only if that node is declared as a discharger
+- **AND** the discharge yields a distinct refined type, so downstream nodes see the discharged type,
+  not a relabelled original
+
+#### Scenario: A tool-capable node is not a discharger and takes no untrusted input
+- **WHEN** a node holding a tool-scoped client consumes `Untrusted<_>`, whether or not its outputs stay
+  untrusted and whether or not it is declared a discharger
+- **THEN** the graph is rejected
+
 ### Requirement: Trust laundering is rejected structurally
 The type system SHALL reject trust laundering — reaching a clean requirement from an untrusted source
 without transiting a declared discharger — as a violation of the lattice order, not by a rule checked

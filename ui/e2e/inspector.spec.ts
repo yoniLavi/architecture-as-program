@@ -67,7 +67,7 @@ test("a run overlays the runtime's trace: tiers, trust, crossings, terminal", as
 
 // ── Rejection ────────────────────────────────────────────────────────
 
-test("an unsafe mutation is refused with its pinned reason class shown", async ({ page }) => {
+test("a faulty case is refused with its pinned reason class shown", async ({ page }) => {
   await loaded(page);
   await page.getByTestId("case-launder_trust").click();
   await expect(page.getByTestId("node-GenerateResponse")).toContainText("Untrusted<RawMessage>");

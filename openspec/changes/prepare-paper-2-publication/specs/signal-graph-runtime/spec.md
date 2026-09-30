@@ -28,6 +28,22 @@ described as enforced: the parent's wider handle is routed to the child unattenu
   another name
 - **THEN** the composition is rejected before the sub-graph runs
 
+### Requirement: Capabilities are provisioned, never carried as data
+The validator SHALL reject a capability type in any data position — a boundary parameter not declared
+as a capability, a node's data input, or anywhere in a node's output, including under a type
+constructor or in a sum variant — since a handle passed along an edge is the reference passing the
+graph gives up to keep its authority topology statically analysable. It SHALL reject an entry in a
+graph's `capabilities` that is not a capability kind. A contract's field paths SHALL begin each segment
+with a letter, so no path reaches a private or dunder attribute of the host language.
+
+#### Scenario: A handle on an edge is rejected
+- **WHEN** a node emits its handle, bare or wrapped, and a downstream node receives it on an edge
+- **THEN** validation rejects the graph, naming the capability in a data position
+
+#### Scenario: A contract cannot reflect into the host
+- **WHEN** a contract names a path beginning with an underscore, such as `__class__`
+- **THEN** it is outside the contract vocabulary and rejected before anything runs
+
 ## MODIFIED Requirements
 
 ### Requirement: Capability crossings record the acting principal

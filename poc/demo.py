@@ -174,6 +174,7 @@ def demo_sandbox_hostile() -> None:
     print("  inference-only node has no tool *import*, not just no tool *method*. And")
     print("  there is no ambient authority to reach for — the confined node's import")
     print(f"  set holds only {capability_imports('node_parse_message')[0]}")
+    print("  beside the function-free type vocabulary,")
     print(f"  with {len(ambient)} filesystem/socket/environment/clock imports in it.")
 
 

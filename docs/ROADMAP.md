@@ -6,7 +6,7 @@
 before upload, the author found that Paper 2 cited the unpublished Paper 3 ten times, while
 Paper 3 cited Paper 2 for every figure, so the dependency ran both ways. The author decided to
 merge the two into one condensed paper, on the principle *say more with fewer words*. The merge
-is written (`merge-and-condense-papers`): Paper 2 is now ~10,000 words with the accounting in
+is written (`merge-and-condense-papers`): Paper 2 is now ~11,500 words (after the review rounds) with the accounting in
 §5, and `papers/03-method/` is deleted (tag `paper-3-before-merge`). What remains is the
 author's read, then the upload to the reserved DOI with *Continues* as the only relation to
 Paper 1.
@@ -18,13 +18,16 @@ One change is open:
   updated for the merged paper. It is archived when the merged paper publishes. It also carries
   what the review rounds after the merge fixed in the artifact: assembly validates a graph
   together with every graph it executes, the trust lattice is checked per sum variant and
-  through type constructors (a disguised `launder_trust` passed before), the evaluation's
-  injection refusal and escape probes measure what they report and are pinned, and spec deltas
-  for `signal-graph-runtime`, `trust-typing` and `evaluation`.
+  through type constructors (a disguised `launder_trust` passed before), a sink rule keeps
+  labelled untrusted data off a tool-capable node, capabilities may not travel on edges, name
+  collisions no longer skip the cross-graph checks, the evaluation's injection refusal and
+  escape probes measure what they report and are pinned, the paper discloses that trust enters
+  only where declared and that the principal is recorded but bound to no handle, and spec
+  deltas for `signal-graph-runtime`, `trust-typing` and `evaluation`.
 
 `merge-and-condense-papers` is written, reviewed, and archived (30 September). Paper 1 is marked
 published and served from its stored artifacts (`mark-published-papers`, archived 30 September).
-`make build` is green at 371 tests + 21 subtests.
+`make build` is green at 383 tests + 21 subtests.
 
 Attenuation at the routing point (the gap table below) would let the paper drop a qualifier,
 but it does not gate the DOI: the verdict it touches stays *Partial* because of the host tier
@@ -46,7 +49,8 @@ either way. It is the first change for version 1.1 of the living paper.
    stays Paper 4's vehicle either way.
 4. **M1 below** — the walking skeleton. Its first piece, `add-io-capability-kinds` (clock,
    allowlisted outbound HTTP, notification), is **implemented** (1 Aug 2026): the derivation now
-   covers seven kinds / eight typed interfaces with no special case, `Clock` is granted as upstream
+   maps seven kinds / eight typed interfaces with no special case, six of them held against a
+   built binary (`EventEmitter` is mapped but unexercised), `Clock` is granted as upstream
    `wasi:clocks/wall-clock` directly (the author-approved resolution of the recorded decision — the
    honest demonstration of the §3.2.1 argument), and Paper 2 §3.2.1/§4.1 carry the widened evidence.
    It was pulled ahead of Paper 2's publication deliberately, because it widens the current paper's
@@ -125,7 +129,7 @@ graph is self-hosting and cute, but has no untrusted input, so it would leave th
 |---|---|---|
 | **Node-local state** | Model state as a capability (`StateHandle<'seen', read-write>`), not as a stateful combinator or a feedback edge | Needs no new language surface, and all six analyses plus the confinement property apply unchanged. Reporting *"we did not need a stateful combinator"* is a genuine simplification of the agenda's three-way open question — and if it proves insufficient, that is equally reportable |
 | **Fan-in / aggregation** | A restricted fold over a homogeneous list; the runtime today *refuses* multi-terminal runs | The highest-value item. It is the first real test of the trust lattice's stated monotonicity condition: a node's output label must be a monotone function of the **meet** of its input labels. The paper asserts that condition and never exercises it. One tainted item in twenty must taint the digest |
-| **I/O capability kinds** | ~~`HTTPClient<allowlist>`, `Clock`, `Notifier<channel>` as typed WIT interfaces~~ — **done** (`add-io-capability-kinds`): seven kinds derive with no special case, `wasi:clocks/wall-clock` granted directly, allowlist narrowing by set inclusion (checked at assembly, not enforced — see the next row), hostile cases pinned | Directly widened the paper's strongest result — the import set derived from the `with` clause and checked against the binary. The clock demonstration replaced the "imports *no* clock" boast with a worked grant |
+| **I/O capability kinds** | ~~`HTTPClient<allowlist>`, `Clock`, `Notifier<channel>` as typed WIT interfaces~~ — **done** (`add-io-capability-kinds`): seven kinds map with no special case (six held against a binary), `wasi:clocks/wall-clock` granted directly, allowlist narrowing by set inclusion (checked at assembly, not enforced — see the next row), hostile cases pinned | Directly widened the paper's strongest result — the import set derived from the `with` clause and checked against the binary. The clock demonstration replaced the "imports *no* clock" boast with a worked grant |
 | **Attenuation at the routing point** | When a parent routes a wider handle to a sub-graph, wrap it in a facade limited to the child's declared scope (mode, tool set, allowlist, store), keeping the caretaker so revocation still reaches it | Strengthens the *current* paper: capability narrowing is checked at assembly but not enforced, so a routed handle's scope is the parent's (Paper 2 §5.1, §7.6). Enforcing it would let the *Partial* "a node cannot exceed its declared capabilities" drop its routed-scope qualifier. A new runtime capability, so it needs its own change |
 | **A driver boundary** | A scheduler that ticks the graph | Small. Today the graph is driven by a test harness; a real service is driven by the world |
 | **A contract language** | ~~Deliberately minimal~~ — **done** (`poc/contracts.py`): closed vocabulary, blame, corpus-pinned. What remains is the *generative* mode: derive a Hypothesis strategy from a precondition and fuzz each node body off the execution path | Prerequisite for the generation experiment below — a generated body needs something to be checked *against* beyond "it compiled". The runtime half exists; the generative half is M3 |

@@ -65,6 +65,63 @@ def launder_trust_via_variant(graph: dict) -> dict:
     return g
 
 
+def launder_trust_by_declaration(graph: dict) -> dict:
+    """`launder_trust`, excused by declaring the tool-capable consumer a discharger.
+
+    Declaring `discharges_trust` is the licence to raise trust, so marking the
+    consumer itself as one made the laundering graph pass every lattice check. A
+    node holding a tool-scoped client cannot be its own discharger: the sink rule
+    rejects it."""
+    g = launder_trust(graph)
+    for node in g["nodes"]:
+        if node["name"] == "GenerateResponse":
+            node["discharges_trust"] = True
+    return g
+
+
+def untrusted_into_tool_node(graph: dict) -> dict:
+    """Raw untrusted input into the tool-capable node, labelled consistently.
+
+    `launder_trust` again, but the node's outputs — and everything downstream —
+    stay `Untrusted<_>`, so no node *raises* trust. The lattice constrains raising
+    trust, not consuming it, so this passed: the adversarial message reached the
+    tool-holding model directly. The sink rule rejects it: a node holding a
+    tool-scoped client may not consume `Untrusted<_>` at all."""
+    g = launder_trust(graph)
+    for node in g["nodes"]:
+        if node["name"] == "GenerateResponse":
+            node["output"] = "ok: Untrusted<AgentResponse> | error: Untrusted<LLMError>"
+        if node["name"] == "SendReply":
+            node["inputs"] = [
+                "Untrusted<AgentResponse>" if i == "AgentResponse" else i for i in node["inputs"]
+            ]
+            node["output"] = "Untrusted<DeliveryConfirmation>"
+        if node["name"] == "HandleLLMError":
+            node["inputs"] = [
+                "Untrusted<LLMError>" if i == "LLMError" else i for i in node["inputs"]
+            ]
+            node["output"] = "Untrusted<DeliveryConfirmation>"
+    return g
+
+
+def delegate_via_edge(graph: dict) -> dict:
+    """Pass a capability along a data edge.
+
+    `FetchContext` returns its knowledge-base handle, wrapped, as its output, and
+    `GenerateResponse` receives it on the edge instead of through its `with`
+    clause. Object discipline permits this reference passing; the signal graph
+    gives it up so the authority topology stays statically analysable. A
+    capability type in a data position is rejected."""
+    g = copy.deepcopy(graph)
+    carried = "Grant<DBHandle<'knowledge-base', read>>"
+    for node in g["nodes"]:
+        if node["name"] == "FetchContext":
+            node["output"] = carried
+        if node["name"] == "GenerateResponse":
+            node["inputs"] = [carried if i == "ConversationContext" else i for i in node["inputs"]]
+    return g
+
+
 def mislabel_subgraph_output(platform: dict) -> dict:
     """Make a sub-graph node lie about what it emits at its boundary.
 
@@ -111,6 +168,9 @@ UNSAFE_VARIANTS = {
     "bypass_pipeline": bypass_pipeline,
     "launder_trust": launder_trust,
     "launder_trust_via_variant": launder_trust_via_variant,
+    "launder_trust_by_declaration": launder_trust_by_declaration,
+    "untrusted_into_tool_node": untrusted_into_tool_node,
+    "delegate_via_edge": delegate_via_edge,
     "mislabel_subgraph_output": mislabel_subgraph_output,
     "unevaluatable_contract": unevaluatable_contract,
 }
