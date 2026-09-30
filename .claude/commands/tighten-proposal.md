@@ -1,12 +1,11 @@
-Please perform a tightening review of one of this repository's living papers. The papers have been through multiple review cycles and are near-final. The goal now is to find small, safe improvements — not to expand scope.
+Please perform a tightening review of this repository's living paper. It has been through multiple review cycles and is near-final. The goal now is to find small, safe improvements — not to expand scope.
 
-**Which paper:** `$ARGUMENTS` — accept `2` (or `demonstrator`) for Paper 2, `3` (or `method`) for Paper 3. If no argument is given, tighten **Paper 2** (`papers/02-demonstrator/proposal.typ`). Paper 1 is **frozen**: never tighten it; a genuine error there is a proposed `ERRATA.md` entry, nothing more.
+**Which paper:** `$ARGUMENTS` — `2` (or `demonstrator`), or no argument: **Paper 2** (`papers/02-demonstrator/proposal.typ`), the only living paper. (The former Paper 3 was merged into it in September 2026.) Paper 1 is **frozen**: never tighten it; a genuine error there is a proposed `ERRATA.md` entry, nothing more.
 
 ## Phase 1: Read everything
 
 Read in parallel:
 - The paper under review
-- The other living paper (skim — needed to check cross-paper statements and to avoid recommending a cut whose content is *supposed* to live here rather than there)
 - `citations.bib`
 - `AGENTS.md` (the editing rules — especially the tightness conventions and hedging vocabulary)
 
@@ -16,11 +15,11 @@ Focus exclusively on these dimensions:
 
 ### Internal consistency
 - Are claims hedged differently in different places? The hedging vocabulary ("would be", "in a well-typed realisation", "in a sound realisation of the type system") must be used equivalently for equivalent claims — no claim hedged in one place and stated as fact in another.
-- Do body claims contradict the designated limits sections (Paper 2 §5/§7; Paper 3 §6)?
+- Do body claims contradict the designated limits sections (§5 and §7)?
 - Are citations used correctly (right claim attributed to right source)?
 - Do the concrete graph examples match their prose descriptions and figure captions?
-- Do prose counts match the tables they summarise? (Paper 3's outcome counts vs `tab:outcomes` is the known instance of this bug class — check it.)
-- Are statements about the *other* paper (title-block note, cross-references) still accurate?
+- Do prose counts match the tables they summarise? (Verdict counts must be `verdicts(...)` over `outcomes`, never typed — the known instance of this bug class.)
+- Are statements about Paper 1 (title-block note, §5) still accurate?
 
 ### Overstatement
 - Properties of the unbuilt type system asserted without conditional language?
@@ -29,11 +28,11 @@ Focus exclusively on these dimensions:
 - Demos given more than a mention (they never get a section, never enter the contributions list)?
 
 ### Redundancy and verbosity
-- The repo's rule is **one primary home per load-bearing point, cross-referenced elsewhere** (e.g. the free-text residual lives in §4.3, the trust-lattice mechanism in §3.2). Flag any second full explanation; the fix is to cut it down to a cross-reference to the primary home.
+- The repo's rule is **one primary home per load-bearing point, cross-referenced elsewhere** (e.g. the free-text residual lives in §4.4, the trust-lattice mechanism in §3.1). Flag any second full explanation; the fix is to cut it down to a cross-reference to the primary home.
 - Sentences or paragraphs that repeat a point already made.
 - Passages that could be shortened without losing meaning; anything a reviewer could reasonably ask to be cut.
 - Prior-art descriptions must earn their length through the positioning work they do (the gap statement at the end).
-- Paper 2's working length target is roughly the low-to-mid 30s of pages. It is a target, not a quota: **never recommend cutting a stated limitation, a hedge, or (in Paper 3) the predictions-and-outcomes table** to hit it.
+- The approved length budget is ~12,000 words. It is a target, not a quota: **never recommend cutting a stated limitation, a hedge, or a row of the predictions-and-outcomes table** to hit it.
 
 ### Surface quality
 - Typos, grammar, awkward phrasing, inconsistent terminology.
@@ -61,7 +60,7 @@ Present findings as a flat prioritised list. For each recommendation:
 ## Important guidance
 
 - **Verify before flagging.** Re-read the surrounding context before calling something a hedging gap or inconsistency — the qualifier may sit in the preceding or following sentence. False positives waste the author's time and erode trust in the review.
-- **Check the designated limits sections** (Paper 2 §5/§7, Paper 3 §5–§6) before flagging an unacknowledged limitation.
+- **Check the designated limits sections** (§5 and §7) before flagging an unacknowledged limitation.
 - **Build the project.** Run `make build` to check for broken references, citation issues, freeze drift, and evaluation-pin divergence.
 - **Verify factual claims.** Suspected factual errors (author name, date, claim about prior work): check the PDFs in `refs/` or do a quick web search before flagging. Only report confirmed errors.
 

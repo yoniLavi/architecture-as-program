@@ -8,6 +8,12 @@ entry must say **what changed**, or say plainly that nothing did.
 Papers cite from `citations.bib`; this file is the reasoning behind those
 citations and, more importantly, behind the design decisions they informed.
 
+*Section numbers below refer to Paper 2 as it stood when each entry was written,
+before the 30 September 2026 merge with Paper 3 renumbered it. In the merged
+paper, §3.3.2 (the confined tier) is §3.2.1; §6.6 (WASM) is §6.3; §6.3 and §6.7
+(effects, adjacent traditions) are folded into §6.4; and §7.5 (open problems) is
+§7.6.*
+
 ---
 
 ## Survey, July 2026 — six domains
@@ -376,8 +382,8 @@ where derive-and-check does something generate-and-prove cannot.
   arXiv:2604.14357 (Ching, Zhou, Zhang; v1 only): the lattice is **user-defined**,
   with labels as types ordered by a `FlowsTo` trait and a four-point diamond as the
   running example. It is evidence for an open lattice, not for two points, and is
-  now cited as such in Paper 3's lattice agenda item, beside the shipped taint
-  systems of §8 above.
+  now cited as such in Paper 2's lattice open problem (§7.6), beside W3C Trusted
+  Types and the shipped taint systems of §8 above.
 - **AgenticOS** (arXiv:2606.21129) — checked again September 2026: still v1 only,
   with no journal reference or venue, so it remains an unrefereed preprint and is
   at most a defensive sentence. Not cited.

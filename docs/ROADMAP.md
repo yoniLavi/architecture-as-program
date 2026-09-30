@@ -2,13 +2,14 @@
 
 ## Start here: state as of 30 September 2026
 
-**Publication is on hold for a merge. Start with `openspec/changes/merge-and-condense-papers/`.**
-In the final review before upload, the author found that Paper 2 cited the unpublished Paper 3
-ten times, while Paper 3 cites Paper 2 for every figure, so the dependency ran both ways. The
-author decided to merge the two papers into one condensed paper of ~12,000 words (from ~30,000),
-on the principle *say more with fewer words*. The change is scaffolded but not started. Its
-`design.md` holds a proposed section budget and four open questions (budget moves, title,
-Paper 3's directory, Zenodo relations) for the author to settle before any prose is written.
+**Publication waits on the author's end-to-end read of the merged paper.** In the final review
+before upload, the author found that Paper 2 cited the unpublished Paper 3 ten times, while
+Paper 3 cites Paper 2 for every figure, so the dependency ran both ways. The author decided to
+merge the two into one condensed paper, on the principle *say more with fewer words*. The merge
+is written (`merge-and-condense-papers`): Paper 2 is now ~10,000 words with the accounting in
+§5, and `papers/03-method/` is deleted (tag `paper-3-before-merge`). What remains is the
+author's read, then the upload to the reserved DOI with *Continues* as the only relation to
+Paper 1.
 
 Two changes are open:
 - **`prepare-paper-2-publication`** is implemented. It carries the CAmkES scoping, the magnitude
@@ -37,7 +38,7 @@ archived 30 September). `make build` is green at 348 tests + 21 subtests.
    allowlisted outbound HTTP, notification), is **implemented** (1 Aug 2026): the derivation now
    covers seven kinds / eight typed interfaces with no special case, `Clock` is granted as upstream
    `wasi:clocks/wall-clock` directly (the author-approved resolution of the recorded decision — the
-   honest demonstration of the §6.7 argument), and Paper 2 §3.3.2/§4.4 carry the widened evidence.
+   honest demonstration of the §6.7 argument), and Paper 2 §3.2.1/§4.4 carry the widened evidence.
    It was pulled ahead of Paper 2's publication deliberately, because it widens the current paper's
    lead result before the DOI rather than after. What remains of M1: node-local state as a
    capability, the scheduler driver, and the feed-triage graph itself.
@@ -54,7 +55,7 @@ requirement fails at archive, because the archiver matches headers exactly; a re
 somewhere in it.
 
 This is the execution plan for the corpus's next research artifact and the paper that reports it. The
-research *agenda* — the open problems — lives in the method paper; this document is narrower and more
+research *agenda* — the open problems — lives in Paper 2's §7.6 and §8; this document is narrower and more
 concrete: **what we build next, in what order, and what it would let a paper claim.**
 
 ## The problem with what we have
