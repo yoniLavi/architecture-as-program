@@ -19,7 +19,9 @@ Focus exclusively on these dimensions:
 - Are citations used correctly (right claim attributed to right source)?
 - Do the concrete graph examples match their prose descriptions and figure captions?
 - Do prose counts match the tables they summarise? (Verdict counts must be `verdicts(...)` over `outcomes`, never typed — the known instance of this bug class.)
-- Are statements about Paper 1 (title-block note, §5) still accurate?
+- Are statements about Paper 1 (title-block note, §5) still accurate, including dates and orderings? Only the *freeze* preceded the build; Paper 1 was published afterwards. Check against `papers/01-vision/ERRATA.md` rather than memory.
+- **Do summary sites match the body?** The abstract, contributions, §5's verdict notes, and the conclusion restate body claims. Put each one beside its body statement: the two must say the same thing, with the same qualifier. The failure is usually one-directional, with a summary quietly shedding "on the confined tier" or "checked, not verified".
+- **Hand-maintained statements about the data that are not numbers** ("the one row", "both graphs", "every node but X"): flag each where an interpolation exists, as a safe fix.
 
 ### Overstatement
 - Properties of the unbuilt type system asserted without conditional language?
@@ -36,6 +38,7 @@ Focus exclusively on these dimensions:
 
 ### Surface quality
 - Typos, grammar, awkward phrasing, inconsistent terminology.
+- **Compression damage.** The paper was condensed from ~27,000 words. Look for sentences that no longer parse, pronouns and "which" clauses whose antecedent was cut, phrasing that became ambiguous ("three of the four correct security claims"), and cross-references that now point at a section that no longer holds what the sentence promises.
 - Formatting issues in the Typst source.
 
 ## Phase 3: Recommendations
@@ -46,6 +49,7 @@ Focus exclusively on these dimensions:
 - Do NOT touch interpolated figures (`#ev` / `#d` expressions): a wrong-looking number there is a `poc/evaluate.py` serialiser question, not a prose edit — flag it separately if suspected, don't "fix" the text.
 - Every recommendation must be self-contained: implementing it should not open new questions or require follow-up changes elsewhere.
 - Prefer cuts and rewrites over additions. The paper should not get longer.
+- Mind the hedge guard. `scripts/check-hedges.py` pins verbatim fragments in §2.3 and §2.4 (listed in the script). A rewording that touches a pinned fragment fails the build, so either leave it alone, or classify the change as a judgement call that needs a deliberate re-seed.
 
 **Classify each recommendation:**
 - **Safe fix:** corrects an error or inconsistency without changing any claim. Unlikely to draw reviewer attention.
@@ -55,13 +59,16 @@ Present findings as a flat prioritised list. For each recommendation:
 - **What:** the specific problem, with line numbers
 - **Classification:** safe fix or judgement call
 - **Why it matters:** impact on credibility or clarity
-- **Suggested fix:** concrete, minimal, and unlikely to prompt further review concerns
+- **Suggested fix:** concrete, minimal, and unlikely to prompt further review concerns. Give the exact replacement text.
+
+One defect at several sites is one finding, listing every line number.
 
 ## Important guidance
 
 - **Verify before flagging.** Re-read the surrounding context before calling something a hedging gap or inconsistency — the qualifier may sit in the preceding or following sentence. False positives waste the author's time and erode trust in the review.
 - **Check the designated limits sections** (§5 and §7) before flagging an unacknowledged limitation.
-- **Build the project.** Run `make build` to check for broken references, citation issues, freeze drift, and evaluation-pin divergence.
+- **Build the project.** Run `make build` to check for broken references, citation issues, freeze drift, evaluation-pin divergence, and lost hedge pins.
+- **Prefer a fresh session.** Tightening prose you just wrote finds little. If this session drafted the text, say so.
 - **Verify factual claims.** Suspected factual errors (author name, date, claim about prior work): check the PDFs in `refs/` or do a quick web search before flagging. Only report confirmed errors.
 
 **If the paper is clean enough that remaining issues are all judgement calls, say so.** A "no safe fixes remain" result is a valid and useful outcome.
