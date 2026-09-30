@@ -97,16 +97,16 @@ change proposals as the evidence trail. The record SHALL NOT claim autonomous re
 ### Requirement: The demonstrator paper is in paper form and reports what the artifact establishes
 The demonstrator paper SHALL be structured as a paper — an abstract, an introduction stating a falsifiable
 central claim scoped to what the artifact substantiates, and design, implementation, evaluation,
-related-work, threats-to-validity, and conclusion sections. It SHALL include an evaluation section whose
-figures and verdicts are drawn from the generated evaluation artifact rather than hand-transcribed. It SHALL
-preserve the project's hedging discipline: a claim is stated in present tense only where the artifact backs
-it.
+predictions-and-outcomes, related-work, threats-to-validity, and conclusion sections. It SHALL include an
+evaluation section whose figures and verdicts are drawn from the generated evaluation artifact rather than
+hand-transcribed. It SHALL preserve the project's hedging discipline: a claim is stated in present tense only
+where the artifact backs it.
 
-The demonstrator paper SHALL NOT carry the corpus's predictions-and-outcomes accounting, which belongs to the
-method paper; it SHALL instead state concisely what it does and does not substantiate, and cite the method
-paper for the accounting. It SHALL position itself against the prior art for LLM-agent security, including
-capability- and provenance-based defences against prompt injection, wherever it claims prompt-injection
-attenuation.
+The demonstrator paper SHALL carry the corpus's predictions-and-outcomes accounting of the frozen vision, in
+condensed form: the protocol under which the vision was frozen at its last pre-build state, every prediction with its
+verdict, and the design corrections the artifact forced. It SHALL position itself against the prior art for
+LLM-agent security, including capability- and provenance-based defences against prompt injection, wherever it
+claims prompt-injection attenuation.
 
 #### Scenario: The demonstrator paper carries an artifact-sourced evaluation
 - **WHEN** the demonstrator paper is built
@@ -115,7 +115,8 @@ attenuation.
 
 #### Scenario: The accounting has exactly one owner
 - **WHEN** a reader looks for the predictions-and-outcomes accounting
-- **THEN** it appears in the method paper only, and the demonstrator paper cites it rather than restating it
+- **THEN** it appears in the demonstrator paper, with every prediction of the frozen vision and its verdict,
+  and no other paper restates it
 
 #### Scenario: Prompt-injection claims engage the prior art
 - **WHEN** the demonstrator paper claims prompt injection is attenuated
@@ -147,41 +148,6 @@ underlying capability, and the interface MAY be noted alongside it.
 - **THEN** the verdict reflects the underlying capability — authoring, in that example — and the interface is
   noted rather than credited
 
-### Requirement: The corpus separates evidence from accounting across two living papers
-The corpus SHALL contain two living papers with distinct claims: a **demonstrator paper** reporting what the
-artifact establishes, and a **method paper** reporting the research protocol and the accounting of the frozen
-vision's predictions against the artifact. Each SHALL state a single central claim and SHALL be readable
-without the other, with cross-citation rather than restatement.
-
-The method paper SHALL NOT interpolate evaluation data; it SHALL cite the demonstrator paper for every figure
-and measurement it refers to, so exactly one paper is the source of any given number.
-
-#### Scenario: Each living paper carries one claim
-- **WHEN** either living paper is built
-- **THEN** its introduction states one central claim, and material serving the other paper's claim is cited
-  rather than reproduced
-
-#### Scenario: Only the demonstrator paper sources evaluation figures
-- **WHEN** the method paper refers to a measurement from the artifact
-- **THEN** it cites the demonstrator paper rather than interpolating the evaluation artifact itself
-
-### Requirement: The method paper documents the pre-registration protocol and its mechanisation
-The method paper SHALL describe the protocol by which the corpus records predictions before building —
-freezing the founding vision, publishing it under a citable identifier, guarding it against silent edit by an
-automated check in the build, permitting only dated errata, and reporting outcomes prediction by prediction
-without revising the predictions. It SHALL present that protocol's **mechanisation** as its contribution and
-the corpus's own history as one worked instance, and SHALL state the limits of generalising from a single
-instance.
-
-#### Scenario: The protocol is described with its enforcement
-- **WHEN** a reader consults the method paper
-- **THEN** it describes both the protocol and the automated check that enforces the freeze, rather than
-  describing the protocol as an intention
-
-#### Scenario: Single-instance generalisation is bounded
-- **WHEN** the method paper draws conclusions from the corpus's own history
-- **THEN** it states that the evidence is one instance and does not claim the protocol is validated generally
-
 ### Requirement: No paper states that the artifact lacks a capability the artifact has
 Every living paper SHALL describe the artifact's capabilities as they stand at build time. A
 paper SHALL NOT state that the demonstrator lacks a capability it has; where a capability
@@ -191,7 +157,7 @@ rather than the absence.
 This closes the gap the corpus's other guards leave open. Interpolation prevents a *number*
 from drifting and pinned verdicts prevent a *mechanism* from silently regressing, but a
 sentence asserting an absence stays green forever after the thing is built. When a change adds
-a capability, correcting every "the demonstrator has no X" claim across both living papers is
+a capability, correcting every "the demonstrator has no X" claim in every living paper is
 part of that change, not a later sweep.
 
 This requirement rests on review and no check enforces it, which is recorded here because it
@@ -208,7 +174,7 @@ capability, and the absence of a check on it SHALL stay stated rather than assum
 - **WHEN** a change gives the artifact a capability a living paper previously described as
   absent, undesigned, or unbuilt
 - **THEN** that change also replaces each such statement with the capability's actual
-  restriction, in both living papers
+  restriction, in every living paper
 
 #### Scenario: An accounting verdict reflects the artifact
 
@@ -229,8 +195,8 @@ exactly as the figure is, and a hand-typed magnitude beside an interpolated figu
 as a hand-typed count beside an interpolated one: it stays green while the data moves underneath it.
 Such a magnitude SHALL be interpolated from the evaluation artifact.
 
-The one-owner-per-number rule SHALL apply to magnitudes as it applies to figures: the method paper
-SHALL cite the demonstrator paper for a magnitude rather than stating one in its own voice.
+A later corpus paper that does not itself source a measurement SHALL cite the published paper that does
+rather than state a magnitude in its own voice.
 
 #### Scenario: A magnitude in the demonstrator paper is interpolated
 - **WHEN** the demonstrator paper states the magnitude of a measured figure anywhere, including
@@ -238,7 +204,8 @@ SHALL cite the demonstrator paper for a magnitude rather than stating one in its
 - **THEN** that magnitude is interpolated from the evaluation artifact rather than typed
 
 #### Scenario: The method paper cites rather than states a magnitude
-- **WHEN** the method paper refers to the magnitude of a demonstrator measurement
+- **WHEN** a later corpus paper (a methods paper, or a successor to the demonstrator) refers to the
+  magnitude of a measurement the demonstrator paper sources
 - **THEN** it cites the demonstrator paper for it and states no magnitude in its own voice
 
 ### Requirement: A falsifiable central claim rests on properties a reader can re-derive
@@ -324,3 +291,13 @@ act recorded in the paper's errata record, and SHALL NOT change as a side effect
 #### Scenario: The served PDF is the record
 - **WHEN** the corpus is built
 - **THEN** the published paper's PDF has the checksum the publication record states for its file
+
+### Requirement: A published paper cites no unpublished work
+A paper that is published under a persistent identifier SHALL NOT cite work that has no published record.
+A citation of work in preparation cannot be followed by a reader, and between two papers of the corpus it
+creates a dependency that forces them to publish in an order neither can satisfy. Where a published paper
+needs material that is not yet published, it SHALL state that material, or its absence, in its own voice.
+
+#### Scenario: The paper is prepared for publication
+- **WHEN** a corpus paper is stamped with its identifier for publication
+- **THEN** every entry in its bibliography has a published record, and none is marked in preparation
