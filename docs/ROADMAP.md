@@ -6,7 +6,7 @@
 before upload, the author found that Paper 2 cited the unpublished Paper 3 ten times, while
 Paper 3 cited Paper 2 for every figure, so the dependency ran both ways. The author decided to
 merge the two into one condensed paper, on the principle *say more with fewer words*. The merge
-is written (`merge-and-condense-papers`): Paper 2 is now ~11,500 words (after the review rounds) with the accounting in
+is written (`merge-and-condense-papers`): Paper 2 is now ~12,400 words (after the review rounds, at its budget) with the accounting in
 §5, and `papers/03-method/` is deleted (tag `paper-3-before-merge`). What remains is the
 author's read, then the upload to the reserved DOI with *Continues* as the only relation to
 Paper 1.
@@ -27,7 +27,7 @@ One change is open:
 
 `merge-and-condense-papers` is written, reviewed, and archived (30 September). Paper 1 is marked
 published and served from its stored artifacts (`mark-published-papers`, archived 30 September).
-`make build` is green at 391 tests + 21 subtests.
+`make build` is green at 395 tests + 21 subtests.
 
 Attenuation at the routing point (the gap table below) would let the paper drop a qualifier,
 but it does not gate the DOI: the verdict it touches stays *Partial* because of the host tier

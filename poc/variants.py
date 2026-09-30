@@ -163,6 +163,28 @@ def launder_via_duplicate_role(graph: dict) -> dict:
     return g
 
 
+def hide_branch_behind_whole_edge(graph: dict) -> dict:
+    """Consume a labelled sum on an unported edge.
+
+    `NotifyUser` takes `ModerateContent`'s whole `ok | violation | escalation` sum on
+    an edge with no port, and the per-variant `violation` and `escalation` edges are
+    removed. The validator once read an unported edge as covering every variant;
+    the runtime routes a variant by its role and never sends one along it, so a
+    policy violation was swallowed with no notification, no escalation, no error."""
+    g = copy.deepcopy(graph)
+    whole = "ok: ModeratedQuery | violation: PolicyViolation | escalation: EscalationRequest"
+    for node in g["nodes"]:
+        if node["name"] == "NotifyUser":
+            node["inputs"] = [whole if i == "PolicyViolation" else i for i in node["inputs"]]
+    g["data_edges"] = [
+        e
+        for e in g["data_edges"]
+        if e["from"] not in ("ModerateContent.violation", "ModerateContent.escalation")
+    ]
+    g["data_edges"].append({"from": "ModerateContent", "to": "NotifyUser"})
+    return g
+
+
 def mislabel_subgraph_output(platform: dict) -> dict:
     """Make a sub-graph node lie about what it emits at its boundary.
 
@@ -214,6 +236,7 @@ UNSAFE_VARIANTS = {
     "delegate_via_edge": delegate_via_edge,
     "route_tool_into_inference_slot": route_tool_into_inference_slot,
     "launder_via_duplicate_role": launder_via_duplicate_role,
+    "hide_branch_behind_whole_edge": hide_branch_behind_whole_edge,
     "mislabel_subgraph_output": mislabel_subgraph_output,
     "unevaluatable_contract": unevaluatable_contract,
 }

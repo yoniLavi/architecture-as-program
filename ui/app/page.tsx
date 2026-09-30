@@ -232,7 +232,7 @@ export default function Inspector() {
                   onClick={() => selectCase(c.name)}
                   data-testid={`case-${c.name}`}
                 >
-                  <span className="mono">{c.name}</span>
+                  <span className="mono">{breakAtUnderscores(c.name)}</span>
                   <span className="verdict badge rejected">rejected</span>
                 </button>
               ))}
@@ -406,6 +406,21 @@ export default function Inspector() {
       </div>
     </main>
   );
+}
+
+/** A long snake_case name, with break opportunities after each underscore, so it
+ *  wraps at a word boundary instead of mid-word. The text content is unchanged. */
+function breakAtUnderscores(name: string) {
+  return name.split("_").map((part, i, parts) => (
+    <span key={i}>
+      {part}
+      {i < parts.length - 1 ? (
+        <>
+          _<wbr />
+        </>
+      ) : null}
+    </span>
+  ));
 }
 
 function caseKey(c: CorpusCase): string {

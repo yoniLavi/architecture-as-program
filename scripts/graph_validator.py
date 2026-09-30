@@ -301,11 +301,11 @@ def _validate_edges(
     edges: list[dict],
     errors: list[str],
 ) -> None:
-    # Track, per source node, which output-variant roles (and the
-    # whole unported output) have at least one consumer. Used for
-    # the variant-completeness check below.
+    # Track, per source node, which output-variant roles have at least one
+    # consumer. Used for the variant-completeness check below.
     consumed_ports: dict[str, set[str]] = {n: set() for n in node_map}
-    consumed_whole: set[str] = set()
+    seen_edges: set[tuple[str, str]] = set()
+    successors: dict[str, set[str]] = {n: set() for n in node_map}
 
     for e in edges:
         if not isinstance(e, dict) or "from" not in e or "to" not in e:
@@ -313,6 +313,16 @@ def _validate_edges(
             continue
         fr = e["from"]
         to = e["to"]
+        # The runtime schedules a node once per arriving edge, so a repeated
+        # edge runs its target twice (a tool-capable node twice, a reply sent
+        # twice) — fan-out the model does not address.
+        if (fr, to) in seen_edges:
+            errors.append(f"{path.name}: duplicate edge {fr!r}→{to!r}")
+            continue
+        seen_edges.add((fr, to))
+        base = fr.rsplit(".", 1)[0] if "." in fr else fr
+        if base in successors and to in node_map:
+            successors[base].add(to)
         if "." in fr:
             from_node, port = fr.rsplit(".", 1)
         else:
@@ -355,8 +365,18 @@ def _validate_edges(
                 continue  # shouldn't happen given the check above
             consumed_ports[from_node].add(port)
         else:
+            if sum_roles(src_output_ast):
+                # The runtime routes a labelled sum's variant by its role, so an
+                # unported edge from one never fires: it would read as consuming
+                # every variant while carrying none, and a branch it "covers"
+                # would be dropped silently at run time.
+                errors.append(
+                    f"{path.name}: edge {fr!r}→{to!r}: {from_node!r} emits a labelled "
+                    f"sum, which is consumed by port; the runtime routes a variant by "
+                    f"its role, so a whole-output edge never fires"
+                )
+                continue
             src_ast = src_output_ast
-            consumed_whole.add(from_node)
 
         # Target data-input resolution.
         tgt_data = _data_inputs(tgt_node, caps)
@@ -399,16 +419,36 @@ def _validate_edges(
                 f"route it through a declared discharger first."
             )
 
-    # Variant-completeness sweep: for every sum-typed output, every
-    # declared variant must have at least one consuming edge, unless
-    # the whole output is consumed unported (which covers all
-    # variants at once).
+    # The graphs run a single active path from boundary to terminal; a cycle
+    # would run without bound (a reply node wired back to the entry sends a
+    # reply per lap). Reject it rather than leave the runtime to loop.
+    def _on_cycle(start: str) -> bool:
+        stack, visited = [start], set()
+        while stack:
+            for nxt in successors.get(stack.pop(), ()):
+                if nxt == start:
+                    return True
+                if nxt not in visited:
+                    visited.add(nxt)
+                    stack.append(nxt)
+        return False
+
+    cyclic = sorted(n for n in successors if _on_cycle(n))
+    if cyclic:
+        errors.append(
+            f"{path.name}: the data edges form a cycle through {cyclic}; a signal graph is acyclic"
+        )
+
+    # Variant-completeness sweep: for every labelled sum output, every
+    # declared variant must have at least one consuming edge on its own
+    # port. (A whole-output edge from a labelled sum is rejected above: the
+    # runtime never sends a variant along one, so it covers nothing.)
     for name, n in node_map.items():
         output_ast = _try_parse(n["output"], f"output of node {name!r}", path, errors)
         if output_ast is None:
             continue
         variants = sum_roles(output_ast)
-        if not variants or name in consumed_whole:
+        if not variants:
             continue
         unconsumed = [v for v in variants if v not in consumed_ports[name]]
         for role in unconsumed:
@@ -612,9 +652,19 @@ def _validate_subgraph_output(
     if not isinstance(declared, str):
         return  # already flagged by the per-graph node check
     try:
-        declared_members = _type_members(parse_type(declared))
+        declared_ast = parse_type(declared)
     except ParseError:
         return  # malformed output already flagged per-graph
+    if sum_roles(declared_ast):
+        # A boundary value is a terminal's output, never a routed variant, so a
+        # labelled boundary type would give the parent ports that never fire.
+        errors.append(
+            f"{path.name}: node {ref!r} is used as a sub-graph but declares a labelled "
+            f"boundary output ({declared!r}); its declared output must carry no role "
+            f"labels, since a boundary value is never a variant and a port on it never fires"
+        )
+        return
+    declared_members = _type_members(declared_ast)
     terminal_members = _terminal_output_members(target)
     if not terminal_members:
         return  # a graph with no discernible terminals is a separate structural fault

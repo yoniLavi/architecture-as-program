@@ -102,6 +102,12 @@
       (`launder_via_duplicate_role` pinned). The narrowing check's message no longer carries
       the sink rule's phrase, so `route_tool_into_inference_slot` is attributed to the check
       that catches it; a test removes the sink rule and its own pins fail
+- [x] 6.23 A whole-output edge from a labelled sum passed variant completeness but never fired
+      (a policy violation swallowed silently); labelled boundary outputs, duplicate edges and
+      cycles were accepted; a node could run twice. All rejected or refused now;
+      `hide_branch_behind_whole_edge` pinned. The inspector screenshots regenerated (the paper
+      figure showed three cases), with long case names wrapping at underscores. The corpus
+      records which cases review found (`found_by_review`, interpolated in §4.2 and §7.1)
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

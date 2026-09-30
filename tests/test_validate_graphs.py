@@ -223,10 +223,13 @@ class TestVariantCompleteness(unittest.TestCase):
                 msg=f"Expected dead-variant error; got: {errors}",
             )
 
-    def test_whole_output_consumed_unported_covers_all_variants(self):
-        """If a downstream node consumes the full sum output (no port
-        suffix), the validator should not flag individual variants as
-        dead — they are all carried by the unported edge."""
+    def test_a_whole_output_edge_from_a_labelled_sum_is_rejected(self):
+        """This test once pinned the opposite: that an unported edge covered
+        every variant. The runtime routes a labelled sum's variant by its role
+        and never sends one along an unported edge, so that edge carried
+        nothing and a branch it "covered" was dropped silently (round I,
+        30 September 2026). It is now rejected, and the variants it claimed to
+        cover are reported dead."""
         with tempfile.TemporaryDirectory() as td:
             graph = {
                 "name": "Pipeline",
@@ -248,8 +251,38 @@ class TestVariantCompleteness(unittest.TestCase):
             }
             paths = _write({"whole.json": graph}, Path(td))
             errors = validate_files(paths)
-            variant_errors = [e for e in errors if "no edge consumes" in e]
-            self.assertEqual(variant_errors, [], msg=f"All errors: {errors}")
+            self.assertTrue(any("whole-output edge never fires" in e for e in errors), errors)
+            self.assertTrue(any("no edge consumes" in e for e in errors), errors)
+
+
+class TestEdgesAreAPath(unittest.TestCase):
+    """A run takes a single active path, each node once (round I, 30 September
+    2026: a duplicate edge ran the tool-capable node twice and sent two replies,
+    and a cycle ran without bound)."""
+
+    def _graph(self, edges: list[dict]) -> dict:
+        return {
+            "name": "Pipeline",
+            "parameters": ["RawInput"],
+            "capabilities": [],
+            "nodes": [
+                {"name": "A", "inputs": ["RawInput"], "output": "Mid"},
+                {"name": "B", "inputs": ["Mid"], "output": "RawInput"},
+            ],
+            "data_edges": edges,
+        }
+
+    def _errors(self, edges: list[dict]) -> list[str]:
+        with tempfile.TemporaryDirectory() as td:
+            return validate_files(_write({"p.json": self._graph(edges)}, Path(td)))
+
+    def test_a_duplicate_edge_is_rejected(self):
+        errors = self._errors([{"from": "A", "to": "B"}, {"from": "A", "to": "B"}])
+        self.assertTrue(any("duplicate edge" in e for e in errors), errors)
+
+    def test_a_cycle_is_rejected(self):
+        errors = self._errors([{"from": "A", "to": "B"}, {"from": "B", "to": "A"}])
+        self.assertTrue(any("form a cycle" in e for e in errors), errors)
 
 
 class TestCrossGraphCapabilityNarrowing(unittest.TestCase):

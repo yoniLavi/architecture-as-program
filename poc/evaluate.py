@@ -137,6 +137,7 @@ REASON_CONTRACT = "contract"
 REASON_CAPABILITY_DATA = "capability as data"
 REASON_SINK = "sink rule"
 REASON_SUM_ROLE = "one variant per port"
+REASON_VARIANT = "variant completeness"
 
 # A reason class is identified by phrases, *any* of which in one of the
 # validator's errors places that error in the class; each phrase is specific to
@@ -151,6 +152,7 @@ REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     REASON_TRUST_LATTICE: ("raises trust without", "trust-lattice violation"),
     REASON_SINK: ("holds a tool-scoped LLMClient",),
     REASON_SUM_ROLE: ("duplicate variant role",),
+    REASON_VARIANT: ("whole-output edge never fires", "but no edge consumes it"),
     REASON_CROSS_GRAPH: (
         "declared output",
         "terminal output types",
@@ -182,6 +184,10 @@ class Case:
     # checks fire. A composition fault is invisible unless the referenced graph is
     # in the batch, so an output-side case names the child graph here.
     with_graphs: tuple[str, ...] = ()
+    # True if the validator *accepted* this mutation until an adversarial review
+    # found it (30 September 2026) and the checks were changed to catch it: the
+    # corpus's own record that it holds what someone thought to write down.
+    found_by_review: bool = False
 
 
 CORPUS: tuple[Case, ...] = (
@@ -230,6 +236,7 @@ CORPUS: tuple[Case, ...] = (
         "`launder_trust` disguised by a sum type: one output variant marked untrusted, "
         "the other leaving clean. Each variant leaves on its own port, so each must "
         "satisfy the lattice on its own.",
+        found_by_review=True,
     ),
     Case(
         "launder_trust_by_declaration",
@@ -239,6 +246,7 @@ CORPUS: tuple[Case, ...] = (
         "`launder_trust` excused by declaring the tool-capable consumer a discharger. The "
         "lattice accepts a declared discharger; the sink rule does not let a node holding "
         "a tool-scoped client be one.",
+        found_by_review=True,
     ),
     Case(
         "delegate_via_edge",
@@ -248,6 +256,7 @@ CORPUS: tuple[Case, ...] = (
         "A node returns the knowledge-base handle it holds, and a downstream node with no "
         "`with` clause for it uses it: reference passing along an edge, the delegation "
         "the graph gives up to keep its authority topology static.",
+        found_by_review=True,
     ),
     Case(
         "untrusted_into_tool_node",
@@ -257,6 +266,7 @@ CORPUS: tuple[Case, ...] = (
         "Raw untrusted input into the tool-capable node, labelled consistently so no node "
         "raises trust. The lattice alone constrains raising trust, not consuming it; the "
         "sink rule keeps untrusted data off a tool-capable node.",
+        found_by_review=True,
     ),
     Case(
         "route_tool_into_inference_slot",
@@ -269,6 +279,7 @@ CORPUS: tuple[Case, ...] = (
         "narrowing check refuses the routing.",
         base="support-platform",
         with_graphs=("customer-support",),
+        found_by_review=True,
     ),
     Case(
         "launder_via_duplicate_role",
@@ -277,7 +288,19 @@ CORPUS: tuple[Case, ...] = (
         REASON_SUM_ROLE,
         "Two variants under one role: the edge check resolved the role to the first, "
         "clean variant while the runtime routed both, and raw untrusted input reached "
-        "the tool-capable node. A port must name one variant.",
+        "the tool-capable node. The type parser rejects a repeated role.",
+        found_by_review=True,
+    ),
+    Case(
+        "hide_branch_behind_whole_edge",
+        "mutation",
+        REJECTED,
+        REASON_VARIANT,
+        "`NotifyUser` takes `ModerateContent`'s whole labelled sum on an unported edge, "
+        "and the violation and escalation edges are removed. The runtime routes by role, "
+        "so the edge never fires and a policy violation is swallowed silently; the "
+        "validator once read it as covering every variant.",
+        found_by_review=True,
     ),
     Case(
         "mislabel_subgraph_output",
@@ -1627,6 +1650,7 @@ def serialise(ev: Evaluation) -> str:
             "canonical_accepted": sum(1 for o in canonical if o.actual == ACCEPTED),
             "mutation_total": len(mutations),
             "mutation_rejected": caught,
+            "found_by_review": sum(1 for o in mutations if o.case.found_by_review),
         },
         "overhead": {
             "compilation_ms": b.compilation_ms,

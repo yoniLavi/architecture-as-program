@@ -380,6 +380,14 @@ def execute(
 
     while pending:
         node_name, value, acting_as = pending.pop(0)
+        if node_name in result.received:
+            # A single active path runs each node once. A second arrival is
+            # fan-in/fan-out the model does not address (its merge order would
+            # need classifying), so it is refused rather than run again.
+            raise ExecutionError(
+                f"node {node_name!r} would run a second time; fan-in and fan-out "
+                f"are unaddressed, so a run reaching a node twice is refused"
+            )
         node = graph.nodes[node_name]
 
         result.received[node_name] = value
