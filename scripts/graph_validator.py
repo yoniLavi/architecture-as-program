@@ -227,7 +227,7 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
             errors.append(f"{path.name}: boundary data input {p!r} declared but never consumed")
 
     _validate_edges(path, node_map, caps, edges, errors)
-    _validate_entry(path, node_map, data_params, edges, errors)
+    _validate_entry(path, node_map, data_params, caps, edges, errors)
     _validate_node_trust_flow(path, node_map, caps, errors)
     _validate_identities(path, node_map, caps, errors)
     _validate_layout(path, node_map, graph.get("layout", {}), errors)
@@ -299,6 +299,7 @@ def _validate_entry(
     path: Path,
     node_map: dict[str, dict],
     data_params: list[str],
+    caps: list[str],
     edges: list[dict],
     errors: list[str],
 ) -> None:
@@ -316,10 +317,19 @@ def _validate_entry(
             f"runs from exactly one entry node, so any other would never run"
         )
         return
-    if len(data_params) == 1 and data_params[0] not in node_map[entries[0]]["inputs"]:
+    if len(data_params) != 1:
+        errors.append(
+            f"{path.name}: a graph takes exactly one boundary data input, got {data_params}"
+        )
+        return
+    # The entry's data input is the boundary and nothing else: a second data input
+    # would have no edge and no boundary to supply it, and the node would run with it
+    # unsatisfied. Its other inputs must be the graph's declared capabilities.
+    entry_data = [i for i in node_map[entries[0]]["inputs"] if i not in caps]
+    if entry_data != data_params:
         errors.append(
             f"{path.name}: entry node {entries[0]!r} does not take the boundary input "
-            f"{data_params[0]!r}"
+            f"{data_params[0]!r} as its only data input (it takes {entry_data})"
         )
 
 

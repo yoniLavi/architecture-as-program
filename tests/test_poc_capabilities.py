@@ -153,6 +153,23 @@ def test_http_client_refuses_an_unparseable_host():
         http.get("not a url")
 
 
+def test_http_client_refuses_urls_parsers_disagree_on():
+    """`urlsplit` reads the host after a backslash as the host; a WHATWG client
+    reads the backslash as a path separator and connects to what came before it.
+    Non-HTTP schemes and userinfo are refused too (round L, 30 September 2026)."""
+    http = HTTPClient(allowlist=frozenset({"Feeds.Example.com"}))
+    for url in (
+        "https://evil.example\\@feeds.example.com/",
+        "file://feeds.example.com/etc/passwd",
+        "gopher://feeds.example.com:25/",
+        "https://user@feeds.example.com/",
+    ):
+        with pytest.raises(CapabilityError):
+            http.get(url)
+    # A hostname is case-insensitive, so a mixed-case entry still matches its host.
+    http.get("https://feeds.example.com/rss")
+
+
 def test_notifier_is_a_write_only_channel_sink():
     n = Notifier("digest")
     n.notify("3 items today")

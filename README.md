@@ -26,7 +26,7 @@ Papers live under [`papers/`](papers/README.md), one directory per paper:
   type-checks on every edge. Reports the artifact and its evaluation, and
   accounts for Paper 1's predictions against it under a pre-registration
   protocol — freeze the vision, publish it under a DOI, guard it in the build,
-  report outcomes without revising predictions — including the three design
+  report outcomes without revising predictions — including the two design
   corrections building it forced. (A separate method paper, *Predicting Before
   Building*, was merged into it in September 2026.)
 

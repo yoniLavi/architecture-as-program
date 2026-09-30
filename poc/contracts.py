@@ -126,7 +126,9 @@ def _resolve(value: object, path: str) -> object:
     # A closed-set field is an Enum at run time, and a contract literal is a string,
     # so compared raw, no literal ever matched: an exhaustive `intent in [...]` came
     # out false and blamed the body (round K, 30 September 2026). A member compares
-    # as its value, which is how the graph and the WIT enum both spell it.
+    # as its value (`billing_question`) — the Python spelling, not WIT's kebab-case
+    # `billing-question`, which a contract must not use. A literal outside the enum
+    # is not rejected before a run, like a field path (the paper says so).
     if isinstance(current, Enum):
         return current.value
     return current

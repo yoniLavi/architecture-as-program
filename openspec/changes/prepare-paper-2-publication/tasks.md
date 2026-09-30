@@ -130,6 +130,13 @@
       literals, so membership over `intent` was always false and blamed the body; a member now
       compares as its value. §3.3.3 says "set membership" and that a postcondition cannot
       see which variant was emitted
+- [x] 6.27 Round L: the `ServiceOutcome` correction reclassified as not counted (the artifact
+      keeps the vision's union convention; the unchecked alias was the demonstrator's gap), so
+      §5.2 reports two corrections; the identity/revocation/rotation row moved to *Partial*;
+      row labels aligned with Paper 1 (trust annotations, Jif-style labels, "without a declared
+      discharge"); the entry must take the boundary as its only data input; the HTTP
+      allowlist refuses backslashes, userinfo, and non-HTTP schemes, and matches hosts
+      case-insensitively
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

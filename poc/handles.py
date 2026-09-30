@@ -239,8 +239,17 @@ class HTTPClient:
     _responses: Mapping[str, str] = field(default_factory=dict)
 
     def get(self, url: str) -> str:
-        host = urlsplit(url).hostname
-        if host is None or host not in self.allowlist:
+        # Refuse what parsers disagree on before reading the host: a backslash is a
+        # path separator to a WHATWG client and userinfo to `urlsplit`, so
+        # `https://evil.example\@feeds.example.com/` passed here and would reach
+        # `evil.example` (round L, 30 September 2026). Only http(s) is HTTP, and a
+        # hostname is case-insensitive.
+        parts = urlsplit(url)
+        host = parts.hostname
+        if "\\" in url or parts.scheme not in ("http", "https") or parts.username is not None:
+            host = None
+        allowed = {h.lower() for h in self.allowlist}
+        if host is None or host not in allowed:
             raise CapabilityError(
                 f"node attempted HTTP to host {host!r} outside its "
                 f"allowlist {sorted(self.allowlist)}"

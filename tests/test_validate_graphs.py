@@ -325,6 +325,13 @@ class TestOneEntryNode(unittest.TestCase):
         errors = self._errors(nodes, [{"from": "A", "to": "B"}, {"from": "B", "to": "C"}])
         self.assertTrue(any("does not take the boundary input" in e for e in errors), errors)
 
+    def test_the_entry_takes_no_second_data_input(self):
+        """Nothing supplies a second data input to the entry, so it would run with it
+        unsatisfied (round L, 30 September 2026)."""
+        nodes = [{"name": "A", "inputs": ["RawInput", "Extra"], "output": "Out"}]
+        errors = self._errors(nodes, [])
+        self.assertTrue(any("only data input" in e for e in errors), errors)
+
 
 class TestCrossGraphCapabilityNarrowing(unittest.TestCase):
     def _child_graph(self, param: str) -> dict:
