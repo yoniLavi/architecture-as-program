@@ -93,7 +93,7 @@
 #align(center)[
   #block(width: 85%)[
     #set text(size: 9pt, style: "italic")
-    Second paper in a corpus on architecture-as-program. The founding vision @lavi_architecture_2026 was frozen at its last state before the executable demonstrator was built, and later published without revising its predictions; this paper reports the artifact, most of it built afterwards, and accounts for the vision's predictions against it without revising them.
+    Second paper in a corpus on architecture-as-program, following up on the founding vision @lavi_architecture_2026.
   ]
 ]
 
