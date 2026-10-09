@@ -512,3 +512,116 @@ world hostile-clocked {
     export escape-fs: func() -> escape-verdict;
     export escape-net: func() -> escape-verdict;
 }
+
+// ── The FeedTriage graph's worlds ────────────────────────────────────────────
+//
+// One per capability-holding node of `graphs/feed-triage.json` and
+// `graphs/triage-item.json`. The four pure nodes (ParseFeeds, LimitBatch,
+// SelectItems, SkipItem) hold nothing and have no world: they stay on the host
+// tier. Read down the `import` lines and the service's whole authority is on
+// the page — one world imports `http-client`, one imports `state-rw`, one
+// imports `notifier`, and no world imports two of them.
+
+/// StartRun — holds `Clock`, and nothing else. The only node that observes the
+/// time; every other node that needs the date receives it as data.
+world start-run {
+    use types.{tick, run-info};
+
+    import wasi:clocks/wall-clock@0.2.0;
+
+    export run: func(tick: tick) -> run-info;
+}
+
+/// LoadSubscriptions — holds `StateHandle<'subscriptions', read>`. It can read
+/// the feed list and cannot add to it: `state-read` has no writer.
+world load-subscriptions {
+    use types.{run-info, subscription-list};
+
+    import state-read;
+
+    export run: func(info: run-info) -> subscription-list;
+}
+
+/// FetchFeeds — holds `HTTPClient<[allowlist]>`, and nothing else. The only world
+/// in the service that imports `http-client`, and it imports no model: what it
+/// fetches is decided by the subscription list, never by anything a model said.
+world fetch-feeds {
+    use types.{subscription-list, feed-batch};
+
+    import http-client;
+
+    export run: func(subscriptions: subscription-list) -> feed-batch;
+}
+
+/// DropSeen — holds `StateHandle<'seen', read>`. Deciding which items are new
+/// confers no way to change which items are new.
+world drop-seen {
+    use types.{feed-item};
+
+    import state-read;
+
+    export run: func(items: list<feed-item>) -> list<feed-item>;
+}
+
+/// ClassifyItem — holds `LLMClient<inference>`, and nothing else. The trust
+/// discharger of the per-item child graph: one untrusted item in, a verdict from
+/// two closed sets out. It can be misled by the item and has nothing to act with.
+world classify-item {
+    use types.{feed-item, classification};
+
+    import inference-llm;
+
+    export run: func(item: feed-item) -> classification;
+}
+
+/// SummariseItem — holds `LLMClient<inference>`, and nothing else.
+world summarise-item {
+    use types.{classified-item, item-verdict};
+
+    import inference-llm;
+
+    export run: func(classified: classified-item) -> item-verdict;
+}
+
+/// ComposeDigest — holds `LLMClient<inference>`. A join: its two data inputs
+/// arrive by position, and the export takes them as two parameters.
+world compose-digest {
+    use types.{selection, run-info, digest};
+
+    import inference-llm;
+
+    export run: func(selected: selection, info: run-info) -> digest;
+}
+
+/// PublishDigest — holds `Notifier<'digest'>`, and nothing else. The service's
+/// one outward act is the one function this world imports.
+world publish-digest {
+    use types.{digest, published-digest};
+
+    import notifier;
+
+    export run: func(composed: digest) -> published-digest;
+}
+
+/// RecordSeen — holds `StateHandle<'seen', read-write>`. The only world that
+/// imports `state-rw`: the only node that can mark an item seen.
+world record-seen {
+    use types.{published-digest, run-report};
+
+    import state-rw;
+
+    export run: func(published: published-digest) -> run-report;
+}
+
+/// A hostile node body for the feed evaluation's negative control: it has
+/// ClassifyItem's signature and is granted what ClassifyItem is granted, and its
+/// world also imports `http-client` — the import an exfiltrating classifier
+/// would need. The derivation must reject it for exactly that interface.
+world hostile-exfiltrating-classifier {
+    use types.{feed-item, classification};
+
+    import inference-llm;
+    import http-client;
+
+    export run: func(item: feed-item) -> classification;
+}

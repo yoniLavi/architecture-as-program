@@ -239,7 +239,11 @@ WASM_OUT    := $(ROOT)/poc/sandbox/wasm
 WASM_TARGET := wasm32-unknown-unknown
 WASM_MODULES := node_parse_message node_moderate_content node_fetch_context \
                 node_generate_response node_send_reply node_heartbeat \
-                hostile_ambient hostile_ungranted hostile_clocked
+                hostile_ambient hostile_ungranted hostile_clocked \
+                node_start_run node_load_subscriptions node_fetch_feeds \
+                node_drop_seen node_classify_item node_summarise_item \
+                node_compose_digest node_publish_digest node_record_seen \
+                hostile_exfiltrating_classifier
 
 # Build the component-tier WASM node artifacts and copy them into
 # poc/sandbox/wasm/ (which is committed).
@@ -259,6 +263,12 @@ WASM_MODULES := node_parse_message node_moderate_content node_fetch_context \
 # `make build` or the pre-commit hooks — the committed artifacts let the sandbox
 # tests run without either toolchain. Rebuild only when the Rust sources or the
 # WIT change.
+#
+# This rebuilds *every* artifact, and a rebuilt component whose source did not
+# change can still differ in bytes (a newer toolchain, a grown WIT package).
+# Commit only the artifacts whose crates you changed, and `git checkout` the
+# rest: the nine components Paper 2 reports on are its evidence as built, and
+# should not churn because a feed-triage node was edited.
 wasm:
 	cargo build --manifest-path $(RUST_DIR)/Cargo.toml --release --target $(WASM_TARGET)
 	@mkdir -p $(WASM_OUT)

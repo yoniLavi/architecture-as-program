@@ -48,10 +48,16 @@ from .graph import (
     validate_graph_dicts,
 )
 from .nodes import REGISTRY
+from .sandbox.feed_nodes import FEED_SANDBOX_REGISTRY
 from .sandbox.interfaces import UnmappedCapability, interface_for
 from .sandbox.nodes import SANDBOX_REGISTRY
 from .trace import GraphTrace, NodeTrace, RecordingHandle, TraceCollector, trust_label
 from .values import Variant
+
+# Every confined-tier port the executor can run: the customer-support graph's and
+# the feed-triage graphs'. The two registries stay separate at their source because
+# they are reported by different evaluations.
+_CONFINED = {**SANDBOX_REGISTRY, **FEED_SANDBOX_REGISTRY}
 
 # How a sub-graph reference resolves to a graph. Defaults to the canonical graphs
 # on disk (by declared name, not filename); tests supply their own.
@@ -598,7 +604,7 @@ def execute(
             result.subgraphs[node_name] = sub
             entry.subgraph = sub.trace
         else:
-            registry = SANDBOX_REGISTRY if node.tier == TIER_SANDBOX else REGISTRY
+            registry = _CONFINED if node.tier == TIER_SANDBOX else REGISTRY
             impl = registry.get(node_name)
             if impl is None:
                 raise ExecutionError(

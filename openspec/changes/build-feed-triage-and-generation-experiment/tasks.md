@@ -22,7 +22,7 @@ full form (1.7 and 3.5 together) rather than as a skeleton with throwaway nodes;
 - [x] 1.1 `StateHandle<'name', read|read-write>`: type grammar, provisioning, assignability
       (read-write narrows to read; names match), JSON-file store under `var/state/` with atomic
       replace; tests
-- [ ] 1.2 WIT interfaces `state-read` and `state-rw` in `caps.wit`; the derivation maps them;
+- [x] 1.2 WIT interfaces `state-read` and `state-rw` in `caps.wit`; the derivation maps them;
       host linking; tests (the Paper 2 derivation rows unchanged — task 0.1 guards it)
 - [x] 1.3 `HTTPClient` real fetch: urllib GET, 5 MiB cap, 15 s timeout, redirects only to
       allowlisted hosts, http(s) only; canned mode stays the default; tests with a local
@@ -106,14 +106,14 @@ toy is built around the answer.
 
 ## 4. The confined tier for the toy
 
-- [ ] 4.1 Rust bodies for the toy's capability-holding leaf nodes (`FetchFeeds`, `DropSeen`,
+- [x] 4.1 Rust bodies for the toy's capability-holding leaf nodes (`FetchFeeds`, `DropSeen`,
       `ClassifyItem`, `SummariseItem`, `ComposeDigest`, `PublishDigest`, `RecordSeen`), hand-written
       — the hand-written control for phase 5
 - [ ] 4.2 Feed derivation rows in `dist/evaluation-feed.json` (separate from Paper 2's): each
       component held against its clause, plus a negative control
 - [ ] 4.3 Tier table rows for the toy (`dist/evaluation-feed.json`): host escapes recorded,
       confined denials discriminating
-- [ ] 4.4 Tier-equality test for the toy's traces
+- [x] 4.4 Tier-equality test for the toy's traces
 
 ## 5. Full generation experiment on the toy (M3, second half)
 
