@@ -1,0 +1,29 @@
+{
+ "trial": "Heartbeat.hand-written",
+ "node": "Heartbeat",
+ "group": "pilot",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n",
+    "lib.rs": "//! `Heartbeat` as a WASM **component** — the I/O-vocabulary demonstrator.\n//!\n//! Contract, ahead of the feed-triage graph that will use these kinds for real:\n//!   Heartbeat : (FeedRef) -> HeartbeatReport\n//!     with Clock, HTTPClient<[...]>, Notifier<'...'>\n//!\n//! Its world imports exactly three interfaces, and the first is the interesting\n//! one: `wasi:clocks/wall-clock@0.2.0`, the *upstream* WASI interface, granted\n//! deliberately. Every other component in this tier demonstrates the absence of\n//! that import; this one demonstrates the same derivation machinery granting it —\n//! a `with` clause visibly buying an authority the artifact otherwise lacks, and\n//! a WASI interface granted as a capability like any other.\n//!\n//! The HTTP allowlist is not visible from in here, which is the design: the\n//! interface carries the operation, the handle behind it carries the scope. This\n//! body can ask for any URL; whether the fetch happens is decided at the\n//! crossing, exactly as an out-of-scope tool call is.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // The three reaches outside the node, one per granted interface: read\n        // the clock, perform the one permitted fetch, report what happened.\n        let stamp = wall_clock::now();\n        let body = http_client::get(&feed_url);\n        let fetched = body.chars().count() as u32;\n        let notified = notifier::notify(&format!(\n            \"fetched {fetched} chars from {feed_url} at t={}s\",\n            stamp.seconds\n        ));\n        HeartbeatReport {\n            seconds: stamp.seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.59
+  }
+ ]
+}

@@ -382,27 +382,36 @@ class Outcome:
         return self.actual != self.case.expected or self.reason != self.case.reason
 
 
-def reasons_in(errors: list[str]) -> frozenset[str]:
+# `signatures` defaults to this corpus's classes throughout. The feed-triage
+# evaluation (`poc/evaluate_feed.py`) passes a superset — its corpus has reason
+# classes this one never needed — and reuses the classification unchanged.
+
+
+def reasons_in(
+    errors: list[str], signatures: dict[str, tuple[str, ...]] | None = None
+) -> frozenset[str]:
     """Every reason class some error in `errors` belongs to."""
+    signatures = REASON_SIGNATURES if signatures is None else signatures
     return frozenset(
-        r
-        for r, phrases in REASON_SIGNATURES.items()
-        if any(p in e for e in errors for p in phrases)
+        r for r, phrases in signatures.items() if any(p in e for e in errors for p in phrases)
     )
 
 
-def _unclassified(errors: list[str]) -> int:
+def _unclassified(errors: list[str], signatures: dict[str, tuple[str, ...]] | None = None) -> int:
     """How many errors no reason class's signature matches."""
-    return sum(
-        not any(p in e for phrases in REASON_SIGNATURES.values() for p in phrases) for e in errors
-    )
+    signatures = REASON_SIGNATURES if signatures is None else signatures
+    return sum(not any(p in e for phrases in signatures.values() for p in phrases) for e in errors)
 
 
-def classify(errors: list[str], pinned: str | None = None) -> str | None:
+def classify(
+    errors: list[str],
+    pinned: str | None = None,
+    signatures: dict[str, tuple[str, ...]] | None = None,
+) -> str | None:
     """The reason class to report for a rejection: the pinned class if it is
     present among the errors' classes, else the single class present, else None
     (no class, or several with none pinned — a divergence, not a guess)."""
-    present = reasons_in(errors)
+    present = reasons_in(errors, signatures)
     if pinned is not None and pinned in present:
         return pinned
     return next(iter(present)) if len(present) == 1 else None

@@ -258,22 +258,34 @@ def heartbeat_sandbox(feed_url: str, clock: Clock, http: HTTPClient, notifier: N
     notified) as wasmtime lifts it.
     """
 
+    from wasmtime.component import Variant as WitVariant
+
     def now():
         t = clock.now()
         return record(seconds=t.seconds, nanoseconds=t.nanoseconds)
 
+    def resolution():
+        return record(seconds=0, nanoseconds=1)
+
     def get(url: str) -> str:
         return http.get(url)
+
+    def fetch(url: str):
+        result = http.fetch(url)
+        return WitVariant("ok", result.body) if result.ok else WitVariant("err", result.error)
 
     def notify(message: str) -> bool:
         notifier.notify(message)
         return True
 
+    # Every function of every granted interface is bound, not only the ones the
+    # hand-written body happens to call: a body is replaceable, and a replacement
+    # may reasonably reach for `fetch` where this one used `get`.
     sandbox = Sandbox(
         "node_heartbeat",
         {
-            CLOCK: {"now": now},
-            HTTP_CLIENT: {"get": get},
+            CLOCK: {"now": now, "resolution": resolution},
+            HTTP_CLIENT: {"get": get, "fetch": fetch},
             NOTIFIER: {"notify": notify},
         },
     )

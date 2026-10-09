@@ -1,0 +1,29 @@
+{
+ "trial": "FetchFeeds.hand-written",
+ "node": "FetchFeeds",
+ "group": "toy",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch};\n    import aap:caps/http-client@0.1.0;\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n",
+    "lib.rs": "//! `FetchFeeds` as a WASM **component**.\n//!\n//! Contract, from `graphs/feed-triage.json`:\n//!   FetchFeeds : (SubscriptionList) -> Untrusted<FeedBatch>\n//!     with HTTPClient<[allowlist]>\n//!\n//! The only component in the service whose world imports `http-client`, and it\n//! imports nothing else: no model, no store. So what gets fetched is decided by\n//! the subscription list this node is handed, and by nothing a model said —\n//! there is no model in here to say it, and no path from one to here.\n//!\n//! The allowlist is not visible from inside. This body can ask for any URL; a\n//! request for a host the graph did not name is refused at the crossing, as a\n//! trap. A *permitted* fetch that fails — a timeout, an error status, a response\n//! over the size cap — comes back as a value, so one dead feed is recorded and\n//! the rest are still read.\n//!\n//! The output is `Untrusted<FeedBatch>`. That label is the graph's, declared on\n//! this node; WIT carries the payload.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::aap::caps::types::{FeedDocument, FetchFailure};\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        let mut documents = Vec::new();\n        let mut failures = Vec::new();\n        for url in subscriptions.urls {\n            // The one reach outside the node, once per subscription.\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.76
+  }
+ ]
+}

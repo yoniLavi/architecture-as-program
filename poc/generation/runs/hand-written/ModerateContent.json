@@ -1,0 +1,29 @@
+{
+ "trial": "ModerateContent.hand-written",
+ "node": "ModerateContent",
+ "group": "pilot",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{customer-query, moderation-result};\n    import aap:caps/inference-llm@0.1.0;\n    export run: func(query: customer-query) -> moderation-result;\n}\n",
+    "lib.rs": "//! `ModerateContent` as a WASM **component** — an inference-only classifier.\n//!\n//! Contract, unchanged from the graph:\n//!   ModerateContent : (CustomerQuery)\n//!     -> ok: ModeratedQuery | violation: PolicyViolation | escalation: EscalationRequest\n//!     with LLMClient<inference>\n//!\n//! Its world imports exactly `inference-llm` and nothing else — the same\n//! attenuation as `ParseMessage`: it can be *influenced* by the query text it\n//! classifies, but holds no tool interface through which to *act* on it. The\n//! moderation verdict is a three-way `variant` whose case names (`ok`, `violation`,\n//! `escalation`) are the very ports the graph's variant edges route on, so the\n//! runtime reads the case directly instead of re-parsing a tag string.\n//!\n//! Interchangeable with the Python body by construction: same signature, same\n//! contract, same closed intent set carried through, a different implementation\n//! language. Confinement is the world; the classification logic is the node's own.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\n// `customer-query` and `moderation-result` are re-exported at the crate root by\n// the world's `use types.{...}`; the variant's payload records are reached through\n// their defining interface.\nuse crate::aap::caps::inference_llm;\nuse crate::aap::caps::types::{EscalationRequest, ModeratedQuery, PolicyViolation};\n\nconst SYSTEM: &str = \"You are a content-moderation classifier. Reply with exactly one of: \\\n                      ok, violation, escalation.\";\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(query: CustomerQuery) -> ModerationResult {\n        // Classify through the inference-only handle — the node's only reach\n        // outside itself, and the only import in its world.\n        let verdict = inference_llm::infer(SYSTEM, &query.question, \"moderate\")\n            .trim()\n            .to_lowercase();\n\n        match verdict.as_str() {\n            \"violation\" => ModerationResult::Violation(PolicyViolation {\n                reason: \"content policy\".to_string(),\n            }),\n            \"escalation\" => ModerationResult::Escalation(EscalationRequest {\n                query,\n                reason: \"ambiguous\".to_string(),\n            }),\n            // Anything else is treated as clean, exactly as the host body does:\n            // a classifier that fails open here would be a policy choice, and the\n            // Python and Rust bodies make the same one.\n            _ => ModerationResult::Ok(ModeratedQuery { query }),\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.8
+  }
+ ]
+}

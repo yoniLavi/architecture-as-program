@@ -1,11 +1,50 @@
 import type {
   CorpusCase,
+  FeedCaseGraphs,
+  FeedCases,
+  FeedRunResponse,
   GraphDoc,
   GraphIndexEntry,
   InjectionScenario,
+  LatestDigest,
   Meta,
   RunResponse,
 } from "./types";
+
+// ── The feed-triage service ──────────────────────────────────────────
+
+export const fetchFeedCases = () => getJson<FeedCases>("/api/feed/cases");
+
+// The pair of graphs a feed corpus case validates, the rewiring applied
+// server-side to whichever of them it rewrites.
+export const fetchFeedCaseGraphs = (name: string) =>
+  getJson<FeedCaseGraphs>(`/api/feed/cases/${name}/graphs`);
+
+export async function runFeed(body: {
+  case?: string;
+  tier?: "host" | "confined";
+  hostile?: string;
+}): Promise<FeedRunResponse> {
+  const resp = await fetch("/api/feed/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = await resp.json();
+  if (!resp.ok && !payload.rejected) {
+    throw new Error(payload.error ?? `feed run failed: ${resp.status}`);
+  }
+  return payload;
+}
+
+// The live service's most recent digest, or the API's own message when it has
+// written none (a 404 is an answer here, not a failure).
+export async function fetchLatestDigest(): Promise<LatestDigest | { error: string }> {
+  const resp = await fetch("/api/feed/digest/latest");
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) return { error: payload.error ?? `latest digest: ${resp.status}` };
+  return payload;
+}
 
 // All calls go through the Next.js rewrite to the Python inspector API — the
 // UI's only source of graphs and traces.

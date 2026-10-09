@@ -167,9 +167,10 @@ def test_a_confined_live_fetch_cannot_be_redirected_off_the_allowlist():
     with serving(routes) as server:
         routes["/hop"] = (302, {"Location": server.url("/secret", host="localhost")}, b"")  # type: ignore[index]
         http = HTTPClient(frozenset({"127.0.0.1"}), live=True)
-        with pytest.raises(CapabilityError, match="outside its allowlist"):
-            fetch_feeds_sandbox(SubscriptionList((server.url("/hop"),)), http)
-        assert "/secret" not in server.requests
+        batch = fetch_feeds_sandbox(SubscriptionList((server.url("/hop"),)), http).value
+        assert batch.documents == ()
+        assert "redirect refused" in batch.failures[0].error
+        assert "/secret" not in server.requests  # the hop was never followed
 
 
 # ── The two tiers agree, body by body ────────────────────────────────
@@ -320,3 +321,128 @@ def test_the_driver_runs_a_confined_tick_against_the_fixture_server(tmp_path):
     assert "A capability model for WebAssembly components" in text
     record = next((tmp_path / "var" / "runs").iterdir()) / "run.json"
     assert '"tier": "confined"' in record.read_text()
+
+
+# ── A host binding written short is not an ungranted capability ──────
+
+
+def test_a_missing_function_of_a_granted_interface_is_the_hosts_fault_and_says_so():
+    """`FetchFeeds` is granted `http-client` and calls its `fetch`. A host that
+    binds the interface with only `get` cannot instantiate it — and must not
+    report that as the component importing something it was not granted, which
+    is what it did to twelve generated `Heartbeat` bodies before this existed."""
+    from poc.sandbox.host import IncompleteHostBinding
+
+    with pytest.raises(IncompleteHostBinding) as caught:
+        Sandbox("node_fetch_feeds", {HTTP_CLIENT: {"get": lambda url: ""}})
+    message = str(caught.value)
+    assert "fault in the host adapter" in message and "http-client" in message
+    assert "it imports a capability it was not granted" not in message
+
+
+def test_an_ungranted_interface_is_still_reported_as_ungranted():
+    with pytest.raises(SandboxError, match="imports a capability it was not granted") as caught:
+        Sandbox("node_fetch_feeds", {})
+    assert type(caught.value) is SandboxError  # the plain class, not the host-fault one
+
+
+def test_the_adapters_bind_every_function_of_the_interfaces_they_link():
+    """The fix at its source: an adapter binds an interface whole, so a body that
+    replaces the hand-written one may call any function of what the node holds."""
+    import re
+
+    from poc.generation import task
+
+    declared = {
+        name: set(re.findall(r"^\s*([a-z][a-z0-9-]*): func", body, re.M))
+        for name, body in re.findall(
+            r"^interface ([a-z0-9-]+) \{\n(.*?)^\}", task.caps_package(), re.M | re.S
+        )
+    }
+    bound: dict[str, set[str]] = {}
+
+    class Recording(Sandbox):
+        def __init__(self, _component, caps=None):
+            for interface, functions in (caps or {}).items():
+                bound.setdefault(interface, set()).update(functions)
+            raise SandboxError("recorded")
+
+    import poc.sandbox.feed_nodes as feed_adapters
+    import poc.sandbox.nodes as adapters
+    from poc.generation.subjects import SUBJECTS
+
+    saved = (adapters.Sandbox, feed_adapters.Sandbox)
+    adapters.Sandbox = feed_adapters.Sandbox = Recording  # type: ignore[misc]
+    try:
+        registry = {
+            **adapters.SANDBOX_REGISTRY,
+            **FEED_SANDBOX_REGISTRY,
+            "Heartbeat": adapters.heartbeat_sandbox,
+        }
+        for subject in SUBJECTS:
+            args = subject.test_inputs()[0]
+            with pytest.raises(SandboxError, match="recorded"):
+                registry[subject.node](
+                    *(args if subject.arity > 1 else (args,)), *subject.handles()
+                )
+    finally:
+        adapters.Sandbox, feed_adapters.Sandbox = saved  # type: ignore[misc]
+
+    for interface, functions in bound.items():
+        name = interface.split("/", 1)[-1].split("@", 1)[0]
+        wanted = {"now", "resolution"} if name == "wall-clock" else declared[name]
+        assert functions == wanted, f"{name}: binds {sorted(functions)}, declares {sorted(wanted)}"
+
+
+# ── A body swapped into the running service ──────────────────────────
+
+
+def _substituting(tmp_path, server, node: str, component: str, **kw) -> serve.Config:
+    """A driver config running `component`'s file in place of `node`'s body."""
+    from poc.sandbox.host import WASM_DIR
+
+    swapped = tmp_path / f"{component}.wasm"
+    swapped.write_bytes((WASM_DIR / f"{component}.wasm").read_bytes())
+    return serve.Config(
+        var_dir=tmp_path / "var",
+        backend=StubLLM(),
+        graph=serve.retarget(PARENT, ["127.0.0.1"]),
+        subscriptions=(server.url("/rss"),),
+        clock=lambda: FIXED,
+        confined=kw.pop("confined", True),
+        substitute={node: swapped},
+        **kw,
+    )
+
+
+def test_a_substituted_body_runs_in_the_service_and_is_named_in_the_run_record(tmp_path):
+    """Interchangeability, on the graph that runs: another file with the node's
+    import set stands in for its body, and the tick is recorded as having used it."""
+    import json
+
+    with serving({"/rss": ok(RSS)}) as server:
+        config = _substituting(tmp_path, server, "ClassifyItem", "node_classify_item")
+        assert serve.run_once(config) == serve.EXIT_OK
+    run = json.loads((next((tmp_path / "var" / "runs").iterdir()) / "run.json").read_text())
+    swapped = run["substituted"]["ClassifyItem"]
+    assert swapped["imports"] == sorted([INFERENCE_LLM, TYPES]) and len(swapped["sha256"]) == 64
+    assert run["counts"]["items_triaged"] == 3 and run["outcome"] == "ok"
+
+
+def test_a_substituted_body_that_over_imports_is_refused_before_the_run(tmp_path, capsys):
+    """The gate is not skipped because a body arrived by an unusual route."""
+    with serving({"/rss": ok(RSS)}) as server:
+        config = _substituting(tmp_path, server, "ClassifyItem", "hostile_exfiltrating_classifier")
+        assert serve.run_once(config) == serve.EXIT_CONFIG
+        assert server.requests == []  # nothing ran, so nothing was fetched
+    err = capsys.readouterr().err
+    assert "http-client" in err and "it was not run" in err
+
+
+def test_a_body_cannot_be_substituted_on_the_host_tier(tmp_path, capsys):
+    with serving({"/rss": ok(RSS)}) as server:
+        config = _substituting(
+            tmp_path, server, "ClassifyItem", "node_classify_item", confined=False
+        )
+        assert serve.run_once(config) == serve.EXIT_CONFIG
+    assert "not running on the confined tier" in capsys.readouterr().err

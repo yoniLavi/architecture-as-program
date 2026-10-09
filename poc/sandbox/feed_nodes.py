@@ -128,7 +128,13 @@ def start_run_sandbox(tick: Tick, clock: Clock) -> RunInfo:
         t = clock.now()
         return record(seconds=t.seconds, nanoseconds=t.nanoseconds)
 
-    out = Sandbox("node_start_run", {CLOCK: {"now": now}}).call("run", record(reason=tick.reason))
+    def resolution():
+        return record(seconds=0, nanoseconds=1)
+
+    # Both functions of the interface, though the hand-written body calls one: a
+    # body is replaceable, and its replacement may call the other.
+    caps = {CLOCK: {"now": now, "resolution": resolution}}
+    out = Sandbox("node_start_run", caps).call("run", record(reason=tick.reason))
     return RunInfo(date=out.date, started=out.started)
 
 

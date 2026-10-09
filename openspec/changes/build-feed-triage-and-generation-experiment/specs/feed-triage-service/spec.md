@@ -12,14 +12,14 @@ The feed-triage graph SHALL give `HTTPClient` to exactly one node, and no node h
 
 #### Scenario: A wiring that puts HTTP downstream of a model
 - **WHEN** a mutation gives `HTTPClient` to `ComposeDigest`
-- **THEN** a structural check rejects it and the case is pinned in the feed corpus
+- **THEN** the service's own structural check rejects it, the driver refuses to run it, and the feed corpus pins both the rejection and the fact that the general validator accepts the graph
 
 ### Requirement: Fetched feed content is labelled untrusted where it enters
 The node that receives fetched feed content SHALL declare its output `Untrusted<_>`, so that feed content enters the trust lattice labelled, and the write-up SHALL state that this label is declared at that node, not inferred.
 
 #### Scenario: Removing the label
 - **WHEN** a mutation declares `FetchFeeds`'s output clean
-- **THEN** the feed corpus pins the rejection that results downstream, or records that none does, as a stated limit
+- **THEN** the feed corpus records that the general validator accepts the graph, as a stated limit, and pins its rejection by the service's own structural check
 
 ### Requirement: The service writes nothing outside the repository
 The service SHALL keep its state, fetched data, run records and digests under the repository's gitignored `var/` directory, and SHALL make no network request other than allowlisted fetches and the model backend.

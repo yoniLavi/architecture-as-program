@@ -232,6 +232,13 @@ class Clock:
         return WallTime(seconds=ns // 1_000_000_000, nanoseconds=ns % 1_000_000_000)
 
 
+class RedirectRefused(CapabilityError):
+    """A permitted fetch whose *server* answered with a redirect to a host outside
+    the allowlist. The hop is never followed. A `CapabilityError`, because the
+    allowlist is what refused it — and its own class, because the reach was the
+    remote server's rather than the node's (see `HTTPClient.fetch`)."""
+
+
 class FetchError(RuntimeError):
     """A permitted fetch that failed: a timeout, a refused connection, an HTTP
     error status, or a response over the size cap. Not a `CapabilityError` — the
@@ -273,10 +280,12 @@ class HTTPClient:
 
     Two operations over the one scope. `get` returns the body and raises on any
     failure. `fetch` returns transport failures as values (`FetchResult`), so a node
-    reading several feeds survives one of them being down — but a request *outside
-    the allowlist* raises from both: that is not a failed fetch, it is a node
-    reaching for authority it was not granted, and it must not be collectable as an
-    error string."""
+    reading several feeds survives one of them being down — but a request *the
+    node makes* outside the allowlist raises from both: that is not a failed fetch,
+    it is a node reaching for authority it was not granted, and it must not be
+    collectable as an error string. A *redirect* off the allowlist is refused in
+    both, and never followed; `fetch` reports it as that feed's failure, since the
+    reach was the server's."""
 
     allowlist: frozenset[str]
     _responses: Mapping[str, str] = field(default_factory=dict)
@@ -317,17 +326,28 @@ class HTTPClient:
             return FetchResult(ok=True, body=self._live_get(url))
         except FetchError as e:
             return FetchResult(ok=False, error=str(e))
+        except RedirectRefused as e:
+            # Refused either way — no request is made to the off-list host. What
+            # differs is who is told. The *node* asked for an allowlisted URL; it
+            # was the remote server that pointed elsewhere, so here it is that
+            # feed's failure, not the node's overreach. (Raising would let any
+            # one allowlisted host fail the whole run by answering with a
+            # redirect.) `get`, which has no failure value, still raises.
+            return FetchResult(ok=False, error=str(e))
 
     def _live_get(self, url: str) -> str:
         check = self._check
 
         class _AllowlistedRedirects(urllib.request.HTTPRedirectHandler):
-            """Apply the handle's own check to every redirect target. A refusal
-            here is a `CapabilityError`, like the first hop's, and it propagates:
-            a redirect off the allowlist is not a failed fetch."""
+            """Apply the handle's own check to every redirect target, so an
+            allowlisted host cannot bounce a request to one the graph never
+            named. The hop is refused before any request is made to it."""
 
             def redirect_request(self, req, fp, code, msg, headers, newurl):
-                check(newurl)
+                try:
+                    check(newurl)
+                except CapabilityError as e:
+                    raise RedirectRefused(f"redirect refused: {e}") from e
                 return super().redirect_request(req, fp, code, msg, headers, newurl)
 
         opener = urllib.request.build_opener(_AllowlistedRedirects)

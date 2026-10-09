@@ -54,9 +54,19 @@ export default function SignalNode({ data, selected }: NodeProps<SignalNodeType>
             ⊼
           </span>
         )}
+        {node.each && (
+          <span
+            className="each-mark"
+            data-testid={`each-${node.name}`}
+            title="each: applied to every element of the list it receives, one isolated run per element"
+          >
+            each
+          </span>
+        )}
       </div>
       <div className="sig" title={`${dataIn.join(", ") || "(boundary)"} → ${node.output}`}>
-        {shortType(dataIn[0] ?? "·")} → {shortType(node.output)}
+        {dataIn.length > 1 ? dataIn.map(shortType).join(", ") : shortType(dataIn[0] ?? "·")} →{" "}
+        {shortType(node.output)}
       </div>
       {withClause.length > 0 && (
         <div className="caps">
@@ -87,6 +97,11 @@ export default function SignalNode({ data, selected }: NodeProps<SignalNodeType>
                 {trace.crossings.length > 0 && (
                   <span className="badge neutral">⇄ {trace.crossings.length}</span>
                 )}
+                {trace.elements && (
+                  <span className="badge tier-graph" data-testid={`elements-${node.name}`}>
+                    {trace.elements.length} element runs
+                  </span>
+                )}
               </>
             )
           )}
@@ -101,7 +116,7 @@ export default function SignalNode({ data, selected }: NodeProps<SignalNodeType>
             data.onOpenSubgraph?.(node.name);
           }}
         >
-          open sub-graph ▸
+          {node.each ? "open per-item graph ▸" : "open sub-graph ▸"}
         </button>
       )}
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />

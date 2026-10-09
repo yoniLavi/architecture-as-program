@@ -1,0 +1,29 @@
+{
+ "trial": "FetchContext.hand-written",
+ "node": "FetchContext",
+ "group": "pilot",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{moderated-query, conversation-context};\n    import aap:caps/kb-read@0.1.0;\n    export run: func(query: moderated-query) -> conversation-context;\n}\n",
+    "lib.rs": "//! `FetchContext` as a WASM **component** — a capability-holding node regenerated\n//! in a second language.\n//!\n//! Contract, unchanged from the graph:\n//!   FetchContext : (ModeratedQuery) -> ConversationContext\n//!     with DBHandle<'knowledge-base', read>\n//!\n//! Its world imports exactly `kb-read`, the read-only knowledge base, and nothing\n//! else. This is the point of regenerating *this* node: it exercises the typed\n//! capability boundary — a database read — rather than a pure transformation.\n//! `kb-read` offers `lookup` and no writer, so the node that assembles context has\n//! no import through which to mutate the store; the read-only mode of the graph\n//! type is the absence of a function, not a runtime permission check.\n//!\n//! The `list<string>` the knowledge base returns crosses as a list — no 0x1E\n//! joining and re-splitting through a string, as the retired flat ABI needed.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\n// `moderated-query` and `conversation-context` are re-exported at the crate root\n// by the world's `use types.{...}`; `Intent` is reached through its defining\n// interface.\nuse crate::aap::caps::kb_read;\nuse crate::aap::caps::types::Intent;\n\n/// The knowledge-base key for an intent: the snake_case spelling the store is\n/// keyed by, matching the host node's `db.read(mq.query.intent.value)`. Total over\n/// the closed `Intent` enum — there is no \"other\" case to forget.\nfn intent_key(intent: Intent) -> &'static str {\n    match intent {\n        Intent::BillingQuestion => \"billing_question\",\n        Intent::TechnicalSupport => \"technical_support\",\n        Intent::AccountChange => \"account_change\",\n        Intent::GeneralInquiry => \"general_inquiry\",\n        Intent::Unknown => \"unknown\",\n    }\n}\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(mq: ModeratedQuery) -> ConversationContext {\n        let intent = mq.query.intent;\n        // The one reach outside the node: a read of the knowledge base, keyed by\n        // intent. `kb-read` has no writer, so this is the whole of its authority.\n        let knowledge = kb_read::lookup(intent_key(intent));\n\n        ConversationContext {\n            intent,\n            question: mq.query.question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.67
+  }
+ ]
+}

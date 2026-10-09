@@ -222,9 +222,13 @@ def test_a_redirect_that_leaves_the_allowlist_is_refused_at_the_handle():
         routes["/hop"] = redirect(server.url("/secret", host="localhost"))  # type: ignore[index]
         with pytest.raises(CapabilityError, match="outside its allowlist"):
             _live("127.0.0.1").get(server.url("/hop"))
-        with pytest.raises(CapabilityError, match="outside its allowlist"):
-            _live("127.0.0.1").fetch(server.url("/hop"))
-        assert "/secret" not in server.requests
+        # `fetch` refuses the same hop and reports it as that feed's failure: the
+        # node asked for an allowlisted URL, and it was the server that pointed
+        # elsewhere. One hostile feed must not be able to fail a whole run.
+        result = _live("127.0.0.1").fetch(server.url("/hop"))
+        assert not result.ok and result.body == ""
+        assert "redirect refused" in result.error and "outside its allowlist" in result.error
+        assert "/secret" not in server.requests  # refused either way: never followed
 
 
 def test_a_redirect_within_the_allowlist_is_followed():

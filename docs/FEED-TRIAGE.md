@@ -29,6 +29,7 @@ open the HTML page in a browser. A tick that finds nothing new writes no digest.
 | `--model` | `haiku` | Model alias passed to the CLI. |
 | `--tier host\|confined` | `host` | Run the capability-holding nodes as Python, or as WASM components that import only the interfaces their `with` clause grants. |
 | `--var DIR` | `var/` | Where the service keeps everything it writes. |
+| `--substitute NODE=FILE` | — | Run a component file in place of `NODE`'s committed body (confined tier only; repeatable). The file is first held to the node's `with` clause, and refused if it imports anything else. This is how a body an agent generated is put into the running service. |
 
 Exit codes: `0` the tick ran; `1` it failed (see `var/runs/<id>/error.txt`); `2` the
 configuration is wrong; `3` another driver holds the lock; `4` the model backend's usage
@@ -79,7 +80,8 @@ HTTPClient<['simonwillison.net', 'rss.arxiv.org', 'bytecodealliance.org', 'lobst
 A subscription on any other host is refused before a run, with exit code `2`. To follow
 a feed on a new host, add the host to that type in `graphs/feed-triage.json` (it appears
 three times: in `parameters`, in `capabilities`, and on `FetchFeeds`). A redirect that
-leaves the list is refused the same way as a direct request would be.
+leaves the list is never followed: that feed is recorded as a failed fetch for the run,
+and the others are still read.
 
 ## What it writes, and where
 
@@ -172,11 +174,19 @@ Four things about that shape are the security argument, and each is asserted in
   `RecordSeen` holds the writer, and it runs after the digest is published. A tick that
   fails anywhere records nothing, and the next one considers the same items again.
 
+The first two are also checked every time the service starts. They are not rules of
+the graph validator — a graph that fetched after asking a model would validate, and
+plenty of useful ones do — so the service carries its own structural check
+(`poc/feed_policy.py`), and the driver refuses to tick on a graph that breaks it.
+
 What the shape does **not** give: a truthful digest. An item's text reaches the models
 that classify, summarise and introduce it, and an item written to mislead them can make
 the digest say something false, or get itself listed as a must-read. That is the same
 free-text residual the demonstrator paper reports, and the hostile-feed evaluation
-measures it rather than assuming it away.
+measures it rather than assuming it away: `dist/evaluation-feed.md` runs eleven hostile
+feeds through the whole service against a model that obeys every instruction it is
+shown, and pins three as having no wiring to travel on, six as landing on a limit, and
+**two as succeeding**.
 
 Three limits of the service as built, stated here because a reader running it will meet
 them:

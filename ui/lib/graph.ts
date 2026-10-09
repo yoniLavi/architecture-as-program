@@ -16,6 +16,7 @@ export interface ParsedEdge {
   source: string;
   port: string | null;
   target: string;
+  toInput: number | null; // the join position this edge feeds, where declared
 }
 
 export function parseEdges(doc: GraphDoc): ParsedEdge[] {
@@ -23,7 +24,11 @@ export function parseEdges(doc: GraphDoc): ParsedEdge[] {
     const dot = e.from.lastIndexOf(".");
     const source = dot === -1 ? e.from : e.from.slice(0, dot);
     const port = dot === -1 ? null : e.from.slice(dot + 1);
-    return { id: `${e.from}->${e.to}`, source, port, target: e.to };
+    const toInput = e.to_input ?? null;
+    // Two edges into different positions of one join may share both endpoints,
+    // so the position is part of the id where one is declared.
+    const id = `${e.from}->${e.to}${toInput === null ? "" : `[${toInput}]`}`;
+    return { id, source, port, target: e.to, toInput };
   });
 }
 
@@ -55,8 +60,9 @@ export function positionsOf(doc: GraphDoc): Record<string, { x: number; y: numbe
   return out;
 }
 
-// The data input of a node is its one input that is not a declared capability;
-// everything else is its `with` clause.
+// A node's data inputs are its inputs that are not declared capabilities (one,
+// or several for a join, in position order); everything else is its `with`
+// clause.
 export function splitInputs(doc: GraphDoc, inputs: string[]) {
   const caps = new Set(doc.capabilities);
   return {
@@ -105,6 +111,7 @@ export function trustRaisers(trace: GraphTrace): string[] {
   for (const n of trace.nodes) {
     if (n.input_trust === "untrusted" && n.output_trust === "trusted") out.push(n.node);
     if (n.subgraph) out.push(...trustRaisers(n.subgraph));
+    for (const el of n.elements ?? []) out.push(...trustRaisers(el));
   }
   return out;
 }

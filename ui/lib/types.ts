@@ -10,11 +10,17 @@ export interface GraphNode {
   output: string;
   discharges_trust?: boolean;
   capability_identities?: Record<string, string>;
+  // A per-item map: a sub-graph node applied to each element of a list, one
+  // isolated child run per element.
+  each?: boolean;
 }
 
 export interface GraphEdge {
   from: string;
   to: string;
+  // The position, among the target's data inputs, that this edge feeds. A node
+  // with several data inputs is a join.
+  to_input?: number;
 }
 
 export interface GraphZone {
@@ -57,6 +63,8 @@ export interface NodeTrace {
   output_trust: Trust | null;
   crossings: Crossing[];
   subgraph?: GraphTrace;
+  // Present only on a per-item node: one nested run per list element, in order.
+  elements?: GraphTrace[];
 }
 
 export interface GraphTrace {
@@ -129,4 +137,87 @@ export interface Meta {
 
 export function isRejected(r: RunResponse): r is RunRejected {
   return (r as RunRejected).rejected === true;
+}
+
+// ── The feed-triage service (`/api/feed/…`) ──────────────────────────
+
+export interface FeedCorpusCase {
+  name: string;
+  kind: "canonical" | "mutation" | "safe-variant";
+  expected: "accepted" | "rejected";
+  reason: string | null;
+  note: string;
+  // True when the general validator accepts the graph — a rejection is then the
+  // service's own shape check (poc/feed_policy.py) and nothing else.
+  validator_accepts: boolean;
+}
+
+export interface HostileCase {
+  name: string;
+  verdict: "impossible" | "bounded" | "residual";
+  attack: string;
+  outcome: string;
+}
+
+export interface FeedCases {
+  corpus: FeedCorpusCase[];
+  hostile: HostileCase[];
+}
+
+export interface FeedCaseGraphs {
+  case: string;
+  parent: GraphDoc;
+  child: GraphDoc;
+}
+
+export interface FeedDigest {
+  markdown: string;
+  html: string;
+}
+
+// The facts the build pins for a hostile run, as returned. Rendered by key; the
+// UI names no fact the payload does not carry.
+export type FeedFactValue = string | number | boolean | string[] | null;
+export type FeedFacts = Record<string, FeedFactValue>;
+
+export interface FeedRunOk {
+  case: string;
+  graph: string;
+  tier: "host" | "confined";
+  hostile: string | null;
+  verdict: string | null;
+  facts: FeedFacts | null;
+  trace: GraphTrace | null;
+  terminals: Record<string, ValueSummary>;
+  digest: FeedDigest;
+}
+
+export interface FeedRunRejected extends RunRejected {
+  validator_accepts: boolean;
+}
+
+export interface FeedRunAccepted {
+  case: string;
+  accepted: true;
+  ran: false;
+}
+
+export type FeedRunResponse = FeedRunOk | FeedRunRejected | FeedRunAccepted;
+
+export interface LatestDigest {
+  date: string;
+  markdown: string;
+  html: string;
+}
+
+export function isFeedRejected(r: FeedRunResponse): r is FeedRunRejected {
+  return (r as FeedRunRejected).rejected === true;
+}
+
+export function isFeedAcceptedOnly(r: FeedRunResponse): r is FeedRunAccepted {
+  return (r as FeedRunAccepted).ran === false;
+}
+
+export function isFeedRunOk(r: FeedRunResponse): r is FeedRunOk {
+  return !isFeedRejected(r) && !isFeedAcceptedOnly(r);
 }

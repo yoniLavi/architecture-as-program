@@ -1,6 +1,7 @@
 "use client";
 
-import type { CorpusCase, GraphDoc, NodeTrace, RunOk } from "@/lib/types";
+import type { ReactNode } from "react";
+import type { CorpusCase, GraphDoc, NodeTrace, ValueSummary } from "@/lib/types";
 import { splitInputs } from "@/lib/graph";
 
 // The right-hand panel: everything shown here is parsed from the canonical
@@ -12,16 +13,29 @@ interface Props {
   corpusCase: CorpusCase | null;
   selectedNode: string | null;
   nodeTrace: NodeTrace | null;
-  run: RunOk | null;
+  run: { terminals: Record<string, ValueSummary> } | null;
+  // Opens one element run of a per-item node (index into the trace's `elements`).
+  onOpenElement?: (node: string, index: number) => void;
+  // Shown under the graph's name when no node is selected (the feed panel).
+  children?: ReactNode;
 }
 
-export default function DetailPanel({ doc, corpusCase, selectedNode, nodeTrace, run }: Props) {
+export default function DetailPanel({
+  doc,
+  corpusCase,
+  selectedNode,
+  nodeTrace,
+  run,
+  onOpenElement,
+  children,
+}: Props) {
   const gn = doc.nodes.find((n) => n.name === selectedNode) ?? null;
 
   if (!gn) {
     return (
       <div className="detail" data-testid="detail-panel">
         <h2>{doc.name}</h2>
+        {children}
         {corpusCase && corpusCase.kind === "mutation" && (
           <p className="note">
             Faulty case <code>{corpusCase.name}</code>: {corpusCase.note}
@@ -79,6 +93,11 @@ export default function DetailPanel({ doc, corpusCase, selectedNode, nodeTrace, 
       <h2>{gn.name}</h2>
       {gn.discharges_trust && (
         <span className="badge trust-trusted">⊼ discharges trust</span>
+      )}
+      {gn.each && (
+        <span className="badge tier-graph" title="each: true in the graph JSON">
+          each — one run per list element
+        </span>
       )}
 
       <h3>Signature</h3>
@@ -149,6 +168,29 @@ export default function DetailPanel({ doc, corpusCase, selectedNode, nodeTrace, 
               This node ran as a nested sub-graph ({nodeTrace.subgraph.nodes.length} inner nodes) —
               open it to see the nested trace.
             </p>
+          )}
+          {nodeTrace.elements && (
+            <>
+              <h3>Element runs</h3>
+              <p className="note" data-testid="element-count">
+                This node ran once per element of the list it received:{" "}
+                <b>{nodeTrace.elements.length} element runs</b> in this trace, each a separate
+                nested run.
+              </p>
+              <div className="element-row">
+                {nodeTrace.elements.map((el, i) => (
+                  <button
+                    key={i}
+                    className="chip-btn"
+                    data-testid={`open-element-${i + 1}`}
+                    title={el.nodes.map((n) => n.node).join(" → ")}
+                    onClick={() => onOpenElement?.(gn.name, i)}
+                  >
+                    {i + 1} of {nodeTrace.elements?.length} ▸
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </>
       )}

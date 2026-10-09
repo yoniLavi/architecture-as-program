@@ -1,0 +1,29 @@
+{
+ "trial": "GenerateResponse.hand-written",
+ "node": "GenerateResponse",
+ "group": "pilot",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{conversation-context, response-result};\n    import aap:caps/tool-llm@0.1.0;\n    import aap:caps/kb-read@0.1.0;\n    export run: func(ctx: conversation-context) -> response-result;\n}\n",
+    "lib.rs": "//! `GenerateResponse` as a WASM **component** — the tool-capable node.\n//!\n//! Contract, unchanged from the graph:\n//!   GenerateResponse : (ConversationContext) -> ok: AgentResponse | error: LLMError\n//!     with LLMClient<[lookup]>, DBHandle<'knowledge-base', read>\n//!\n//! Its world imports exactly two interfaces — `tool-llm` (the LLM, offering only\n//! the `lookup` tool) and `kb-read` (the read-only knowledge base). The\n//! tool-orchestration loop still lives here, in the node body: the node decides\n//! how to use its capabilities, and it can only reach the two it was granted.\n//!\n//! The port to typed WIT changed three things worth naming:\n//!\n//!   * **The model's reply is a `variant`, not a tagged string.** The core-wasm\n//!     body parsed `\"T\" FS text` / `\"C\" FS tool FS query` out of a flat buffer and\n//!     had a `_ => \"malformed model reply\"` arm for when that parse failed. A\n//!     malformed reply is no longer representable: `reply` is either `Text` or\n//!     `Call`, so the arm is gone along with the failure mode it handled.\n//!\n//!   * **The knowledge base returns `list<string>`.** No more 0x1E-joining and\n//!     re-splitting a list through a string.\n//!\n//!   * **The output is the graph's sum type.** `response-result` has cases `ok`\n//!     and `error` — the same role labels the graph's variant edges route on, so\n//!     the runtime reads the case name directly instead of re-parsing a tag.\n//!\n//! What did NOT change is the security property, and it is worth being precise\n//! about why. The node still checks `req.tool != \"lookup\"` below. That check is\n//! not what confines it: `lookup` is the only tool the node has an interface for,\n//! so a model demanding `exfiltrate` finds no import to travel through. The check\n//! exists to turn an unreachable request into a *legible* error rather than\n//! silently ignoring it. Confinement is the world; this is diagnostics.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\n// `conversation-context` and `response-result` are re-exported at the crate root\n// by the world's `use types.{...}`; the payload records come from the interface.\nuse crate::aap::caps::kb_read;\nuse crate::aap::caps::tool_llm::{self, Reply};\nuse crate::aap::caps::types::{AgentResponse, LlmError};\n\n/// Tool-loop budget, matching the host tier's `ToolLLM._MAX_ROUNDS`.\nconst MAX_ROUNDS: usize = 3;\nconst SYSTEM: &str = \"You are a helpful customer-support agent. Use the lookup tool if needed.\";\n\n/// The one tool this node's `with` clause grants. Named here only so the error\n/// message below can be specific — the enforcement is the import set.\nconst GRANTED_TOOL: &str = \"lookup\";\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(ctx: ConversationContext) -> ResponseResult {\n        let question = ctx.question;\n        let mut convo = question.clone();\n\n        for _ in 0..MAX_ROUNDS {\n            match tool_llm::generate(SYSTEM, &convo) {\n                // The model answered. Done.\n                Reply::Text(text) => {\n                    return ResponseResult::Ok(AgentResponse { text });\n                }\n                // The model asked for a tool.\n                Reply::Call(req) => {\n                    if req.tool != GRANTED_TOOL {\n                        // Unreachable authority, reported legibly. There is no\n                        // import for this tool, so the node could not act on the\n                        // request even if it wanted to; saying so beats dropping it.\n                        return ResponseResult::Error(LlmError {\n                            message: format!(\n                                \"requested tool {:?} is outside this node's capability set\",\n                                req.tool\n                            ),\n                        });\n                    }\n                    let hits = kb_read::lookup(&req.query);\n                    let result = if hits.is_empty() {\n                        \"no knowledge-base match\".to_string()\n                    } else {\n                        hits.join(\"; \")\n                    };\n                    convo = format!(\"{question}\\n\\n[TOOL RESULT lookup] {result}\");\n                }\n            }\n        }\n\n        // Budget exhausted without a text reply. The host tier returns its last\n        // (empty) text in the same situation; the two bodies stay interchangeable.\n        ResponseResult::Ok(AgentResponse {\n            text: String::new(),\n        })\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.79
+  }
+ ]
+}

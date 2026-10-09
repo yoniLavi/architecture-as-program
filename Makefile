@@ -70,13 +70,15 @@ UI_FIGS := $(addprefix $(DIST)/ui/,$(UI_FIGS_USED))
 # dist/papers/02-demonstrator/ (see README).
 ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 
-.PHONY: build clean validate-graphs test wasm check-freeze check-hedges grammar evaluation paper1 paper2 aliases api ui ui-check ui-e2e
+.PHONY: build clean validate-graphs test wasm check-freeze check-hedges grammar evaluation evaluation-feed generation paper1 paper2 aliases api ui ui-check ui-e2e
 
-build: validate-graphs check-freeze check-hedges grammar evaluation paper1 paper2 aliases
+build: validate-graphs check-freeze check-hedges grammar evaluation evaluation-feed generation paper1 paper2 aliases
 	@echo "Build complete."
 
 grammar: $(DIST)/grammar.md
 evaluation: $(DIST)/evaluation.md $(DIST)/evaluation.json
+evaluation-feed: $(DIST)/evaluation-feed.md
+generation: $(DIST)/generation.md
 paper1: $(P1_SERVED) $(P1_DOCS)
 paper2: $(P2_DOCS) $(P2_PUB_PDF)
 aliases: $(ALIASES)
@@ -107,6 +109,27 @@ $(DIST)/evaluation.md: $(POC_SRC) $(POC_WASM) $(GRAPHS_SRC) scripts/graph_valida
 # this rule only has to establish the ordering and assert the file appeared.
 $(DIST)/evaluation.json: $(DIST)/evaluation.md
 	@test -f $@ || { echo "poc.evaluate did not write $@" >&2; exit 1; }
+
+# Feed-triage evaluation artifact — the service's own evidence, pinned like the
+# one above and written to its *own* files, so that nothing about the service can
+# move a figure Paper 2 typesets from evaluation.json: a corpus of rewirings,
+# each component held to its `with` clause, the tier table, and a hostile-feed
+# corpus run through the whole service on both tiers. The hostile run serves its
+# feeds from a server on 127.0.0.1 (stdlib, ephemeral port); nothing else is
+# contacted and no model is called. Emits evaluation-feed.md and .json.
+FEED_SRC := $(wildcard poc/feeds/*.py) $(wildcard poc/feeds/corpus/*)
+$(DIST)/evaluation-feed.md: $(POC_SRC) $(POC_WASM) $(FEED_SRC) $(GRAPHS_SRC) scripts/graph_validator.py scripts/type_parser.py | $(DIST)
+	$(PY_POC) -m poc.evaluate_feed
+
+# Generation-experiment artifact — the node-generation experiment's results,
+# rendered from the committed trial records (poc/generation/results.json, derived
+# from poc/generation/runs/). Stdlib-only and offline: this step calls no model
+# and builds no crate, so the build needs neither a subscription nor a Rust
+# toolchain. Running trials is `python -m poc.generation.harness`, by hand. The
+# one pin: the hand-written bodies must pass the same pipeline clean, or the
+# report is refused.
+$(DIST)/generation.md: poc/generation/report.py poc/generation/results.json | $(DIST)
+	$(PY) -m poc.generation.report
 
 # Validate the shared graph JSON files: structural, type-aware, cross-graph.
 # Depends on `test` so validator-logic changes are tested before use.
@@ -243,7 +266,7 @@ WASM_MODULES := node_parse_message node_moderate_content node_fetch_context \
                 node_start_run node_load_subscriptions node_fetch_feeds \
                 node_drop_seen node_classify_item node_summarise_item \
                 node_compose_digest node_publish_digest node_record_seen \
-                hostile_exfiltrating_classifier
+                hostile_exfiltrating_classifier hostile_seen_writer
 
 # Build the component-tier WASM node artifacts and copy them into
 # poc/sandbox/wasm/ (which is committed).

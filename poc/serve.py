@@ -29,12 +29,14 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import sys
 import time
 import traceback
 from collections.abc import Iterable, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,7 +44,7 @@ from urllib.parse import urlsplit
 
 from type_parser import TApp, TList, TString, parse_type
 
-from . import digest
+from . import digest, feed_policy
 from .feed_nodes import SUBSCRIPTIONS_KEY
 from .feed_values import Tick
 from .graph import REPO_ROOT, AssemblyError, assemble, load_graph_dict
@@ -52,6 +54,7 @@ from .runtime import ExecutionResult, execute
 
 VAR_DIR = REPO_ROOT / "var"
 GRAPH = "feed-triage"
+CHILD_GRAPH = "triage-item"
 
 EXIT_OK = 0
 EXIT_FAILED = 1
@@ -111,10 +114,18 @@ class Config:
     web: Mapping[str, str] = field(default_factory=dict)
     confined: bool = False
     graph: dict = field(default_factory=lambda: load_graph_dict(GRAPH))
+    # The per-item child graph `TriageItem`, as the runtime will resolve it.
+    child: dict = field(default_factory=lambda: load_graph_dict(CHILD_GRAPH))
     subscriptions: tuple[str, ...] = DEFAULT_SUBSCRIPTIONS
     clock: object | None = None  # Callable[[], WallTime]; None reads the real clock
     # graph name → the nodes to run confined; overrides `confined` when given.
     sandbox: Mapping[str, Iterable[str]] | None = None
+    # node name → a component file to run in place of that node's committed one.
+    # How a generated body is put into a live run: the node's `with` clause, its
+    # host bindings and everything around it stay exactly as they are, and only
+    # the body changes. Confined-tier nodes only — a body is interchangeable
+    # because it is a component with a fixed import set.
+    substitute: Mapping[str, Path] = field(default_factory=dict)
 
     def now(self) -> WallTime:
         if self.clock is not None:
@@ -219,6 +230,8 @@ class RunRecord:
     counts: dict[str, int] = field(default_factory=dict)
     fetch_failures: list[dict[str, str]] = field(default_factory=list)
     digest: str | None = None
+    # node → {component, sha256, imports}, for a run with a body swapped in.
+    substituted: dict[str, dict] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -232,7 +245,65 @@ class RunRecord:
             "counts": self.counts,
             "fetch_failures": self.fetch_failures,
             "digest": self.digest,
+            "substituted": self.substituted,
         }
+
+
+def _check_substitutes(config: Config, confined: Mapping[str, Iterable[str]]) -> dict[str, dict]:
+    """Hold each substituted component to its node's `with` clause before the run,
+    and return what was substituted, for the run record.
+
+    The gate is not skipped because the body came from somewhere unusual: a
+    substituted component is held to exactly the import set derived from the
+    graph, by the same derivation as every committed one, and a component that
+    over-imports is refused here rather than at its first crossing."""
+    if not config.substitute:
+        return {}
+    from .sandbox.feed_nodes import FEED_COMPONENTS
+    from .sandbox.host import imports_of
+    from .sandbox.interfaces import expected_imports
+
+    graphs = {config.graph["name"]: config.graph, config.child["name"]: config.child}
+    stems = {GRAPH: config.graph, CHILD_GRAPH: config.child}
+    running_confined = {n for g in graphs for n in confined.get(g, ())}
+    record: dict[str, dict] = {}
+    for node, path in config.substitute.items():
+        if node not in FEED_COMPONENTS:
+            raise ConfigError(f"no component port for node {node!r}; nothing to substitute")
+        if node not in running_confined:
+            raise ConfigError(
+                f"{node!r} is not running on the confined tier, so a substituted component "
+                f"would not be used; run with --tier confined"
+            )
+        stem, _artifact = FEED_COMPONENTS[node]
+        expected = expected_imports(stems[stem], node)
+        actual = imports_of(path)
+        if actual != expected:
+            raise ConfigError(
+                f"the component substituted for {node!r} imports {actual}, but the node's "
+                f"`with` clause derives {expected}; it was not run"
+            )
+        record[node] = {
+            "component": str(path),
+            "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+            "imports": actual,
+        }
+    return record
+
+
+@contextmanager
+def _substituted(config: Config):
+    """Load each substituted component in place of its node's committed artifact,
+    for the body of the `with`."""
+    if not config.substitute:
+        yield
+        return
+    from .sandbox.feed_nodes import FEED_COMPONENTS
+    from .sandbox.host import substituted
+
+    swaps = {FEED_COMPONENTS[node][1]: Path(path) for node, path in config.substitute.items()}
+    with substituted(swaps):
+        yield
 
 
 def _world(config: Config) -> World:
@@ -320,6 +391,11 @@ def tick(config: Config) -> RunRecord:
     try:
         world = _world(config)
         check_subscriptions(_seed_subscriptions(world, config), config.graph)
+        # The service's own invariants (one fetch node, no model upstream of it,
+        # fetched content labelled untrusted). A graph that breaks one is not run.
+        shape = feed_policy.problems(config.graph, config.child)
+        if shape:
+            raise ConfigError("the graph breaks the service's invariants:\n  " + "\n  ".join(shape))
         child_sandbox = config.sandbox or (
             {name: nodes for name, nodes in CONFINED_NODES.items()} if config.confined else {}
         )
@@ -329,7 +405,10 @@ def tick(config: Config) -> RunRecord:
             world=world,
             sandbox=child_sandbox.get(config.graph["name"], ()),
         )
-        result = execute(graph, Tick(), sandbox=child_sandbox)
+        resolve = {config.child["name"]: config.child}
+        record.substituted = _check_substitutes(config, child_sandbox)
+        with _substituted(config):
+            result = execute(graph, Tick(), graphs=resolve, sandbox=child_sandbox)
         model_calls = len(getattr(config.backend, "calls", [])) - calls_before
         record.counts, record.fetch_failures = _counts(result, model_calls)
         record.outcome = "ok"
@@ -477,6 +556,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--var", type=Path, default=VAR_DIR, help="the service's data directory")
     parser.add_argument("--export", type=Path, help="with --report: also write the summary here")
+    parser.add_argument(
+        "--substitute",
+        action="append",
+        default=[],
+        metavar="NODE=COMPONENT",
+        help="run a component file in place of NODE's committed body (confined tier; "
+        "repeatable). The component is held to the node's `with` clause first.",
+    )
     args = parser.parse_args(argv)
 
     if args.report:
@@ -492,7 +579,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.backend == "stub"
         else ClaudeCLIBackend(model=args.model, effort="low", workdir=args.var / "llm")
     )
-    config = Config(var_dir=args.var, backend=backend, confined=args.tier == "confined")
+    substitute = {}
+    for item in args.substitute:
+        node, _, path = item.partition("=")
+        if not node or not path:
+            parser.error(f"--substitute takes NODE=COMPONENT, got {item!r}")
+        substitute[node] = Path(path)
+    config = Config(
+        var_dir=args.var,
+        backend=backend,
+        confined=args.tier == "confined",
+        substitute=substitute,
+    )
     if args.once:
         return run_once(config)
     return run_every(config, args.every)

@@ -1,0 +1,29 @@
+{
+ "trial": "RecordSeen.hand-written",
+ "node": "RecordSeen",
+ "group": "toy",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{published-digest, run-report};\n    import aap:caps/state-rw@0.1.0;\n    export run: func(published: published-digest) -> run-report;\n}\n",
+    "lib.rs": "//! `RecordSeen` as a WASM **component**.\n//!\n//! Contract, from `graphs/feed-triage.json`:\n//!   RecordSeen : (PublishedDigest) -> RunReport\n//!     with StateHandle<'seen', read-write>\n//!     ensures recorded >= 0\n//!\n//! The only component in the service whose world imports `state-rw`, so the only\n//! node that can mark an item seen — and the last to run. If anything upstream\n//! fails, this never executes, nothing is recorded, and the next run considers\n//! the same items again. The ordering is the graph's, not a convention in here.\n//!\n//! What it writes are item ids, which the parser computed as digests: no string\n//! a feed chose is ever used as a key.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_rw;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(published: PublishedDigest) -> RunReport {\n        for id in &published.considered {\n            // The node's reach outside itself: one write per considered item.\n            state_rw::put(id, &published.date);\n        }\n        RunReport {\n            recorded: published.considered.len() as u32,\n            date: published.date,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.73
+  }
+ ]
+}

@@ -35,10 +35,14 @@ from poc.inspector_api import (
     ApiError,
     case_graph,
     corpus_index,
+    feed_case_graphs,
+    feed_cases,
     graph_file,
     graph_index,
     injection_scenario,
+    latest_digest,
     run_case,
+    run_feed,
     serve,
 )
 from poc.sandbox import available
@@ -258,3 +262,121 @@ def test_http_unknown_route_is_404(api_base):
     with pytest.raises(urllib.error.HTTPError) as e:
         _get(f"{api_base}/api/nope")
     assert e.value.code == 404
+
+
+# ── The feed-triage service ──────────────────────────────────────────
+#
+# The inspector's view of the service is the feed evaluation's, served: the same
+# cases, the same runner, the same classification. These pin that it stays so.
+
+
+def test_the_feed_cases_are_the_feed_evaluations_cases():
+    from poc.evaluate_feed import FEED_CORPUS
+    from poc.feeds.corpus import CASES
+
+    _, payload = feed_cases()
+    assert [c["name"] for c in payload["corpus"]] == [c.name for c in FEED_CORPUS]
+    assert [c["name"] for c in payload["hostile"]] == [c.name for c in CASES]
+    assert {c["verdict"] for c in payload["hostile"]} == {"impossible", "bounded", "residual"}
+
+
+def test_a_feed_run_answers_with_a_trace_that_nests_one_run_per_item():
+    """The per-item map, as the inspector receives it: `elements` on the mapped
+    node, one nested trace per feed item, each a run of the child graph."""
+    status, payload = run_feed({})
+    assert status == 200 and payload["graph"] == "FeedTriage" and payload["tier"] == "host"
+    assert validate_document(payload["trace"]) == []
+    nodes = {n["node"]: n for n in payload["trace"]["nodes"]}
+    elements = nodes["TriageItem"]["elements"]
+    assert len(elements) == 5 and {e["graph"] for e in elements} == {"TriageItem"}
+    assert elements[0]["nodes"][0]["node"] == "ClassifyItem"
+    assert payload["digest"]["markdown"].startswith("# Feed digest")
+    assert "<h1>" in payload["digest"]["html"]
+    assert payload["hostile"] is None and payload["facts"] is None
+
+
+@sandboxed
+def test_a_confined_feed_run_reports_the_capability_holding_nodes_as_sandboxed():
+    _, payload = run_feed({"tier": "confined"})
+    tiers = {n["node"]: n["tier"] for n in payload["trace"]["nodes"]}
+    assert tiers["FetchFeeds"] == "sandbox" and tiers["ParseFeeds"] == "host"
+    assert tiers["TriageItem"] == "graph"
+
+
+def test_a_hostile_feed_run_carries_the_facts_the_build_pins():
+    from poc.feeds.corpus import CASES
+
+    status, payload = run_feed({"hostile": "exfiltration"})
+    assert status == 200 and payload["verdict"] == "impossible"
+    pinned = next(c for c in CASES if c.name == "exfiltration").expect
+    assert {k: payload["facts"][k] for k in pinned} == pinned
+    assert payload["facts"]["offlist_requests"] == 0
+    assert "/evil/collect" in payload["digest"]["markdown"]  # written down, never fetched
+
+
+def test_a_residual_hostile_run_is_served_as_succeeding():
+    """The inspector must not flatter the design: a case pinned as succeeding is
+    shown succeeding."""
+    _, payload = run_feed({"hostile": "self_promotion"})
+    assert payload["verdict"] == "residual" and payload["facts"]["hostile_in_must_read"] is True
+
+
+def test_a_rejected_feed_rewiring_says_which_layer_rejected_it():
+    status, payload = run_feed({"case": "join_missing_position"})
+    assert status == 422 and payload["reason_class"] == "join position"
+    assert payload["validator_accepts"] is False
+
+    status, payload = run_feed({"case": "http_downstream_of_a_model"})
+    assert status == 422 and payload["reason_class"] == "service shape"
+    assert payload["validator_accepts"] is True  # only the service's own check rejects it
+
+
+def test_an_accepted_rewiring_is_reported_accepted_and_not_run():
+    status, payload = run_feed({"case": "join_carries_taint_through"})
+    assert (status, payload["accepted"], payload["ran"]) == (200, True, False)
+
+
+def test_the_graphs_of_a_feed_case_carry_its_rewiring():
+    _, payload = feed_case_graphs("http_downstream_of_a_model")
+    compose = next(n for n in payload["parent"]["nodes"] if n["name"] == "ComposeDigest")
+    assert any(i.startswith("HTTPClient<") for i in compose["inputs"])
+    assert payload["child"]["name"] == "TriageItem"
+
+
+def test_unknown_feed_cases_are_404():
+    for call in (lambda: run_feed({"case": "nope"}), lambda: run_feed({"hostile": "nope"})):
+        with pytest.raises(ApiError) as e:
+            call()
+        assert e.value.status == 404
+
+
+def test_the_latest_digest_is_served_from_var_or_reported_absent(tmp_path, monkeypatch):
+    from poc import digest
+    from poc import serve as driver
+
+    monkeypatch.setattr(driver, "VAR_DIR", tmp_path)
+    with pytest.raises(ApiError) as e:
+        latest_digest()
+    assert e.value.status == 404
+
+    digest.publish(tmp_path / "digests", "2026-10-08", "# Older\n")
+    digest.publish(tmp_path / "digests", "2026-10-09", "# Feed digest — 2026-10-09\n\n- one\n")
+    _, payload = latest_digest()
+    assert payload["date"] == "2026-10-09"
+    assert payload["markdown"].startswith("# Feed digest") and "<li>one</li>" in payload["html"]
+
+
+def test_http_feed_routes_round_trip(api_base):
+    _, body = _get(f"{api_base}/api/feed/cases")
+    assert len(json.loads(body)["hostile"]) == 11
+    _, body = _get(f"{api_base}/api/feed/cases/feed-triage/graphs")
+    assert json.loads(body)["parent"]["name"] == "FeedTriage"
+    req = urllib.request.Request(
+        f"{api_base}/api/feed/run",
+        data=json.dumps({"hostile": "cross_item_read"}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req) as resp:
+        payload = json.loads(resp.read())
+    assert payload["facts"]["hostile_calls_saw_other_items"] is False

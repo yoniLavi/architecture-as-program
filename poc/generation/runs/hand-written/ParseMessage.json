@@ -1,0 +1,29 @@
+{
+ "trial": "ParseMessage.hand-written",
+ "node": "ParseMessage",
+ "group": "pilot",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{raw-message, customer-query};\n    import aap:caps/inference-llm@0.1.0;\n    export run: func(message: raw-message) -> customer-query;\n}\n",
+    "lib.rs": "//! `ParseMessage` as a WASM **component**.\n//!\n//! Contract, unchanged from the graph:\n//!   ParseMessage : (Untrusted<RawMessage>) -> CustomerQuery  with LLMClient<inference>\n//!\n//! What changed from the core-wasm port is the boundary — and the boundary\n//! changed the code. There is no `(ptr, len)` ABI, no 0x1F framing, and no\n//! `alloc` export: the host and this component exchange `raw-message` and\n//! `customer-query` *values*, and the marshalling is generated from\n//! `poc/sandbox/wit/caps.wit`, which the host links against too.\n//!\n//! Two checks that the core-wasm body had to perform are gone, absorbed into the\n//! type:\n//!\n//!   * **The closed intent set.** The old body got a string back from the model\n//!     and tested it with `INTENTS.contains(...)`, so that adversarial text could\n//!     not widen the intent set. Here `Intent` is a WIT `enum`: the widening that\n//!     check was guarding against is not representable at all. `classify` below\n//!     still maps an unknown label to `Unknown`, but it is now a total function\n//!     into a closed type rather than a defensive filter over an open one.\n//!\n//!   * **The absence of a tool surface.** The old body noted in a comment that it\n//!     imported no tool host function. Here it imports the `inference-llm`\n//!     interface, whose one function returns a `string`. There is no tool-request\n//!     case to receive and no tool interface in the world to call.\n//!\n//! Capability surface: this component's import set is exactly\n//! `aap:caps/inference-llm@0.1.0` — not \"plus some powerless WASI stubs\", but\n//! exactly that and nothing else. `tests/test_poc_sandbox.py` asserts it.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\n// `raw-message` and `customer-query` are re-exported at the crate root by the\n// world's `use types.{...}`; `Intent` is reached through its defining interface.\nuse crate::aap::caps::inference_llm;\nuse crate::aap::caps::types::Intent;\n\n/// The one free-text field that survives into the structured world. Bounding it\n/// is the node's job — the type system cannot say \"short string\" here.\nconst MAX_QUESTION_LEN: usize = 512;\n\nconst SYSTEM: &str = \"You are an intent classifier for customer-support messages. \\\n                      Reply with exactly one of: billing_question, technical_support, \\\n                      account_change, general_inquiry, unknown.\";\n\n/// Map the model's free-text label onto the closed `Intent` enum.\n///\n/// Total by construction: any label that is not one of the four named intents\n/// becomes `Unknown`. There is no way to return \"some other intent\" even if the\n/// model insists on one, because `Intent` has no such value — the closed-set\n/// guarantee is held by the type, not by a membership test in this function.\nfn classify(label: &str) -> Intent {\n    match label.trim().to_lowercase().as_str() {\n        \"billing_question\" => Intent::BillingQuestion,\n        \"technical_support\" => Intent::TechnicalSupport,\n        \"account_change\" => Intent::AccountChange,\n        \"general_inquiry\" => Intent::GeneralInquiry,\n        _ => Intent::Unknown,\n    }\n}\n\n/// Capitalised tokens (`[A-Z][A-Za-z0-9_-]{2,}`), de-duplicated, order-stable —\n/// the same minimal entity extraction the Python node performs.\nfn entities(raw: &str) -> Vec<String> {\n    let mut out: Vec<String> = Vec::new();\n    let mut token = String::new();\n    let is_word = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-';\n    let push = |token: &mut String, out: &mut Vec<String>| {\n        if token.len() >= 3 {\n            if let Some(first) = token.chars().next() {\n                if first.is_ascii_uppercase() && !out.contains(token) {\n                    out.push(token.clone());\n                }\n            }\n        }\n        token.clear();\n    };\n    for c in raw.chars() {\n        if is_word(c) {\n            token.push(c);\n        } else {\n            push(&mut token, &mut out);\n        }\n    }\n    push(&mut token, &mut out);\n    out\n}\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(message: RawMessage) -> CustomerQuery {\n        let raw = message.text;\n\n        // Classify through the inference-only handle — the node's only reach\n        // outside itself, and the only import in its world.\n        let label = inference_llm::infer(SYSTEM, &raw, \"classify\");\n\n        CustomerQuery {\n            intent: classify(&label),\n            entities: entities(&raw),\n            // The residual free-text channel. Still adversarial data — but now a\n            // bounded, *named* field of a typed record, not a slice of a blob\n            // whose shape both sides had to agree about by convention.\n            question: raw.chars().take(MAX_QUESTION_LEN).collect(),\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 1.67
+  }
+ ]
+}

@@ -31,7 +31,8 @@ it was not granted", and it now fails naming the *interface*, not a bare symbol.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,16 @@ WASM_DIR = Path(__file__).resolve().parent / "wasm"
 class SandboxError(RuntimeError):
     """Raised when a component cannot be instantiated or run — most importantly,
     when it imports a capability interface the caller did not grant."""
+
+
+class IncompleteHostBinding(SandboxError):
+    """Raised when a component calls a function of a *granted* interface that the
+    host's binding of that interface does not supply.
+
+    Neither a confinement failure nor a fault in the component: the adapter that
+    links the node was written short. Kept apart from `SandboxError` proper so
+    that it is never reported — to a reader, or to a model being asked to fix its
+    code — as a capability the node was not granted."""
 
 
 class SandboxTypeError(SandboxError):
@@ -133,9 +144,72 @@ def available() -> bool:
     return find_spec("wasmtime") is not None
 
 
+# Two hooks for the generation experiment (`poc/generation/`), which runs bodies
+# a model wrote through the same adapters as the committed ones. Both are empty
+# in every ordinary run, and both are process-wide on purpose: the experiment
+# evaluates one component per child process.
+#
+# `_SUBSTITUTED` maps an artifact's name to another file to load in its place — a
+# freshly built, generated body standing in for the hand-written one.
+#
+# `_PERMISSIVE` is the *gate-off control*, and it weakens the tier deliberately.
+# It holds capability interfaces to link beside whatever a node was granted, so
+# that a component importing an ungranted interface instantiates instead of
+# being refused. That is exactly the failure the gate exists to prevent; the
+# control turns the gate off to count how many over-importing bodies would then
+# have built, passed their contracts, and run.
+_SUBSTITUTED: dict[str, Path] = {}
+_PERMISSIVE: dict[str, Mapping[str, Callable[..., Any]]] = {}
+
+
+@contextmanager
+def substituted(components: Mapping[str, Path]) -> Iterator[None]:
+    """Load `components` (artifact name → file) in place of the committed
+    artifacts of those names, for the body of the `with`."""
+    previous = dict(_SUBSTITUTED)
+    _SUBSTITUTED.update(components)
+    try:
+        yield
+    finally:
+        _SUBSTITUTED.clear()
+        _SUBSTITUTED.update(previous)
+
+
+@contextmanager
+def permissive(extra: Mapping[str, Mapping[str, Callable[..., Any]]]) -> Iterator[None]:
+    """Link `extra` beside every node's granted interfaces: the gate, off. For the
+    generation experiment's control only — see `_PERMISSIVE` above."""
+    previous = dict(_PERMISSIVE)
+    _PERMISSIVE.update(extra)
+    try:
+        yield
+    finally:
+        _PERMISSIVE.clear()
+        _PERMISSIVE.update(previous)
+
+
 def wasm_path(name: str) -> Path:
     """Path to a built component artifact, e.g. `wasm_path('node_parse_message')`."""
-    return WASM_DIR / f"{name}.wasm"
+    return _SUBSTITUTED.get(name, WASM_DIR / f"{name}.wasm")
+
+
+def imports_of(path: Path) -> list[str]:
+    """Every interface the component in the file at `path` imports, sorted.
+
+    Read fresh, never from `_COMPONENT_CACHE`. The cache is keyed by path, which
+    is right for committed artifacts and wrong here: the generation experiment
+    builds one component after another to the *same* path, and a cached answer
+    would hold each to its predecessor's imports. (It did, the first time the
+    hand-written control was run: every node after the first was reported as
+    importing what the first imported.)"""
+    import wasmtime
+    from wasmtime.component import Component
+
+    global _ENGINE
+    if _ENGINE is None:
+        _ENGINE = wasmtime.Engine(engine_config())
+    component = Component.from_file(_ENGINE, str(path))
+    return sorted(component.type.imports(_ENGINE).keys())
 
 
 def record(**fields: Any):
@@ -239,7 +313,9 @@ class Sandbox:
 
         self.component_name = component_name
         self.crossings = 0
-        self._caps = dict(caps or {})
+        # Granted interfaces win over the gate-off control's stand-ins, so the
+        # control only ever *adds* what a node was not granted.
+        self._caps = {**_PERMISSIVE, **dict(caps or {})}
 
         path = wasm_path(component_name)
         if not path.exists():
@@ -275,6 +351,23 @@ class Sandbox:
                     f"allocate memory for the guest, which is a resource failure and not "
                     f"a capability one: {e}"
                 ) from e
+            # A third way to fail, and the most misleading of the three: the
+            # component imports an interface the caller *did* provide, and calls a
+            # function of it the caller's binding left out. That is a fault in the
+            # host adapter, not in the component and not in the grant. The
+            # generation pilot ran into it — `Heartbeat` bodies calling
+            # `http-client.fetch` against an adapter that bound only `get` — and,
+            # before this branch existed, every one was told it had imported a
+            # capability it was not granted.
+            text = str(e)
+            for iface_name, funcs in self._caps.items():
+                if f"`{iface_name}`" in text and "function implementation is missing" in text:
+                    raise IncompleteHostBinding(
+                        f"{component_name!r} could not be instantiated — the host binds "
+                        f"{iface_name} with only {sorted(funcs)}, and the component calls a "
+                        f"function of it that is missing. This is a fault in the host "
+                        f"adapter, not an ungranted capability: {e}"
+                    ) from e
             raise SandboxError(
                 f"{component_name!r} could not be instantiated — it imports a capability "
                 f"it was not granted: {e}"

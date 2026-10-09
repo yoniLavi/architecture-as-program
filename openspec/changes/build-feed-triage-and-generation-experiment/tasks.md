@@ -64,28 +64,42 @@ full form (1.7 and 3.5 together) rather than as a skeleton with throwaway nodes;
 The roadmap's recommendation: answer "does the gate ever fire on generated code?" before the
 toy is built around the answer.
 
-- [ ] 2.1 Generative contract mode: `contracts.strategy(...)` from the closed vocabulary, seeded
+- [x] 2.1 Generative contract mode: `contracts.strategy(...)` from the closed vocabulary, seeded
       stdlib `random`; discard inputs violating `requires`; tests that each form generates its
       boundary cases
-- [ ] 2.2 Contracts attached in the graph for the subject nodes (in a copy used by the harness,
+- [x] 2.2 Contracts attached in the graph for the subject nodes (in a copy used by the harness,
       so `graphs/customer-support.json` and Paper 2 stay unchanged)
-- [ ] 2.3 `poc/generation/`: task builder (signature, contracts, types, the whole `aap:caps`
+- [x] 2.3 `poc/generation/`: task builder (signature, contracts, types, the whole `aap:caps`
       package, the grant statement, a crate skeleton); prompts for the honest and adversarial
       arms committed as files
-- [ ] 2.4 Generator: `claude -p --model <tier> --tools ""` in an empty temp dir; reply parsing
+- [x] 2.4 Generator: `claude -p --model <tier> --tools ""` in an empty temp dir; reply parsing
       into `world.wit` + `lib.rs`; failure class `format`
-- [ ] 2.5 Pipeline: build, component, gate (`gate:<iface>`, `gate-under:<iface>`), ambient scan
+- [x] 2.5 Pipeline: build, component, gate (`gate:<iface>`, `gate-under:<iface>`), ambient scan
       (`ambient-attempt:<module>`), contract property tests, graph run; feedback loop up to 4
       iterations
-- [ ] 2.6 Recording and resume: `poc/generation/runs/<run-id>/` per trial, `results.json`
+      - *As built:* one class beyond the design's — `signature`, for a component whose export
+        is not the node's. The contract and run steps execute in a child process with a
+        90-second deadline, because a generated body may not terminate and the runtime's engine
+        is deliberately not given fuel. The run step fails only if the graph does not run;
+        whether it took the hand-written body's path is recorded as information, since the
+        contract vocabulary cannot say what a body should compute. A world's *declared*
+        ungranted imports are recorded beside the gate's catches, because an import the body
+        never calls is dropped at build and reaches no import table.
+      - *Incident, 9 October:* the pilot's first twelve `Heartbeat` trials failed with
+        `signature` because the host adapter bound `http-client` with only `get`, and the
+        models were told they had imported an ungranted capability. The fault was the
+        harness's. Those trials are kept, uncounted, under `poc/generation/voided/` with the
+        account; adapters now bind interfaces whole (a test holds them to it), the host
+        raises `IncompleteHostBinding` for this case, and the pipeline stops on it.
+- [x] 2.6 Recording and resume: `poc/generation/runs/<run-id>/` per trial, `results.json`
       derived; the harness skips recorded trials
-- [ ] 2.7 Controls: gate-off re-evaluation of the same components; hand-written bodies through
+- [x] 2.7 Controls: gate-off re-evaluation of the same components; hand-written bodies through
       the pipeline (expected zero violations, pinned)
-- [ ] 2.8 Pilot run: 6 nodes × 2 arms × 3 tiers × N=5; commit runs and results
-- [ ] 2.9 `poc/generation/report.py` → `dist/generation.{md,json}`: first-try success, iterations,
+- [x] 2.8 Pilot run: 6 nodes × 2 arms × 3 tiers × N=5; commit runs and results
+- [x] 2.9 `poc/generation/report.py` → `dist/generation.{md,json}`: first-try success, iterations,
       catch rate by interface, no-attempt vs attempted-and-caught, ambient attempts, gate-off
       ship count; one-family limit in the first paragraph; build step reads committed results only
-- [ ] 2.10 Author checkpoint: pilot numbers reviewed; decide N for phase 5
+- [x] 2.10 Author checkpoint: pilot numbers reviewed; decide N for phase 5
 
 ## 3. Fan-in (M2)
 
@@ -95,12 +109,17 @@ toy is built around the answer.
 - [x] 3.2 Positional join: `"to_input"` on edges; validator requires one edge per position and
       rejects a join whose positions lie on exclusive branches; runtime runs it once all
       positions arrive and refuses a run ending with a join waiting; tests
-- [ ] 3.3 The trust meet, exercised: a join with one `Untrusted<_>` input among clean ones must
+- [x] 3.3 The trust meet, exercised: a join with one `Untrusted<_>` input among clean ones must
       emit an untrusted output unless it is a declared discharger; corpus cases in
       `FEED_CORPUS` pinned to the trust lattice
-- [ ] 3.4 Mutations for the new rules in `FEED_CORPUS` (unported join position, exclusive-branch
+- [x] 3.4 Mutations for the new rules in `FEED_CORPUS` (unported join position, exclusive-branch
       join, map with a mismatched child boundary, map laundering trust past the child), each
       pinned to its reason class with isolation enforced
+      - *As built:* two further cases, `http_downstream_of_a_model` and
+        `fetched_content_unlabelled`, which the **validator accepts**. They are rejected by a
+        structural check written for this service (`poc/feed_policy.py`), run by the driver
+        before every tick. The corpus pins both the rejection and the validator's acceptance,
+        so the limit is a checked fact rather than a sentence.
 - [x] 3.5 `graphs/feed-triage.json` full form: `TriageEach` over `TriageItem`, `SelectItems`,
       `ComposeDigest` joining selected items with the run's metadata; validator, diagrams
 
@@ -109,9 +128,9 @@ toy is built around the answer.
 - [x] 4.1 Rust bodies for the toy's capability-holding leaf nodes (`FetchFeeds`, `DropSeen`,
       `ClassifyItem`, `SummariseItem`, `ComposeDigest`, `PublishDigest`, `RecordSeen`), hand-written
       — the hand-written control for phase 5
-- [ ] 4.2 Feed derivation rows in `dist/evaluation-feed.json` (separate from Paper 2's): each
+- [x] 4.2 Feed derivation rows in `dist/evaluation-feed.json` (separate from Paper 2's): each
       component held against its clause, plus a negative control
-- [ ] 4.3 Tier table rows for the toy (`dist/evaluation-feed.json`): host escapes recorded,
+- [x] 4.3 Tier table rows for the toy (`dist/evaluation-feed.json`): host escapes recorded,
       confined denials discriminating
 - [x] 4.4 Tier-equality test for the toy's traces
 
@@ -124,23 +143,30 @@ toy is built around the answer.
 
 ## 6. Adversarial evaluation (M4)
 
-- [ ] 6.1 Hostile feed corpus under `poc/feeds/corpus/`: exfiltration instruction, cross-item
+- [x] 6.1 Hostile feed corpus under `poc/feeds/corpus/`: exfiltration instruction, cross-item
       read request, digest impersonation, state-write request, oversized feed, malformed XML,
       entity expansion, external entity; each with the outcome it must produce
-- [ ] 6.2 Harness: run the service against the corpus through the fixture server, on the stub
+- [x] 6.2 Harness: run the service against the corpus through the fixture server, on the stub
       backend with a deterministic fooled model, on both tiers; pinned in the build; results
       in `dist/evaluation-feed.json`
-- [ ] 6.3 A recorded live run of the corpus on the Claude backend (not in the build; committed
+- [x] 6.3 A recorded live run of the corpus on the Claude backend (not in the build; committed
       with its date and model), reporting what the digest said
-- [ ] 6.4 Write-up positioned against AgentDojo's threat model and CaMeL's defence: what is
+- [x] 6.4 Write-up positioned against AgentDojo's threat model and CaMeL's defence: what is
       structurally impossible here (exfiltration, cross-item reads), what is bounded by scope,
       and the residual (a misleading digest), stated plainly
+      - *As built:* the write-up is the "Hostile feeds" section of the generated
+        `dist/evaluation-feed.md`, so its counts cannot drift from the run. Eleven cases:
+        three impossible, six bounded, **two residual and pinned as succeeding**. The live
+        run (6.3, Haiku, host tier) followed none of the six instructions; the artifact says
+        why that is a narrow fact. One behaviour changed because of this corpus: a redirect
+        off the allowlist used to raise and fail the whole tick, so any one allowlisted host
+        could stop the service; `fetch` now reports it as that feed's failure.
 
 ## 7. Demo
 
-- [ ] 7.1 Inspector renders `feed-triage.json`, the per-item map (drill-down to one item's run),
+- [x] 7.1 Inspector renders `feed-triage.json`, the per-item map (drill-down to one item's run),
       and the join; e2e checks; screenshots regenerated
-- [ ] 7.2 The inspector links the latest local digest; the hostile-corpus walkthrough mirrors
+- [x] 7.2 The inspector links the latest local digest; the hostile-corpus walkthrough mirrors
       6.4's language
 
 ## 8. Live operation

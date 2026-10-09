@@ -1,0 +1,29 @@
+{
+ "trial": "StartRun.hand-written",
+ "node": "StartRun",
+ "group": "toy",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{tick, run-info};\n    import wasi:clocks/wall-clock@0.2.0;\n    export run: func(tick: tick) -> run-info;\n}\n",
+    "lib.rs": "//! `StartRun` as a WASM **component**.\n//!\n//! Contract, from `graphs/feed-triage.json`:\n//!   StartRun : (Tick) -> RunInfo  with Clock\n//!\n//! The only node of the feed-triage service that observes the time. Its world\n//! imports exactly `wasi:clocks/wall-clock@0.2.0` — the upstream WASI interface,\n//! granted as a capability — and every later node that needs the date receives\n//! it from here as data. A component that wanted the time and did not hold this\n//! node's `with` clause would have no import to ask through.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::wasi::clocks::wall_clock;\n\n/// `YYYY-MM-DD` (UTC) for a count of seconds since the epoch.\n///\n/// The civil-from-days algorithm: there is no date library in a component built\n/// for `wasm32-unknown-unknown`, and linking one in would be a great deal of\n/// code to format ten characters.\nfn date_of(seconds: u64) -> String {\n    let z = (seconds / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z.rem_euclid(146_097);\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let day = doy - (153 * mp + 2) / 5 + 1;\n    let month = if mp < 10 { mp + 3 } else { mp - 9 };\n    let year = yoe + era * 400 + i64::from(month <= 2);\n    format!(\"{year:04}-{month:02}-{day:02}\")\n}\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_tick: Tick) -> RunInfo {\n        // The one reach outside the node: read the clock, once.\n        let seconds = wall_clock::now().seconds;\n        RunInfo {\n            date: date_of(seconds),\n            started: seconds,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.75
+  }
+ ]
+}

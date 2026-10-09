@@ -1,0 +1,29 @@
+{
+ "trial": "PublishDigest.hand-written",
+ "node": "PublishDigest",
+ "group": "toy",
+ "arm": "hand-written",
+ "model": "hand-written",
+ "model_id": "hand-written",
+ "n": 1,
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": null,
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{digest, published-digest};\n    import aap:caps/notifier@0.1.0;\n    export run: func(composed: digest) -> published-digest;\n}\n",
+    "lib.rs": "//! `PublishDigest` as a WASM **component**.\n//!\n//! Contract, from `graphs/feed-triage.json`:\n//!   PublishDigest : (Digest) -> PublishedDigest  with Notifier<'digest'>\n//!\n//! The service's one outward act is the one function this world imports:\n//! `notifier.notify`. Where a notification goes — a dated file on this machine —\n//! is the host's binding, not something this body can see or choose.\n//!\n//! The digest is rendered to Markdown here. Every field is flattened to one line\n//! first, and square brackets are replaced, so an item's text cannot start a\n//! heading or a list of its own or close the link it sits in. That keeps the\n//! digest's *structure* the node's; what the lines *say* is still derived from\n//! untrusted text, and nothing here makes it true.\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::notifier;\nuse crate::aap::caps::types::{Category, Importance, ItemVerdict};\n\nfn category_name(category: Category) -> &'static str {\n    match category {\n        Category::Release => \"release\",\n        Category::Security => \"security\",\n        Category::Research => \"research\",\n        Category::Tooling => \"tooling\",\n        Category::Discussion => \"discussion\",\n        Category::Other => \"other\",\n    }\n}\n\n/// A field as it may appear inside a Markdown line: one line, and unable to\n/// close the link it sits in.\nfn plain(text: &str) -> String {\n    text.split_whitespace()\n        .collect::<Vec<_>>()\n        .join(\" \")\n        .replace('[', \"(\")\n        .replace(']', \")\")\n}\n\nfn render(digest: &Digest) -> String {\n    let mut lines: Vec<String> = vec![\n        format!(\"# Feed digest — {}\", digest.date),\n        String::new(),\n        plain(&digest.overview),\n        String::new(),\n    ];\n    let sections = [\n        (\"Must read\", Importance::MustRead),\n        (\"Worth a look\", Importance::WorthALook),\n    ];\n    for (heading, importance) in sections {\n        let chosen: Vec<&ItemVerdict> = digest\n            .entries\n            .iter()\n            .filter(|e| e.importance == importance)\n            .collect();\n        if chosen.is_empty() {\n            continue;\n        }\n        lines.push(format!(\"## {heading}\"));\n        lines.push(String::new());\n        for entry in chosen {\n            let mut title = plain(&entry.title);\n            if title.is_empty() {\n                title = \"(untitled)\".to_string();\n            }\n            let head = if entry.link.is_empty() {\n                title\n            } else {\n                format!(\"[{title}]({})\", entry.link)\n            };\n            lines.push(format!(\n                \"- {head} — {} ({})\",\n                plain(&entry.summary),\n                category_name(entry.category)\n            ));\n        }\n        lines.push(String::new());\n    }\n    format!(\"{}\\n\", lines.join(\"\\n\").trim_end())\n}\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(composed: Digest) -> PublishedDigest {\n        // A quiet run publishes nothing and still reports what it considered.\n        let published = if composed.entries.is_empty() {\n            false\n        } else {\n            // The one reach outside the node.\n            notifier::notify(&render(&composed));\n            true\n        };\n        PublishedDigest {\n            date: composed.date,\n            considered: composed.considered,\n            published,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.94
+  }
+ ]
+}

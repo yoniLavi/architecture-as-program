@@ -249,6 +249,147 @@ def injection_scenario() -> tuple[int, dict]:
     }
 
 
+# ── The feed-triage service ──────────────────────────────────────────
+#
+# Kept under its own routes (`/api/feed/…`) rather than folded into the corpus
+# ones above: those serve the cases Paper 2's evaluation pins, and what the
+# inspector says about them is part of that paper's record. Everything here comes
+# from `poc/evaluate_feed.py` — the same cases, the same runner, the same
+# classification — so, as above, what the UI offers and what the build guards
+# cannot diverge.
+
+
+def feed_cases() -> tuple[int, dict]:
+    """The feed evaluation's two corpora: rewirings of the graphs, and hostile feeds."""
+    from . import evaluate_feed as ef
+    from .feeds.corpus import CASES
+
+    return 200, {
+        "corpus": [
+            {
+                "name": c.name,
+                "kind": c.kind,
+                "expected": c.expected,
+                "reason": c.reason,
+                "note": c.note,
+                "validator_accepts": c.validator_accepts,
+            }
+            for c in ef.FEED_CORPUS
+        ],
+        "hostile": [
+            {"name": c.name, "verdict": c.verdict, "attack": c.attack, "outcome": c.outcome}
+            for c in CASES
+        ],
+    }
+
+
+def _feed_case(name: str):
+    from . import evaluate_feed as ef
+
+    case = next((c for c in ef.FEED_CORPUS if c.name == name), None)
+    if case is None:
+        raise ApiError(404, f"no feed corpus case {name!r}")
+    return case
+
+
+def feed_case_graphs(name: str) -> tuple[int, dict]:
+    """The two graphs a feed corpus case validates: the canonical pair, with the
+    case's rewiring applied to whichever of them it rewrites."""
+    from . import evaluate_feed as ef
+
+    case = _feed_case(name)
+    parent, child = ef._graphs_for(case.name)
+    return 200, {"case": name, "parent": parent, "child": child}
+
+
+def run_feed(payload: dict) -> tuple[int, dict]:
+    """One tick of the feed-triage service, through `evaluate_feed`'s own runners.
+
+    `case` names a feed corpus case (default: the canonical graph). A rewiring
+    that is rejected answers 422 with the errors, the reason class, and *which
+    layer* rejected it — the validator, or only the service's own shape check.
+
+    A graph that is accepted is run for one tick. With `hostile` naming a hostile
+    feed, the tick is that case — the feed served from the fixture server, the
+    model fooled — and the answer carries the facts the build pins for it.
+    Otherwise it is a tick over the sample feeds on the stub model."""
+    from . import evaluate_feed as ef
+    from . import feed_policy
+    from .feeds.corpus import CASES
+
+    case = _feed_case(str(payload.get("case") or ef.PARENT_STEM))
+    tier = payload.get("tier", TIER_HOST)
+    if tier not in (TIER_HOST, TIER_CONFINED):
+        raise ApiError(400, f"tier must be {TIER_HOST!r} or {TIER_CONFINED!r}, got {tier!r}")
+    if tier == TIER_CONFINED and not sandbox_available():
+        raise ApiError(
+            409, "the confined tier needs wasmtime (`uv sync --group poc`); run the host tier"
+        )
+
+    parent, child = ef._graphs_for(case.name)
+    errors = validate_graph_dicts([parent, child])
+    validator_accepts = not errors
+    if not errors:
+        errors = feed_policy.problems(parent, child)
+    if errors:
+        return 422, {
+            "rejected": True,
+            "case": case.name,
+            "reason_class": ef.classify(errors, case.reason, ef.FEED_SIGNATURES),
+            "validator_accepts": validator_accepts,
+            "errors": errors,
+        }
+    if case.kind != "canonical":
+        # An accepted rewiring (the safe variant) validates and assembles; its
+        # rewritten types have no node bodies, so there is nothing to run.
+        return 200, {"case": case.name, "accepted": True, "ran": False}
+
+    confined = tier == TIER_CONFINED
+    hostile_name = payload.get("hostile")
+    if hostile_name:
+        hostile = next((c for c in CASES if c.name == hostile_name), None)
+        if hostile is None:
+            raise ApiError(404, f"no hostile feed case {hostile_name!r}")
+        facts, markdown, result = ef.run_hostile_traced(hostile, confined=confined)
+        verdict = hostile.verdict
+    else:
+        result, sent, _backend = ef.benign_tick(confined=confined)
+        facts, markdown, verdict = None, (sent[-1] if sent else ""), None
+
+    from . import digest
+
+    return 200, {
+        "case": case.name,
+        "graph": parent["name"],
+        "tier": tier,
+        "hostile": hostile_name or None,
+        "verdict": verdict,
+        "facts": facts,
+        "trace": None if result is None else result.trace.to_dict(include_timing=False),
+        "terminals": {}
+        if result is None
+        else {n: _value_summary(v) for n, v in result.terminals.items()},
+        "digest": {
+            "markdown": markdown,
+            "html": digest.render_html(markdown, title="Feed digest") if markdown else "",
+        },
+    }
+
+
+def latest_digest() -> tuple[int, dict]:
+    """The most recent digest the live service wrote under `var/digests/`, if any.
+
+    Read-only, like everything here: the inspector links what the service
+    published and has no way to publish."""
+    from . import digest, serve
+
+    page = digest.latest(serve.VAR_DIR / "digests")
+    if page is None:
+        raise ApiError(404, "the service has written no digest yet")
+    markdown = page.with_suffix(".md").read_text()
+    return 200, {"date": page.stem, "markdown": markdown, "html": page.read_text()}
+
+
 def meta() -> tuple[int, dict]:
     """What this server can do right now — the UI reads this instead of guessing."""
     return 200, {
@@ -311,6 +452,12 @@ class InspectorHandler(BaseHTTPRequestHandler):
             self._dispatch(lambda: case_graph(parts[2]))
         elif parts == ["api", "meta"]:
             self._dispatch(meta)
+        elif parts == ["api", "feed", "cases"]:
+            self._dispatch(feed_cases)
+        elif len(parts) == 5 and parts[:3] == ["api", "feed", "cases"] and parts[4] == "graphs":
+            self._dispatch(lambda: feed_case_graphs(parts[3]))
+        elif parts == ["api", "feed", "digest", "latest"]:
+            self._dispatch(latest_digest)
         else:
             self._send_json(404, {"error": f"no route {path!r}"})
 
@@ -329,6 +476,8 @@ class InspectorHandler(BaseHTTPRequestHandler):
             self._dispatch(lambda: run_case(payload))
         elif path == "/api/scenario/injection":
             self._dispatch(injection_scenario)
+        elif path == "/api/feed/run":
+            self._dispatch(lambda: run_feed(payload))
         else:
             self._send_json(404, {"error": f"no route {path!r}"})
 

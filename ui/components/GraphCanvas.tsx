@@ -157,14 +157,22 @@ export default function GraphCanvas({
       const taken = ov?.taken ?? false;
       const base = accent(e.port ? edgeColors[e.port] : undefined, "var(--line-2)");
       const color = untrusted ? "var(--untrusted)" : taken ? "var(--trusted)" : base;
-      const label = untrusted
-        ? `⚠ Untrusted${e.port ? ` · ${e.port}` : ""}`
-        : (e.port ?? undefined);
+      // The label is the edge's own declared facts — variant role, join
+      // position — prefixed, after a run, by the trust the trace recorded.
+      const parts = [
+        untrusted ? "⚠ Untrusted" : null,
+        e.port,
+        e.toInput === null ? null : `[${e.toInput}]`,
+      ].filter(Boolean);
+      const label = parts.length ? parts.join(" · ") : undefined;
       return {
         id: e.id,
         source: e.source,
         target: e.target,
         label,
+        // A join's position label is set larger: these graphs are tall, and
+        // the position is the one thing the edge says.
+        className: e.toInput === null ? undefined : "join-edge",
         animated: taken,
         style: {
           stroke: color,

@@ -32,6 +32,13 @@ The harness SHALL re-evaluate every generated component with the gate disabled a
 - **WHEN** a hand-written body is reported as a gate violation
 - **THEN** the build fails, because the control shows the gate is not trustworthy
 
+### Requirement: A fault of the harness is not charged to the model
+The harness SHALL abandon a trial, recording nothing for it, when it detects that a failure is its own and not the generated body's, and SHALL keep any trials later found to be so contaminated apart from the counted results, with the reason.
+
+#### Scenario: The host adapter omits a function the body may call
+- **WHEN** a generated body calls a function of an interface its node is granted and the harness's adapter did not bind it
+- **THEN** the run stops with a harness fault, the trial is not recorded as a failure of the body, and the model is not given the fault as feedback
+
 ### Requirement: Runs are recorded and the build never calls a model
 Every trial's prompt, reply, extracted files, verdict and iteration count SHALL be committed under `poc/generation/runs/`, the build SHALL derive the report from those records alone, and the harness SHALL resume from the last recorded trial.
 

@@ -20,7 +20,11 @@ The `HTTPClient` handle SHALL perform real GET requests only to allowlisted host
 
 #### Scenario: A redirect leaves the allowlist
 - **WHEN** an allowlisted host redirects to a host outside the allowlist
-- **THEN** the fetch is refused at the handle, as an off-list request is
+- **THEN** the redirect is refused at the handle and never followed, and no request is made to the off-list host
+
+#### Scenario: A refused redirect does not fail the run
+- **WHEN** a node reads several URLs through the operation that returns failures as values, and one answers with a redirect off the allowlist
+- **THEN** that URL is reported as a failed fetch and the others are still read, while a request the node itself makes to an off-list host still raises
 
 #### Scenario: An oversized response
 - **WHEN** a response exceeds the size cap
@@ -56,11 +60,22 @@ A node SHALL be permitted several data inputs when each is fed by exactly one ed
 - **THEN** validation rejects the graph, and a run ending with a join still waiting is refused
 
 ### Requirement: The LLM backend can be the local Claude CLI
-The runtime SHALL provide an LLM backend that calls `claude -p` with no tools and no session persistence in a temporary directory, and SHALL keep the deterministic stub as the backend for every test and build step.
+The runtime SHALL provide an LLM backend that calls `claude -p` with no tools, no session persistence and none of the user's or repository's instructions, in an empty temporary directory, without passing an API key through, and SHALL keep the deterministic stub as the backend for every test and build step.
 
 #### Scenario: No test calls a model
 - **WHEN** the test suite and `make build` run
 - **THEN** no `claude` process is started
+
+#### Scenario: The subscription is nearly spent
+- **WHEN** the CLI reports a usage window at or above the backend's ceiling
+- **THEN** the next call is refused without starting a process, and the caller is told to stop and resume later
+
+### Requirement: A host binding written short is not reported as an ungranted capability
+The confined tier SHALL distinguish a component that imports an interface it was not granted from a component that calls a function of a granted interface which the host's binding omits, and SHALL report the second as a fault of the host adapter.
+
+#### Scenario: A granted interface is bound without one of its functions
+- **WHEN** a component calls `fetch` on an `http-client` the host bound with only `get`
+- **THEN** instantiation fails naming the incomplete binding, not an ungranted capability
 
 ### Requirement: A routed handle is attenuated to the child's declared scope
 When a parent routes a capability to a sub-graph, the runtime SHALL deliver a facade limited to the child's declared type (mode, tool set, allowlist, store name), keeping the caretaker so revocation still reaches it. This requirement is implemented only after Paper 2 publishes, together with Paper 2 version 1.1.
