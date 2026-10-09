@@ -76,6 +76,10 @@ def trust_label(value: object) -> str:
     first, so a sum-typed node's output is labelled by what it actually emits."""
     if isinstance(value, Variant):
         value = value.value
+    # A list is as trusted as its least trusted element, and so are the several
+    # inputs of a join, which arrive as a tuple: the meet over what was received.
+    if isinstance(value, list | tuple):
+        return UNTRUSTED if any(trust_label(v) == UNTRUSTED for v in value) else TRUSTED
     return UNTRUSTED if isinstance(value, Untrusted) else TRUSTED
 
 
@@ -153,6 +157,10 @@ class NodeTrace:
     principal: str | None = None
     acting_as: list[str] = field(default_factory=list)
     subgraph: GraphTrace | None = None
+    # For a per-item node: one nested run per list element, in list order. None
+    # (and absent from the document) for every other node; an empty list is a
+    # per-item node that was handed an empty list.
+    elements: list[GraphTrace] | None = None
     # Excluded from every structural comparison and from the schema's required
     # fields. Present only when a run is asked to time itself; never populated on
     # the paths the pins compare, so structure stays deterministic.
@@ -210,6 +218,11 @@ class NodeTrace:
             out["subgraph"] = self.subgraph.to_dict(
                 include_timing=include_timing, include_calls=include_calls
             )
+        if self.elements is not None:
+            out["elements"] = [
+                run.to_dict(include_timing=include_timing, include_calls=include_calls)
+                for run in self.elements
+            ]
         if include_timing and self.timing_us is not None:
             out["timing_us"] = self.timing_us
         return out
@@ -246,6 +259,8 @@ class GraphTrace:
             yield node
             if node.subgraph is not None:
                 yield from node.subgraph.walk()
+            for run in node.elements or ():
+                yield from run.walk()
 
 
 class TraceCollector:

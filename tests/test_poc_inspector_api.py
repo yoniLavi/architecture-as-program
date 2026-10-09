@@ -59,7 +59,9 @@ def test_graph_index_lists_every_canonical_graph():
     entries = {g["file"]: g["name"] for g in payload["graphs"]}
     assert entries == {
         "customer-support": "CustomerSupport",
+        "feed-triage": "FeedTriage",
         "support-platform": "SupportPlatform",
+        "triage-item": "TriageItem",
     }
 
 

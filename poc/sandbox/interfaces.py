@@ -58,7 +58,7 @@ CLOCK = "wasi:clocks/wall-clock@0.2.0"  # Clock
 # The graph-level capability kinds (heads of `with`-clause types) this tier
 # models. `LLMClient` is one kind realised by two interfaces (inference vs tool
 # scope), which is why this tuple and CAPABILITY_INTERFACES have different sizes.
-CAPABILITY_KINDS: tuple[str, ...] = (
+PAPER2_KINDS: tuple[str, ...] = (
     "LLMClient",
     "DBHandle",
     "ResponseChannel",
@@ -67,6 +67,17 @@ CAPABILITY_KINDS: tuple[str, ...] = (
     "HTTPClient",
     "Notifier",
 )
+
+# The vocabulary grew after Paper 2 (*Confinement by Construction*) reported it:
+# node-local state arrived with the feed-triage service. The seven kinds above are
+# kept as their own tuple because that paper's Evaluation section counts them, and
+# a kind added for a later artifact must not move a figure in a paper that never
+# exercised it. `poc/evaluate.py` reads the `PAPER2_*` sets; everything that
+# *runs* reads the full ones below.
+CAPABILITY_KINDS: tuple[str, ...] = (*PAPER2_KINDS, "StateHandle")
+
+STATE_READ = _iface("state-read")  # StateHandle<'name', read>
+STATE_RW = _iface("state-rw")  # StateHandle<'name', read-write>
 
 # The shared domain vocabulary: records, enums and variants, and *no functions*.
 # Every component imports it, and it grants no authority — it is how the two sides
@@ -77,7 +88,7 @@ TYPES = _iface("types")
 # Every interface that carries authority. Anything a component imports which is
 # not in here and is not TYPES is, by definition, something this tier did not
 # intend to hand out.
-CAPABILITY_INTERFACES = frozenset(
+PAPER2_INTERFACES = frozenset(
     {
         INFERENCE_LLM,
         TOOL_LLM,
@@ -89,6 +100,7 @@ CAPABILITY_INTERFACES = frozenset(
         CLOCK,
     }
 )
+CAPABILITY_INTERFACES = PAPER2_INTERFACES | {STATE_READ, STATE_RW}
 
 
 class UnmappedCapability(ValueError):
@@ -162,6 +174,18 @@ def interface_for(cap_type: str) -> str:
 
     if ast.head == "Notifier":
         return NOTIFIER
+
+    if ast.head == "StateHandle":
+        # Two interfaces for one kind, as with `LLMClient`: the mode is the
+        # presence or absence of `put` and `delete` in what the node imports, so a
+        # read-only node has no function through which to write. The store's
+        # *name* lives in the handle, like an HTTP allowlist.
+        mode = ast.args[1] if len(ast.args) == 2 else None
+        if isinstance(mode, TName) and mode.name == "read":
+            return STATE_READ
+        if isinstance(mode, TName) and mode.name == "read-write":
+            return STATE_RW
+        raise UnmappedCapability(f"unrecognised StateHandle shape: {cap_type!r}")
 
     raise UnmappedCapability(f"unknown capability kind: {cap_type!r}")
 

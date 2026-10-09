@@ -132,6 +132,135 @@ interface types {
         fetched: u32,
         notified: bool,
     }
+
+    // ── The FeedTriage graph's domain types ──────────────────────────────────
+    //
+    // These mirror `poc/feed_values.py` and the type strings in
+    // `graphs/feed-triage.json` and `graphs/triage-item.json`. As above, the
+    // `Untrusted<_>` label is the validator's; WIT carries the payload.
+
+    /// The boundary input: one firing of the driver's timer.
+    record tick {
+        reason: string,
+    }
+
+    /// What the run knows about itself: the date it publishes under and the
+    /// instant it began, both read from the clock by the one node that holds it.
+    record run-info {
+        date: string,
+        started: u64,
+    }
+
+    record subscription-list {
+        urls: list<string>,
+    }
+
+    /// One fetched feed, unparsed: the URL asked for and the body that came back.
+    record feed-document {
+        url: string,
+        body: string,
+    }
+
+    /// A feed that could not be fetched this run. Carried as data so one dead
+    /// feed does not fail the tick, and so the run record says which.
+    record fetch-failure {
+        url: string,
+        error: string,
+    }
+
+    /// Untrusted<FeedBatch> — everything the outside world sent this run.
+    record feed-batch {
+        documents: list<feed-document>,
+        failures: list<fetch-failure>,
+    }
+
+    /// Untrusted<FeedItem> — one entry of one feed. `id` is a digest computed by
+    /// the parser, never a string the feed chose, so it is safe as a store key.
+    /// Every text field is bounded by the parser and is still adversarial data.
+    record feed-item {
+        id: string,
+        feed: string,
+        title: string,
+        link: string,
+        published: string,
+        text: string,
+    }
+
+    /// The closed category set. As with `intent`: a feed item cannot talk the
+    /// classifier into a seventh category, because there is no value for one.
+    enum category {
+        release,
+        security,
+        research,
+        tooling,
+        discussion,
+        other,
+    }
+
+    /// The closed importance set the selection sorts on.
+    enum importance {
+        must-read,
+        worth-a-look,
+        skip,
+    }
+
+    /// ClassifiedItem — an item the classifier kept, with trust discharged. The
+    /// item's text rides along: the free-text residual, bounded and still
+    /// adversarial, exactly as `customer-query.question` is.
+    record classified-item {
+        item: feed-item,
+        category: category,
+        importance: importance,
+    }
+
+    /// DroppedItem — an item the classifier judged not worth a summary.
+    record dropped-item {
+        item: feed-item,
+        category: category,
+    }
+
+    /// `keep: ClassifiedItem | drop: DroppedItem`, with the graph's role labels.
+    variant classification {
+        keep(classified-item),
+        drop(dropped-item),
+    }
+
+    /// ItemVerdict — what one item's child run hands back to the parent.
+    record item-verdict {
+        id: string,
+        feed: string,
+        title: string,
+        link: string,
+        category: category,
+        importance: importance,
+        summary: string,
+        kept: bool,
+    }
+
+    /// Selection — the items that made the digest, plus the id of every item
+    /// considered, kept or not, so that all of them can be marked seen.
+    record selection {
+        entries: list<item-verdict>,
+        considered: list<string>,
+    }
+
+    record digest {
+        date: string,
+        overview: string,
+        entries: list<item-verdict>,
+        considered: list<string>,
+    }
+
+    record published-digest {
+        date: string,
+        considered: list<string>,
+        published: bool,
+    }
+
+    record run-report {
+        date: string,
+        recorded: u32,
+    }
 }
 
 /// `LLMClient<inference>` — model access with no tool calling.
@@ -218,6 +347,34 @@ interface http-client {
     /// boundary, not a value — a node cannot probe its own allowlist by
     /// collecting error strings.
     get: func(url: string) -> string;
+
+    /// Fetch a URL, with a *transport* failure returned as a value: a timeout,
+    /// an error status, a response over the size cap. A node reading several
+    /// feeds survives one being down. A request outside the allowlist is still a
+    /// trap, here as in `get` — that is not a failed fetch but a reach for
+    /// authority the node was not granted, and it must not be collectable.
+    fetch: func(url: string) -> result<string, string>;
+}
+
+/// `StateHandle<'name', read>` — look a key up in one named store.
+///
+/// The read-only mode is, as with `kb-read`, the absence of a function: there is
+/// no `put` here, so a node holding this cannot change what the next run sees.
+/// There is no way to list keys either — a node can ask about a key it already
+/// knows, not enumerate the store.
+interface state-read {
+    get: func(key: string) -> option<string>;
+}
+
+/// `StateHandle<'name', read-write>` — read and change one named store.
+///
+/// A separate interface rather than `state-read` plus a writer, so that the
+/// derivation maps one capability type to one interface and a node's mode is
+/// readable off its import list.
+interface state-rw {
+    get: func(key: string) -> option<string>;
+    put: func(key: string, value: string);
+    delete: func(key: string);
 }
 
 /// `Notifier<'channel'>` — write-only sink for notifications to one channel.

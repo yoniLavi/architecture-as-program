@@ -78,6 +78,8 @@ def generate_pseudocode(g):
             lines.append(f"    with {', '.join(rendered_caps)}")
         if node.get("discharges_trust"):
             lines.append("    # discharges trust")
+        if node.get("each"):
+            lines.append("    # each: one isolated run of the sub-graph per list element")
         lines.append("")
 
     # Data-flow edges only (capability wiring is expressed by `with` clauses)
@@ -85,7 +87,9 @@ def generate_pseudocode(g):
     froms = [e["from"] for e in data_edges]
     pad = max(len(f) for f in froms)
     for e in data_edges:
-        lines.append(f"  edge {e['from']:<{pad}} \u2192 {e['to']}")
+        # An edge into a join names the input position it fills.
+        position = f"[{e['to_input']}]" if "to_input" in e else ""
+        lines.append(f"  edge {e['from']:<{pad}} \u2192 {e['to']}{position}")
 
     lines.append("}")
     return "\n".join(lines)
@@ -187,7 +191,9 @@ def generate_fletcher(g):
                 else:
                     parts.append(f"#cap[{e}]")
             ann = " \\ ".join(parts)
-            emit(f"  node(({coord(pos[0])}, {coord(pos[1])}), align(center)[*{n}*\\ {ann}]),")
+            # A per-item node is drawn with its multiplicity beside its name.
+            title = f"*{n}* #cap[(each)]" if nd.get("each") else f"*{n}*"
+            emit(f"  node(({coord(pos[0])}, {coord(pos[1])}), align(center)[{title}\\ {ann}]),")
         else:
             emit(f"  node(({coord(pos[0])}, {coord(pos[1])}), [*{n}*\\ #cap[(pure)]]),")
 

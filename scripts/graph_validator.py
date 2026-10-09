@@ -142,6 +142,9 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
         if "binds_principal" in n and not isinstance(n["binds_principal"], bool):
             errors.append(f"{path.name}: node {nname!r} `binds_principal` must be boolean")
             continue
+        if "each" in n and not isinstance(n["each"], bool):
+            errors.append(f"{path.name}: node {nname!r} `each` must be boolean")
+            continue
         # Contracts are checked for *parseability* here. Resolvable field paths are
         # not yet checked anywhere before a run (poc/contracts.py
         # `unresolvable_paths` is not called). The split is forced by what each
@@ -227,12 +230,52 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
             errors.append(f"{path.name}: boundary data input {p!r} declared but never consumed")
 
     _validate_edges(path, node_map, caps, edges, errors)
+    _validate_each_shape(path, node_map, caps, errors)
     _validate_entry(path, node_map, data_params, caps, edges, errors)
     _validate_node_trust_flow(path, node_map, caps, errors)
     _validate_identities(path, node_map, caps, errors)
     _validate_layout(path, node_map, graph.get("layout", {}), errors)
 
     return node_map
+
+
+def _list_element(src: str) -> Type | None:
+    """`T` if `src` is `List<T>`, else None."""
+    try:
+        ast = parse_type(src)
+    except ParseError:
+        return None
+    if isinstance(ast, TApp) and ast.head == "List" and len(ast.args) == 1:
+        return ast.args[0]
+    return None
+
+
+def _validate_each_shape(
+    path: Path,
+    node_map: dict[str, dict],
+    caps: list[str],
+    errors: list[str],
+) -> None:
+    """The per-item map, intra-graph half. A node declaring `"each": true` is
+    applied to each element of a list, so it takes exactly one data input, a
+    `List<_>`, and emits a `List<_>`. Whether the element types are the referenced
+    graph's boundary types is the cross-graph half (`_validate_cross_graph`); this
+    half is what can be said of the node alone, and it is said here so that a
+    malformed map is rejected even when the graph it names is not in the batch."""
+    for name, n in node_map.items():
+        if not n.get("each", False):
+            continue
+        data = _data_inputs(n, caps)
+        if len(data) != 1 or _list_element(data[0]) is None:
+            errors.append(
+                f"{path.name}: per-item node {name!r} must take exactly one data input, "
+                f"a `List<_>` (it takes {data}); `each` applies a sub-graph to each element"
+            )
+        if _list_element(n["output"]) is None:
+            errors.append(
+                f"{path.name}: per-item node {name!r} must emit a `List<_>` "
+                f"(it emits {n['output']!r}); one output element per input element"
+            )
 
 
 def _validate_capability_identities_shape(
@@ -343,8 +386,12 @@ def _validate_edges(
     # Track, per source node, which output-variant roles have at least one
     # consumer. Used for the variant-completeness check below.
     consumed_ports: dict[str, set[str]] = {n: set() for n in node_map}
-    seen_edges: set[tuple[str, str]] = set()
+    seen_edges: set[tuple[str, str, object]] = set()
     successors: dict[str, set[str]] = {n: set() for n in node_map}
+    # target node → input position → the `from` of every edge feeding it, and the
+    # same edges as (source node, port, position), for the join checks below.
+    fed: dict[str, dict[int, list[str]]] = {n: {} for n in node_map}
+    in_edges: dict[str, list[tuple[str, str | None, int]]] = {n: [] for n in node_map}
 
     for e in edges:
         if not isinstance(e, dict) or "from" not in e or "to" not in e:
@@ -354,11 +401,12 @@ def _validate_edges(
         to = e["to"]
         # The runtime schedules a node once per arriving edge, so a repeated
         # edge runs its target twice (a tool-capable node twice, a reply sent
-        # twice) — fan-out the model does not address.
-        if (fr, to) in seen_edges:
+        # twice) — fan-out the model does not address. Two edges from one source
+        # into *different* positions of a join are different edges.
+        if (fr, to, e.get("to_input")) in seen_edges:
             errors.append(f"{path.name}: duplicate edge {fr!r}→{to!r}")
             continue
-        seen_edges.add((fr, to))
+        seen_edges.add((fr, to, e.get("to_input")))
         base = fr.rsplit(".", 1)[0] if "." in fr else fr
         if base in successors and to in node_map:
             successors[base].add(to)
@@ -422,15 +470,34 @@ def _validate_edges(
         if len(tgt_data) == 0:
             errors.append(f"{path.name}: edge {fr!r}→{to!r}: target node {to!r} has no data inputs")
             continue
-        if len(tgt_data) > 1:
+        # Which of the target's data inputs this edge feeds. A node with one data
+        # input needs no position; a node with several is a *join*, and each edge
+        # into it names the position it fills, so that values are delivered by
+        # position and never by the order they happened to arrive in.
+        position = e.get("to_input")
+        if position is None:
+            if len(tgt_data) > 1:
+                errors.append(
+                    f"{path.name}: edge {fr!r}→{to!r}: target node {to!r} joins "
+                    f"{len(tgt_data)} data inputs ({tgt_data}), so each edge into it "
+                    f"must name its join position (`to_input`)"
+                )
+                continue
+            position = 0
+        elif (
+            not isinstance(position, int)
+            or isinstance(position, bool)
+            or not 0 <= position < len(tgt_data)
+        ):
             errors.append(
-                f"{path.name}: edge {fr!r}→{to!r}: target node {to!r} has multiple "
-                f"data inputs ({tgt_data}); multi-input disambiguation is a "
-                f"Phase 1 language-design question (see the paper's research agenda)"
+                f"{path.name}: edge {fr!r}→{to!r} names join position {position!r}, "
+                f"but {to!r} has {len(tgt_data)} data input(s)"
             )
             continue
+        fed[to].setdefault(position, []).append(fr)
+        in_edges[to].append((from_node, port, position))
 
-        tgt_ast = _try_parse(tgt_data[0], f"input of node {to!r}", path, errors)
+        tgt_ast = _try_parse(tgt_data[position], f"input of node {to!r}", path, errors)
         if tgt_ast is None:
             continue
 
@@ -478,6 +545,8 @@ def _validate_edges(
             f"{path.name}: the data edges form a cycle through {cyclic}; a signal graph is acyclic"
         )
 
+    _validate_joins(path, node_map, caps, fed, in_edges, errors)
+
     # Variant-completeness sweep: for every labelled sum output, every
     # declared variant must have at least one consuming edge on its own
     # port. (A whole-output edge from a labelled sum is rejected above: the
@@ -496,6 +565,76 @@ def _validate_edges(
                 f"{role!r} but no edge consumes it; the variant is dead "
                 f"code at the graph level."
             )
+
+
+def _validate_joins(
+    path: Path,
+    node_map: dict[str, dict],
+    caps: list[str],
+    fed: dict[str, dict[int, list[str]]],
+    in_edges: dict[str, list[tuple[str, str | None, int]]],
+    errors: list[str],
+) -> None:
+    """The positional join: a node with several data inputs, run once, when every
+    position holds a value.
+
+    Two rules. (1) Each position is fed by exactly one edge. A position with none
+    would wait for ever; a position with two would be a *merge* of streams, whose
+    result depends on which arrived first — the order-sensitive case this design
+    deliberately leaves open. (2) The positions must not lie on mutually exclusive
+    branches of one sum: a node emits one variant per run, so a join fed from two
+    of its variants could never fire.
+
+    What is not checked here: a join one of whose positions is conditional and
+    another not. It fires on some runs and is left waiting on others, and the
+    runtime refuses a run that ends that way rather than dropping the value."""
+    joins = {name: n for name, n in node_map.items() if len(_data_inputs(n, caps)) > 1}
+    for name, n in joins.items():
+        data = _data_inputs(n, caps)
+        for position in range(len(data)):
+            sources = fed[name].get(position, [])
+            if len(sources) != 1:
+                errors.append(
+                    f"{path.name}: join position {position} of node {name!r} "
+                    f"({data[position]}) is fed by {len(sources)} edges"
+                    f"{' (' + ', '.join(sources) + ')' if sources else ''}; each position "
+                    f"of a join takes exactly one"
+                )
+
+    # The branch conditions a node's running depends on: the (sum node, role)
+    # pairs that must all have been emitted for a value to reach it. Positions
+    # combine by union (all are needed); several edges into one position are
+    # alternatives, so only what they share is certain.
+    memo: dict[str, frozenset[tuple[str, str]]] = {}
+
+    def conditions(node: str, visiting: frozenset[str]) -> frozenset[tuple[str, str]]:
+        if node in memo:
+            return memo[node]
+        if node in visiting:  # a cycle, reported elsewhere
+            return frozenset()
+        by_position: dict[int, list[frozenset[tuple[str, str]]]] = {}
+        for src, port, position in in_edges[node]:
+            cond = conditions(src, visiting | {node})
+            if port is not None:
+                cond = cond | {(src, port)}
+            by_position.setdefault(position, []).append(cond)
+        result: frozenset[tuple[str, str]] = frozenset()
+        for alternatives in by_position.values():
+            result |= frozenset.intersection(*alternatives)
+        memo[node] = result
+        return result
+
+    for name in joins:
+        roles_by_sum: dict[str, set[str]] = {}
+        for sum_node, role in conditions(name, frozenset()):
+            roles_by_sum.setdefault(sum_node, set()).add(role)
+        for sum_node, roles in sorted(roles_by_sum.items()):
+            if len(roles) > 1:
+                errors.append(
+                    f"{path.name}: join {name!r} takes inputs from mutually exclusive "
+                    f"branches of {sum_node!r} ({sorted(roles)}); a node emits one variant "
+                    f"per run, so this join could never fire"
+                )
 
 
 def _validate_node_trust_flow(
@@ -694,6 +833,16 @@ def _validate_subgraph_output(
         declared_ast = parse_type(declared)
     except ParseError:
         return  # malformed output already flagged per-graph
+    if node.get("each", False):
+        # A per-item node emits one boundary value per element, so what must match
+        # the child's terminals is the *element* type of its declared `List<_>`.
+        # Trust is kept in the comparison, as below: a child whose terminal emits
+        # `Untrusted<X>` cannot be declared `List<X>` by its parent, so the only
+        # place an element's trust can rise is a discharger inside the child.
+        element = _list_element(declared)
+        if element is None:
+            return  # not a list: flagged by the per-graph `each` shape check
+        declared_ast = element
     if sum_roles(declared_ast):
         # A boundary value is a terminal's output, never a routed variant, so a
         # labelled boundary type would give the parent ports that never fire.
@@ -763,6 +912,18 @@ def _validate_cross_graph(
 
             mismatches: list[str] = []
             for i, (p, e) in enumerate(zip(provided, expected, strict=True)):
+                if n.get("each", False) and e not in target_caps:
+                    # The per-item map, element-wise: the parent supplies a list
+                    # whose element type is the child's boundary input, trust
+                    # label and all. The child is run once per element and never
+                    # sees the list.
+                    element = _list_element(p)
+                    if element is None or element != _try_parse(e, f"parameter {e!r}", path, []):
+                        mismatches.append(
+                            f"position {i}: a per-item node supplies `List<T>` where the "
+                            f"sub-graph takes `T`; {p!r} is not a list of {e!r}"
+                        )
+                    continue
                 if p == e:
                     continue
                 # Different strings: capability positions may still

@@ -1,10 +1,17 @@
 """Signal-graph executor.
 
-Propagates a boundary input value through an `AssembledGraph`. Because the
-validator guarantees each node has exactly one data input, execution is a simple
+Propagates a boundary input value through an `AssembledGraph`. Execution is a
 data-driven walk: deliver a value to a node, run its implementation with its
 declared capability handles, then route the output along the matching edges
 (selecting the variant for sum-typed outputs).
+
+Fan-in exists in two restricted forms, and no others. A **join** is a node with
+several data inputs, each fed by exactly one edge naming its position; it runs
+once, when every position holds a value, and receives them by position. A
+**per-item map** is a sub-graph node declaring `each`: the sub-graph is run once
+per element of a list, each element in its own isolated run. What is still
+refused is a second arrival at one input — merging streams, where the result
+would depend on arrival order.
 
 A node whose name resolves to another graph is a **sub-graph node**: its body is
 that graph. It is executed by assembling and running the referenced graph as a
@@ -25,6 +32,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 from type_parser import TApp, TList, TName, TString, parse_type
 
@@ -61,6 +69,8 @@ class ExecutionResult:
     # sub-graph node name → the nested run's own result, so a composed execution
     # can be inspected at both altitudes.
     subgraphs: dict[str, ExecutionResult] = field(default_factory=dict)
+    # per-item node name → one nested result per list element, in list order.
+    elements: dict[str, list[ExecutionResult]] = field(default_factory=dict)
     # The structured, schema-pinned trace of this run: nodes in execution order,
     # their tiers, trust labels, and capability crossings, with sub-graph runs
     # nested. The machine-readable form of what the fields above expose piecemeal.
@@ -102,7 +112,12 @@ def _scope_of(cap_type: str) -> str:
         if isinstance(arg, TName):
             return arg.name
         if isinstance(arg, TList):
-            names = sorted(i.name for i in arg.items if isinstance(i, TName))
+            # A tool list holds names; an HTTP allowlist holds string literals.
+            names = sorted(
+                i.name if isinstance(i, TName) else i.value
+                for i in arg.items
+                if isinstance(i, TName | TString)
+            )
             if names:
                 return "+".join(names)
     return cap_type
@@ -256,6 +271,14 @@ def _run_subgraph(
     free, and holds *whichever tier* the child's nodes run on: `sandbox` names which
     of the child's nodes run confined, but supplies no way to provision authority,
     so a confined child node still gets exactly the handles the parent routed."""
+    _check_composition(parent, node, child, stack)
+    return _run_child(parent, node, child, value, resolve, sandbox, stack, collector, acting_as)
+
+
+def _check_composition(
+    parent: AssembledGraph, node: Node, child: dict, stack: tuple[str, ...]
+) -> None:
+    """Refuse a composition the cross-graph analyses reject, before running it."""
     if node.name in stack:
         chain = " → ".join([*stack, node.name])
         raise ExecutionError(
@@ -281,6 +304,20 @@ def _run_subgraph(
         if errors:
             raise AssemblyError(errors)
 
+
+def _run_child(
+    parent: AssembledGraph,
+    node: Node,
+    child: dict,
+    value: object,
+    resolve: GraphResolver,
+    sandbox: Mapping[str, Iterable[str]] | None,
+    stack: tuple[str, ...],
+    collector: TraceCollector,
+    acting_as: tuple[str, ...] = (),
+) -> tuple[object, ExecutionResult]:
+    """One nested assembly and run of `child` on `value`: the whole of what a
+    sub-graph node does, and one element's worth of what a per-item node does."""
     child_sandbox = sandbox.get(child["name"], ()) if sandbox else ()
     # The principal crosses the composition boundary with the routed handles: a
     # sub-graph acts on behalf of whoever the parent is acting for, and — like the
@@ -312,6 +349,77 @@ def _run_subgraph(
         # is deferred.
         raise ExecutionError(f"in sub-graph {node.name!r}: {e}") from e
     return _boundary_output(node.name, sub), sub
+
+
+def _run_each(
+    parent: AssembledGraph,
+    node: Node,
+    child: dict,
+    values: object,
+    resolve: GraphResolver,
+    sandbox: Mapping[str, Iterable[str]] | None,
+    stack: tuple[str, ...],
+    collector: TraceCollector,
+    acting_as: tuple[str, ...] = (),
+) -> tuple[tuple[object, ...], list[ExecutionResult]]:
+    """The per-item map: run the sub-graph once per element, each in its own run.
+
+    Isolation is the point, and it is structural. Each element gets a fresh
+    assembly of the child and its own execution; the child receives one element
+    as its boundary input and nothing else, so no node inside it can be handed a
+    second. What an instruction hidden in one feed item can reach is therefore
+    that item — there is no wiring by which it could see the others. (The child
+    runs do share the handles the parent routed: one model client, by design. They
+    share no *data*.)
+
+    Elements run in list order and results are collected in that order. A failing
+    element fails the whole node, naming its index, and no partial list is
+    emitted: a list one short would silently misalign with whatever consumes it."""
+    if not isinstance(values, list | tuple):
+        raise ExecutionError(
+            f"per-item node {node.name!r} expects a list, got {type(values).__name__}"
+        )
+    _check_composition(parent, node, child, stack)
+    outputs: list[object] = []
+    runs: list[ExecutionResult] = []
+    for index, element in enumerate(values):
+        try:
+            output, sub = _run_child(
+                parent, node, child, element, resolve, sandbox, stack, collector, acting_as
+            )
+        except Exception as e:
+            raise ExecutionError(
+                f"element {index} of per-item node {node.name!r} failed: {e}"
+            ) from e
+        outputs.append(output)
+        runs.append(sub)
+    return tuple(outputs), runs
+
+
+def _schedule_rank(graph: AssembledGraph) -> dict[str, tuple[int, str]]:
+    """A fixed order to run ready nodes in: by depth (the longest path from the
+    entry), then by name.
+
+    With fan-out, several nodes can be ready at once, and which the worklist
+    happened to hold first would otherwise depend on the order edges were listed
+    in. Ranking by a property of the graph's shape makes a run's order — and so
+    its trace — the same however the JSON is arranged, which is what lets a join
+    be described as commutative: its inputs are delivered by position, and nothing
+    else about the run moves with their arrival order either."""
+    predecessors: dict[str, list[str]] = {n: [] for n in graph.nodes}
+    for e in graph.edges:
+        predecessors[e.dst_node].append(e.src_node)
+    depth: dict[str, int] = {}
+
+    def of(name: str, visiting: frozenset[str]) -> int:
+        if name not in depth:
+            if name in visiting:  # unreachable: validation rejects a cycle
+                return 0
+            sources = predecessors[name]
+            depth[name] = 1 + max((of(s, visiting | {name}) for s in sources), default=-1)
+        return depth[name]
+
+    return {name: (of(name, frozenset()), name) for name in graph.nodes}
 
 
 def _entry_node(graph: AssembledGraph) -> Node:
@@ -378,9 +486,14 @@ def execute(
     # extends the chain for everything downstream of itself, and the chain travels
     # with the value rather than being a single cursor, so two branches descending
     # from different binders cannot pick up each other's delegates.
-    pending: list[tuple[str, object, tuple[str, ...]]] = [
-        (_entry_node(graph).name, boundary_value, tuple(_acting_as))
+    # An item is (node, input position, value, chain): one value arriving at one
+    # of a node's data inputs.
+    pending: list[tuple[str, int, object, tuple[str, ...]]] = [
+        (_entry_node(graph).name, 0, boundary_value, tuple(_acting_as))
     ]
+    rank = _schedule_rank(graph)
+    # Joins part-way to firing: node → position → (value, chain).
+    waiting: dict[str, dict[int, tuple[object, tuple[str, ...]]]] = {}
 
     # Precompute outgoing edges per source node.
     out_edges: dict[str, list] = {n: [] for n in graph.nodes}
@@ -388,16 +501,39 @@ def execute(
         out_edges[e.src_node].append(e)
 
     while pending:
-        node_name, value, acting_as = pending.pop(0)
+        # The ready item of lowest rank, not the oldest: see `_schedule_rank`.
+        pending.sort(key=lambda item: (rank[item[0]], item[1]))
+        node_name, position, value, acting_as = pending.pop(0)
         if node_name in result.received:
-            # A single active path runs each node once. A second arrival is
-            # fan-in/fan-out the model does not address (its merge order would
-            # need classifying), so it is refused rather than run again.
+            # Each node runs once per run. A second arrival at a position is a
+            # *merge* of streams — the order-sensitive fan-in this model does not
+            # address — so it is refused rather than run again.
             raise ExecutionError(
-                f"node {node_name!r} would run a second time; fan-in and fan-out "
-                f"are unaddressed, so a run reaching a node twice is refused"
+                f"node {node_name!r} would run a second time; merging several "
+                f"arrivals at one input is unaddressed, so a run reaching a node "
+                f"twice is refused"
             )
         node = graph.nodes[node_name]
+
+        # A join holds each arriving value until every position has one, then runs
+        # once on all of them, delivered by position. Nothing about the result
+        # depends on which arrived first.
+        arity = len(graph.data_inputs(node))
+        is_join = arity > 1
+        if is_join:
+            held = waiting.setdefault(node_name, {})
+            if position in held:
+                raise ExecutionError(
+                    f"join {node_name!r} received a second value at position {position}; "
+                    f"each position of a join takes exactly one"
+                )
+            held[position] = (value, acting_as)
+            if len(held) < arity:
+                continue
+            del waiting[node_name]
+            value = tuple(held[i][0] for i in range(arity))
+            # The join acts for everyone its inputs were acting for.
+            acting_as = tuple(dict.fromkeys(d for i in range(arity) for d in held[i][1]))
 
         result.received[node_name] = value
         result.order.append(node_name)
@@ -425,13 +561,36 @@ def execute(
         # agreement rather than only the fact of breakage. The precondition is
         # checked before either branch, so a sub-graph node's `requires` is
         # evaluated exactly as a leaf's is.
-        contracts.check(node.requires, value, node=node_name, kind="requires")
+        # A join's precondition reads its inputs by position: `in0.field`, `in1.field`.
+        subject = (
+            SimpleNamespace(**{f"in{i}": v for i, v in enumerate(value)})  # type: ignore[arg-type]
+            if is_join
+            else value
+        )
+        contracts.check(node.requires, subject, node=node_name, kind="requires")
 
         # A node whose name resolves to a graph *is* that graph; it needs no
         # registered implementation. Resolution is checked first so composition is
         # decided by the graph, not by whatever happens to be in the registry.
         child = resolve(node_name)
-        if child is not None:
+        if node.each:
+            # A per-item node is a sub-graph by definition. Refusing a leaf here is
+            # what keeps `each` from becoming a way to hand one body a whole list
+            # while the graph claims per-element isolation.
+            if child is None:
+                raise ExecutionError(
+                    f"per-item node {node_name!r} names no graph; `each` applies a "
+                    f"sub-graph to each element and has no meaning on a leaf"
+                )
+            entry.tier = result.tiers[node_name] = TIER_GRAPH
+            output, runs = _run_each(
+                graph, node, child, value, resolve, sandbox, _stack, collector, acting_as
+            )
+            result.elements[node_name] = runs
+            entry.elements = [run.trace for run in runs]
+            # The child runs moved the collector's cursor; nothing else this node
+            # does crosses a capability, so there is nothing to restore it for.
+        elif child is not None:
             entry.tier = result.tiers[node_name] = TIER_GRAPH
             output, sub = _run_subgraph(
                 graph, node, child, value, resolve, sandbox, _stack, collector, acting_as
@@ -446,7 +605,8 @@ def execute(
                     f"no {node.tier}-tier implementation registered for node {node_name!r}"
                 )
             entry.tier = result.tiers[node_name] = node.tier
-            output = impl(value, *_capability_handles(graph, node, collector))
+            data = value if is_join else (value,)
+            output = impl(*data, *_capability_handles(graph, node, collector))  # type: ignore[misc]
 
         # Postconditions see the value the node actually emitted. A Variant is
         # checked on its payload, so a contract talks about the value that flows
@@ -476,11 +636,11 @@ def execute(
         for e in edges:
             if isinstance(output, Variant):
                 if e.src_port == output.role:
-                    pending.append((e.dst_node, output.value, downstream))
+                    pending.append((e.dst_node, e.dst_input, output.value, downstream))
                     routed = True
             else:
                 if e.src_port is None:
-                    pending.append((e.dst_node, output, downstream))
+                    pending.append((e.dst_node, e.dst_input, output, downstream))
                     routed = True
         # A node with out-edges is not a terminal, so a value no edge carries would
         # vanish with no error. Validation should make this unreachable; refusing it
@@ -491,5 +651,16 @@ def execute(
                 f"node {node_name!r} emitted {'variant ' + repr(role) if role else 'a value'} "
                 f"that no edge carries"
             )
+
+    # A join still holding a value has an input that never came: one of its
+    # positions sits on a branch this run did not take. The value it holds would
+    # be dropped without a word, so the run is refused instead. (Validation
+    # rejects the join that can *never* fire; this catches the one that did not.)
+    if waiting:
+        stuck = ", ".join(
+            f"{name!r} (holding position(s) {sorted(held)})"
+            for name, held in sorted(waiting.items())
+        )
+        raise ExecutionError(f"the run ended with a join still waiting: {stuck}")
 
     return result

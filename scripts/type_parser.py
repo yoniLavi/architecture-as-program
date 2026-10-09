@@ -291,7 +291,16 @@ def trust_level(t: Type) -> Trust:
 # importing the runtime; `poc/sandbox/interfaces.py` maps the same set onto WIT
 # interfaces, and a test holds the two equal.
 CAPABILITY_HEADS = frozenset(
-    {"LLMClient", "DBHandle", "ResponseChannel", "EventEmitter", "Clock", "HTTPClient", "Notifier"}
+    {
+        "LLMClient",
+        "DBHandle",
+        "ResponseChannel",
+        "EventEmitter",
+        "Clock",
+        "HTTPClient",
+        "Notifier",
+        "StateHandle",
+    }
 )
 
 
@@ -463,6 +472,14 @@ _DB_MODE_COVERS: dict[str, frozenset[str]] = {
 }
 
 
+# StateHandle modes: a chain, `read-write` over `read`. There is no `append`:
+# a store a node may add to but not read back is a log, which `DBHandle` models.
+_STATE_MODE_COVERS: dict[str, frozenset[str]] = {
+    "read-write": frozenset({"read-write", "read"}),
+    "read": frozenset({"read"}),
+}
+
+
 def _http_allowlist(app: TApp) -> frozenset[str] | None:
     """Normalise an `HTTPClient<[...]>` argument to its permitted host set.
     The scope must be a non-empty list of string-literal hosts; returns None
@@ -493,6 +510,8 @@ def is_assignable(actual: Type, target: Type) -> bool:
     * `DBHandle<scope, mode>`: scopes must match exactly; the
       actual mode must cover the target mode under the lattice
       `read-write ⊇ {read, append}`.
+    * `StateHandle<'name', mode>`: store names must match exactly;
+      `read-write` covers `read`.
     * Trust markers are not handled here — `Untrusted<T>` is never
       assignable to `T` (trust discharge is enforced separately).
     * All other types: strict equality only."""
@@ -530,4 +549,17 @@ def is_assignable(actual: Type, target: Type) -> bool:
         if covered is None:
             return amode.name == tmode.name
         return tmode.name in covered
+    if actual.head == "StateHandle":
+        # Node-local state narrows as a `DBHandle` does, over a two-mode order:
+        # the store names must match exactly, and `read-write` may stand in where
+        # `read` is declared, never the reverse.
+        if len(actual.args) != 2 or len(target.args) != 2:
+            return False
+        if actual.args[0] != target.args[0]:
+            return False
+        amode = actual.args[1]
+        tmode = target.args[1]
+        if not isinstance(amode, TName) or not isinstance(tmode, TName):
+            return False
+        return tmode.name in _STATE_MODE_COVERS.get(amode.name, frozenset())
     return False

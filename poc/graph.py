@@ -18,7 +18,7 @@ from pathlib import Path
 from graph_validator import validate_files
 
 from .contracts import ContractError, Predicate, parse_all
-from .handles import Revoker, Rotator, manage, provision
+from .handles import Revoker, Rotator, World, manage, provision
 from .llm import LLMBackend
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -71,6 +71,9 @@ class Node:
     # without contracts costs nothing at run time beyond two empty loops.
     requires: tuple[Predicate, ...] = ()
     ensures: tuple[Predicate, ...] = ()
+    # A per-item map: the node is a sub-graph applied to each element of its
+    # `List<_>` input, one isolated child run per element.
+    each: bool = False
 
 
 @dataclass
@@ -78,6 +81,9 @@ class Edge:
     src_node: str
     src_port: str | None  # variant role, or None for the whole output
     dst_node: str
+    # Which of the target's data inputs this edge feeds. 0 for the ordinary
+    # single-input node; a join's edges each name their own position.
+    dst_input: int = 0
 
 
 @dataclass
@@ -199,6 +205,11 @@ class AssembledGraph:
     def handles_for(self, node: Node) -> dict[str, object]:
         """The capability handles a node declares, keyed by capability type."""
         return {inp: self.handle_for(node, inp) for inp in node.inputs if inp in self.handles}
+
+    def data_inputs(self, node: Node) -> list[str]:
+        """The node's non-capability input types, in declaration order — its join
+        positions. One entry for an ordinary node, several for a join."""
+        return [inp for inp in node.inputs if inp not in self.capabilities]
 
     def data_input_type(self, node: Node) -> str | None:
         """The single non-capability input type of a node (or None for a source
@@ -322,6 +333,7 @@ def assemble(
     revocable_instances: Iterable[tuple[str, str]] = (),
     rotatable_instances: Iterable[tuple[str, str]] = (),
     handles: Mapping[str, object] | None = None,
+    world: World | None = None,
 ) -> AssembledGraph:
     """Validate and assemble a graph dict into a runnable `AssembledGraph`.
 
@@ -371,7 +383,14 @@ def assemble(
     with the handles the parent routed to that node, so the child exercises the
     parent's authority and cannot quietly provision more of its own. A capability
     with no supplied handle is provisioned as before, so `backend` is required only
-    when something actually needs provisioning."""
+    when something actually needs provisioning.
+
+    `world` binds the handles that reach outside the process — live HTTP, file-backed
+    state stores, a notifier that publishes. Without one, an assembly gets a private
+    default world in which nothing real is bound: canned HTTP, in-memory stores,
+    notifiers that only record. One world per assembly, so two handles naming the
+    same state store reach the same state."""
+    world = world if world is not None else World()
     errors = validate_graph_dict(graph)
     if errors:
         raise AssemblyError(errors)
@@ -397,6 +416,7 @@ def assemble(
             requires=_contract(n, "requires"),
             ensures=_contract(n, "ensures"),
             tier=TIER_SANDBOX if n["name"] in sandbox_nodes else TIER_HOST,
+            each=bool(n.get("each", False)),
         )
         for n in graph["nodes"]
     }
@@ -411,7 +431,14 @@ def assemble(
             src_node, src_port = fr.rsplit(".", 1)
         else:
             src_node, src_port = fr, None
-        edges.append(Edge(src_node=src_node, src_port=src_port, dst_node=e["to"]))
+        edges.append(
+            Edge(
+                src_node=src_node,
+                src_port=src_port,
+                dst_node=e["to"],
+                dst_input=int(e.get("to_input", 0)),
+            )
+        )
 
     capabilities = list(graph["capabilities"])
     supplied = dict(handles or {})
@@ -427,7 +454,7 @@ def assemble(
                     f"provision one from"
                 ]
             )
-        return provision(cap_type, backend=backend, stores=stores)
+        return provision(cap_type, backend=backend, stores=stores, world=world)
 
     provisioned: dict[str, object] = {
         cap: supplied[cap] if cap in supplied else _provision(cap) for cap in capabilities

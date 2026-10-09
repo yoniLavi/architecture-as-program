@@ -15,6 +15,8 @@ external authority. The handle's *surface* is the enforcement:
 * `Clock`            (`Clock`)                      — read the wall clock, nothing else.
 * `HTTPClient`       (`HTTPClient<[host, ...]>`)    — outbound HTTP, allowlisted hosts only.
 * `Notifier`         (`Notifier<channel>`)          — write-only notification sink.
+* `ReadStateHandle`  (`StateHandle<name, read>`)    — look up a key in one named store.
+* `ReadWriteStateHandle` (`StateHandle<name, read-write>`) — read and change it.
 
 The three `DBHandle` surfaces make the mode lattice concrete: `read-write` covers both `read` and
 `append`, while `read` and `append` are mutually incomparable — neither handle's operations are a
@@ -28,9 +30,15 @@ Unforgeable confinement is the job of the WASM/WASI tier (a later change).
 
 from __future__ import annotations
 
+import json
+import os
+import re
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from type_parser import TApp, TList, TName, TString, parse_type
@@ -224,6 +232,29 @@ class Clock:
         return WallTime(seconds=ns // 1_000_000_000, nanoseconds=ns % 1_000_000_000)
 
 
+class FetchError(RuntimeError):
+    """A permitted fetch that failed: a timeout, a refused connection, an HTTP
+    error status, or a response over the size cap. Not a `CapabilityError` — the
+    node was entitled to ask, and the world said no."""
+
+
+@dataclass(frozen=True)
+class FetchResult:
+    """The outcome of `HTTPClient.fetch`: a body, or the reason there is none.
+    Mirrors the `fetch-result` variant of the `http-client` WIT interface."""
+
+    ok: bool
+    body: str = ""
+    error: str = ""
+
+
+# Bounds on a live fetch. A feed is text; five mebibytes is far more than any
+# feed worth reading, and far less than a response that could exhaust the host.
+HTTP_MAX_BYTES = 5 * 1024 * 1024
+HTTP_TIMEOUT_S = 15.0
+HTTP_USER_AGENT = "architecture-as-program-feed-triage/0.1"
+
+
 @dataclass
 class HTTPClient:
     """`HTTPClient<[host, ...]>` — outbound HTTP scoped to an allowlist of hosts.
@@ -231,14 +262,29 @@ class HTTPClient:
     The first capability whose scope is a *set* rather than a mode or a name. The
     allowlist is enforced at the handle: a request whose host is outside it raises
     `CapabilityError`, exactly as `ToolLLM` refuses an out-of-scope tool — the
-    node holds the operation, the handle holds the scope. The PoC performs no live
-    network I/O: `_responses` is a canned url → body mapping seeded like `stores`,
-    so what is being demonstrated is the authority boundary, not an HTTP stack."""
+    node holds the operation, the handle holds the scope.
+
+    Two modes. By default `_responses` is a canned url → body mapping seeded like
+    `stores`, and no network I/O happens: every test and the build run this way.
+    With `live=True` the handle performs a real GET, bounded four ways — the
+    allowlist, a response size cap, a timeout, and a redirect policy that applies
+    the same allowlist check to every hop, so an allowlisted host cannot bounce the
+    request somewhere the graph never named.
+
+    Two operations over the one scope. `get` returns the body and raises on any
+    failure. `fetch` returns transport failures as values (`FetchResult`), so a node
+    reading several feeds survives one of them being down — but a request *outside
+    the allowlist* raises from both: that is not a failed fetch, it is a node
+    reaching for authority it was not granted, and it must not be collectable as an
+    error string."""
 
     allowlist: frozenset[str]
     _responses: Mapping[str, str] = field(default_factory=dict)
+    live: bool = False
+    max_bytes: int = HTTP_MAX_BYTES
+    timeout: float = HTTP_TIMEOUT_S
 
-    def get(self, url: str) -> str:
+    def _check(self, url: str) -> None:
         # Refuse what parsers disagree on before reading the host: a backslash is a
         # path separator to a WHATWG client and userinfo to `urlsplit`, so
         # `https://evil.example\@feeds.example.com/` passed here and would reach
@@ -254,20 +300,208 @@ class HTTPClient:
                 f"node attempted HTTP to host {host!r} outside its "
                 f"allowlist {sorted(self.allowlist)}"
             )
-        return self._responses.get(url, "")
+
+    def get(self, url: str) -> str:
+        self._check(url)
+        if not self.live:
+            return self._responses.get(url, "")
+        return self._live_get(url)
+
+    def fetch(self, url: str) -> FetchResult:
+        self._check(url)
+        if not self.live:
+            if url not in self._responses:
+                return FetchResult(ok=False, error="no response")
+            return FetchResult(ok=True, body=self._responses[url])
+        try:
+            return FetchResult(ok=True, body=self._live_get(url))
+        except FetchError as e:
+            return FetchResult(ok=False, error=str(e))
+
+    def _live_get(self, url: str) -> str:
+        check = self._check
+
+        class _AllowlistedRedirects(urllib.request.HTTPRedirectHandler):
+            """Apply the handle's own check to every redirect target. A refusal
+            here is a `CapabilityError`, like the first hop's, and it propagates:
+            a redirect off the allowlist is not a failed fetch."""
+
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                check(newurl)
+                return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+        opener = urllib.request.build_opener(_AllowlistedRedirects)
+        request = urllib.request.Request(url, headers={"User-Agent": HTTP_USER_AGENT})
+        try:
+            with opener.open(request, timeout=self.timeout) as response:
+                declared = response.headers.get("Content-Length")
+                if declared is not None and declared.isdigit() and int(declared) > self.max_bytes:
+                    raise FetchError(
+                        f"response from {url} declares {declared} bytes, over the "
+                        f"{self.max_bytes}-byte cap"
+                    )
+                # One byte past the cap is enough to know the cap was exceeded, and
+                # nothing read so far is returned: a truncated feed is not a feed.
+                raw = response.read(self.max_bytes + 1)
+                if len(raw) > self.max_bytes:
+                    raise FetchError(f"response from {url} exceeds the {self.max_bytes}-byte cap")
+                charset = response.headers.get_content_charset() or "utf-8"
+        except urllib.error.HTTPError as e:
+            raise FetchError(f"{url}: HTTP {e.code}") from e
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise FetchError(f"{url}: {getattr(e, 'reason', e)}") from e
+        try:
+            return raw.decode(charset, errors="replace")
+        except LookupError:
+            return raw.decode("utf-8", errors="replace")
 
 
 @dataclass
 class Notifier:
     """`Notifier<channel>` — write-only sink for notifications to one channel.
     Structurally a sibling of `EventEmitter`: the outbound side of the feed-triage
-    toy, and the simplest of the three I/O kinds."""
+    toy, and the simplest of the three I/O kinds.
+
+    `_publish`, where the world binds one, is what a notification *does* beyond
+    being recorded: the feed-triage service binds it to the local digest writer
+    (`poc/digest.py`), so `Notifier<'digest'>` is a dated file on this machine and
+    nothing that leaves it. Without one the handle only records, which is what
+    every test not about publishing wants."""
 
     channel: str
     sent: list[str] = field(default_factory=list)
+    _publish: Callable[[str], None] | None = None
 
     def notify(self, message: str) -> None:
         self.sent.append(message)
+        if self._publish is not None:
+            self._publish(message)
+
+
+# ── Node-local state ───────────────────────────────────────────────
+
+
+class StateStore:
+    """One named key → string store, host-side: the thing a `StateHandle` is a
+    handle *to*.
+
+    Backed by a single JSON file when given a path, and by a dict otherwise (the
+    default for tests). Every `put` and `delete` rewrites the file through a
+    temporary sibling and an atomic rename, so a reader — or a restart — sees the
+    old contents or the new, never half of either. That is durability enough for
+    one process; two drivers at once are refused by the driver's lock file, not
+    handled here."""
+
+    def __init__(self, name: str, path: Path | None = None):
+        self.name = name
+        self._path = path
+        self._data: dict[str, str] = {}
+        if path is not None and path.exists():
+            loaded = json.loads(path.read_text())
+            if not isinstance(loaded, dict):
+                raise ValueError(f"state store {name!r} at {path} is not a JSON object")
+            self._data = {str(k): str(v) for k, v in loaded.items()}
+
+    def get(self, key: str) -> str | None:
+        return self._data.get(key)
+
+    def put(self, key: str, value: str) -> None:
+        self._data[key] = value
+        self._flush()
+
+    def delete(self, key: str) -> None:
+        if self._data.pop(key, None) is not None:
+            self._flush()
+
+    def keys(self) -> list[str]:
+        """For the host (the driver's report, tests). No handle exposes it: a node
+        can ask about a key it knows, not enumerate the store."""
+        return sorted(self._data)
+
+    def _flush(self) -> None:
+        if self._path is None:
+            return
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_name(self._path.name + ".tmp")
+        tmp.write_text(json.dumps(self._data, indent=1, sort_keys=True) + "\n")
+        os.replace(tmp, self._path)
+
+
+@dataclass
+class ReadStateHandle:
+    """`StateHandle<'name', read>` — look a key up in one named store. There is
+    no `put`, so a node holding this cannot change what the next run will see."""
+
+    name: str
+    _store: StateStore
+
+    def get(self, key: str) -> str | None:
+        return self._store.get(key)
+
+
+@dataclass
+class ReadWriteStateHandle:
+    """`StateHandle<'name', read-write>` — read and change one named store.
+
+    State is a capability, not a language construct: there is no stateful
+    combinator and no feedback edge in the graph. A node that remembers across
+    runs says so in its `with` clause, names the store, and says whether it may
+    write — which is what lets a reader see, from the graph alone, that the only
+    node able to mark a feed item as seen is the last one."""
+
+    name: str
+    _store: StateStore
+
+    def get(self, key: str) -> str | None:
+        return self._store.get(key)
+
+    def put(self, key: str, value: str) -> None:
+        self._store.put(key, value)
+
+    def delete(self, key: str) -> None:
+        self._store.delete(key)
+
+
+# ── The world: what outward-facing handles are bound to ────────────
+
+
+_STORE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+
+
+@dataclass
+class World:
+    """What the handles that reach outside the process are bound to.
+
+    A capability *type* says what a node may do (`HTTPClient<['feeds.example.com']>`,
+    `StateHandle<'seen', read>`); it does not say whether the fetch is real or where
+    the store's file lives. Those are deployment facts, and they are collected here
+    so that `assemble` takes one argument for them. The default binds nothing real:
+    canned HTTP, in-memory stores, notifiers that only record — the world every test
+    runs in. The driver (`poc/serve.py`) binds the real one, rooted at `var/`."""
+
+    # url → canned body, for the default (non-live) HTTP mode.
+    web: Mapping[str, str] = field(default_factory=dict)
+    live_http: bool = False
+    # Directory holding one `<name>.json` per state store; None keeps them in memory.
+    state_dir: Path | None = None
+    # channel name → what a notification on it does, beyond being recorded.
+    publishers: Mapping[str, Callable[[str], None]] = field(default_factory=dict)
+    # Injected time, so a run is reproducible. None reads the real clock.
+    clock: Callable[[], WallTime] | None = None
+    _stores: dict[str, StateStore] = field(default_factory=dict, repr=False)
+
+    def store(self, name: str) -> StateStore:
+        """The one store of that name. Two handles over `'seen'` — a reader's and a
+        writer's — share it, which is what makes them handles to the same state."""
+        if not _STORE_NAME.match(name):
+            # The name comes from a type string and becomes a filename.
+            raise ValueError(
+                f"state store name {name!r} must be lowercase letters, digits and hyphens"
+            )
+        if name not in self._stores:
+            path = None if self.state_dir is None else self.state_dir / f"{name}.json"
+            self._stores[name] = StateStore(name, path)
+        return self._stores[name]
 
 
 # ── Provisioning: capability type string → handle instance ─────────
@@ -295,16 +529,20 @@ def provision(
     backend: LLMBackend,
     stores: Mapping[str, Mapping[str, list[str]]],
     web: Mapping[str, str] | None = None,
+    world: World | None = None,
 ):
     """Construct the capability handle named by a graph parameter/`with` type.
 
     `stores` maps a database scope name (e.g. 'knowledge-base') to its contents;
-    `web` maps a URL to its canned response body (the PoC performs no live network
-    I/O). Raises ValueError for capability shapes the PoC does not model."""
+    `web` maps a URL to its canned response body. `world` binds the handles that
+    reach outside the process (live HTTP, file-backed state, a publishing
+    notifier); without one nothing real is bound. Raises ValueError for capability
+    shapes the PoC does not model."""
     ast = parse_type(cap_type)
+    world = world if world is not None else World(web=dict(web or {}))
 
     if isinstance(ast, TName) and ast.name == "Clock":
-        return Clock()
+        return Clock(_source=world.clock)
 
     if not isinstance(ast, TApp):
         raise ValueError(f"not a capability type: {cap_type!r}")
@@ -352,10 +590,24 @@ def provision(
                 f"unrecognised HTTPClient shape: {cap_type!r}; the scope is a "
                 f"non-empty list of string-literal hosts"
             )
-        return HTTPClient(allowlist=hosts, _responses=dict(web or {}))
+        return HTTPClient(allowlist=hosts, _responses=dict(world.web), live=world.live_http)
 
     if ast.head == "Notifier":
-        return Notifier(channel=_scope_label(ast))
+        channel = _scope_label(ast)
+        return Notifier(channel=channel, _publish=world.publishers.get(channel))
+
+    if ast.head == "StateHandle":
+        if len(ast.args) != 2 or not isinstance(ast.args[0], TString):
+            raise ValueError(f"unrecognised StateHandle shape: {cap_type!r}")
+        mode = ast.args[1].name if isinstance(ast.args[1], TName) else ""
+        store = world.store(ast.args[0].value)
+        if mode == "read":
+            return ReadStateHandle(store.name, store)
+        if mode == "read-write":
+            return ReadWriteStateHandle(store.name, store)
+        raise ValueError(
+            f"unrecognised StateHandle mode {mode!r} in {cap_type!r}; modes are read, read-write"
+        )
 
     raise ValueError(f"unknown capability kind: {cap_type!r}")
 

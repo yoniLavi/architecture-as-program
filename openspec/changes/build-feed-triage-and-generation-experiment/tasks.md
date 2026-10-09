@@ -3,37 +3,61 @@
 Phases are ordered so that stopping at any boundary leaves something runnable and something
 measured. Each phase ends green (`make build`) and committed.
 
+**As built (9 October 2026).** The author delegated the open decisions for this run ("follow
+your preferences"). Three departures from the order below, each noted at its task:
+fan-in (3.1, 3.2) was built before the graph, so `feed-triage.json` was written once in its
+full form (1.7 and 3.5 together) rather than as a skeleton with throwaway nodes; the feed list
+(1.10) was chosen by the implementer and is replaceable; and the model backend adds
+`--safe-mode` and `--system-prompt` to the command the design gave (1.5).
+
 ## 0. Keep Paper 2 still
 
-- [ ] 0.1 Test that pins every key of `dist/evaluation.json` that Paper 2 interpolates to its
+- [x] 0.1 Test that pins every key of `dist/evaluation.json` that Paper 2 interpolates to its
       value at the start of this change; a slip fails the build (removed deliberately at
       Paper 2 v1.1)
-- [ ] 0.2 `var/` gitignored; `var/README` explaining what lives there
+- [x] 0.2 `var/` gitignored; `var/README` explaining what lives there
 
 ## 1. Walking skeleton (M1): one feed, one item, one digest
 
-- [ ] 1.1 `StateHandle<'name', read|read-write>`: type grammar, provisioning, assignability
+- [x] 1.1 `StateHandle<'name', read|read-write>`: type grammar, provisioning, assignability
       (read-write narrows to read; names match), JSON-file store under `var/state/` with atomic
       replace; tests
 - [ ] 1.2 WIT interfaces `state-read` and `state-rw` in `caps.wit`; the derivation maps them;
       host linking; tests (the Paper 2 derivation rows unchanged — task 0.1 guards it)
-- [ ] 1.3 `HTTPClient` real fetch: urllib GET, 5 MiB cap, 15 s timeout, redirects only to
+- [x] 1.3 `HTTPClient` real fetch: urllib GET, 5 MiB cap, 15 s timeout, redirects only to
       allowlisted hosts, http(s) only; canned mode stays the default; tests with a local
       fixture server (no network in tests)
-- [ ] 1.4 Local digest `Notifier`: dated Markdown and HTML under `var/digests/`; tests
-- [ ] 1.5 `ClaudeCLIBackend` in `poc/llm.py` (`claude -p --tools "" --no-session-persistence
+- [x] 1.4 Local digest `Notifier`: dated Markdown and HTML under `var/digests/`; tests
+- [x] 1.5 `ClaudeCLIBackend` in `poc/llm.py` (`claude -p --tools "" --no-session-persistence
       --output-format json`, cwd a temp dir under `var/`); unit tests use a fake executable,
       never the real CLI
-- [ ] 1.6 Feed parsing (`poc/feeds.py`): RSS 2.0 and Atom, entity expansion disabled, size and
+      - *As built:* the command also passes `--safe-mode` and `--system-prompt`. A directory
+        under `var/` is inside the repository, so without `--safe-mode` the CLI discovers the
+        repository's `CLAUDE.md` (and the user's memory, hooks and plugins) and hands them to a
+        model meant to see only its prompt. The backend also scrubs `ANTHROPIC_*`/`CLAUDE*`
+        from the child's environment and stops at a usage ceiling (90% of any window).
+- [x] 1.6 Feed parsing (`poc/feeds.py`): RSS 2.0 and Atom, entity expansion disabled, size and
       item-count limits; tests including billion-laughs and external-entity inputs
-- [ ] 1.7 `graphs/feed-triage.json`, skeleton form: Tick → FetchFeeds → ParseFeeds → DropSeen →
+      - *As built:* a package, `poc/feeds/`, so that the hostile corpus of 6.1 can live at
+        `poc/feeds/corpus/` as that task names it.
+- [x] 1.7 `graphs/feed-triage.json`, skeleton form: Tick → FetchFeeds → ParseFeeds → DropSeen →
       a single-item summarise → PublishDigest → RecordSeen; validator accepts it; diagram and
       listing generate
-- [ ] 1.8 `poc/serve.py --once` / `--every`: lock file, run directory with trace, exit codes;
+      - *As built:* written once, in the full form of 3.5 (fan-in was built first). Eleven
+        nodes plus the three of `graphs/triage-item.json` — fourteen, under the proposal's
+        "roughly 15–20". `Clock` sits on a new entry node, `StartRun`, rather than on
+        `FetchFeeds`, so the run's date reaches `ComposeDigest` as data through the join;
+        `DropSeen` holds the seen-store *read-only* (the design sketch gave it read-write),
+        leaving `RecordSeen` the only writer.
+- [x] 1.8 `poc/serve.py --once` / `--every`: lock file, run directory with trace, exit codes;
       tests on the stub backend and the fixture server
-- [ ] 1.9 `docs/FEED-TRIAGE.md`: how to run it, the feed list and allowlist, the launchd example
+- [x] 1.9 `docs/FEED-TRIAGE.md`: how to run it, the feed list and allowlist, the launchd example
       (documented, not installed)
-- [ ] 1.10 Author checkpoint: the author names the feed list (design open question 1)
+- [x] 1.10 Author checkpoint: the author names the feed list (design open question 1)
+      - *As built:* the author declined to choose ("whichever ones you think would be useful").
+        The implementer chose five feeds on four hosts (`docs/FEED-TRIAGE.md`): two high-volume
+        arXiv listings where most items should be dropped, three low-volume blogs where most
+        should not. They are a default in `poc/serve.py`, seeded into `var/` and editable there.
 
 ## 2. Generation pilot on the six existing ported nodes (M3, first half)
 
@@ -65,10 +89,10 @@ toy is built around the answer.
 
 ## 3. Fan-in (M2)
 
-- [ ] 3.1 Per-item map: `"each": true` on a sub-graph node; validator checks element-wise
+- [x] 3.1 Per-item map: `"each": true` on a sub-graph node; validator checks element-wise
       (`List<T>` in, `List<U>` out against the child's boundary); runtime runs one isolated
       child per element in order; tests including an empty list and a failing element
-- [ ] 3.2 Positional join: `"to_input"` on edges; validator requires one edge per position and
+- [x] 3.2 Positional join: `"to_input"` on edges; validator requires one edge per position and
       rejects a join whose positions lie on exclusive branches; runtime runs it once all
       positions arrive and refuses a run ending with a join waiting; tests
 - [ ] 3.3 The trust meet, exercised: a join with one `Untrusted<_>` input among clean ones must
@@ -77,7 +101,7 @@ toy is built around the answer.
 - [ ] 3.4 Mutations for the new rules in `FEED_CORPUS` (unported join position, exclusive-branch
       join, map with a mismatched child boundary, map laundering trust past the child), each
       pinned to its reason class with isolation enforced
-- [ ] 3.5 `graphs/feed-triage.json` full form: `TriageEach` over `TriageItem`, `SelectItems`,
+- [x] 3.5 `graphs/feed-triage.json` full form: `TriageEach` over `TriageItem`, `SelectItems`,
       `ComposeDigest` joining selected items with the run's metadata; validator, diagrams
 
 ## 4. The confined tier for the toy

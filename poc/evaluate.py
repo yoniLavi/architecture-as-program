@@ -59,8 +59,6 @@ from .handles import (
 from .llm import LLMRequest, LLMResponse, StubLLM, ToolCall
 from .runtime import execute
 from .sandbox import (
-    CAPABILITY_INTERFACES,
-    CAPABILITY_KINDS,
     CLOCK,
     INFERENCE_LLM,
     TOOL_LLM,
@@ -77,6 +75,13 @@ from .sandbox.bench import (
 )
 from .sandbox.host import Sandbox, capability_imports, component_imports, ungranted_imports
 from .sandbox.host import record as _record
+
+# This harness is Paper 2's evidence, so it counts the vocabulary Paper 2 reports:
+# the seven kinds and eight interfaces that existed when it was written. Kinds
+# added for later artifacts (node-local state, for the feed-triage service) are
+# reported by `poc/evaluate_feed.py` and must not move a figure here.
+from .sandbox.interfaces import PAPER2_INTERFACES as CAPABILITY_INTERFACES
+from .sandbox.interfaces import PAPER2_KINDS as CAPABILITY_KINDS
 from .sandbox.interfaces import expected_imports, kinds_for_node
 from .sandbox.nodes import heartbeat_sandbox
 from .trace import GraphTrace, validate_document

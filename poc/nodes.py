@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .feed_nodes import FEED_REGISTRY
 from .generated.parse_message import parse_message
 from .handles import AppendDBHandle, InferenceLLM, ReadDBHandle, ResponseChannel, ToolLLM
 from .values import (
@@ -189,4 +190,6 @@ REGISTRY: dict[str, NodeImpl] = {
     # SupportPlatform's leaves (the service nodes are sub-graphs, not entries here).
     "RouteRequest": route_request,
     "RecordAudit": record_audit,
+    # The feed-triage graphs' leaves live in their own module.
+    **FEED_REGISTRY,
 }

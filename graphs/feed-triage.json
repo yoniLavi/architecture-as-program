@@ -1,0 +1,257 @@
+{
+  "name": "FeedTriage",
+  "parameters": [
+    "Tick",
+    "Clock",
+    "StateHandle<'subscriptions', read>",
+    "HTTPClient<['simonwillison.net', 'rss.arxiv.org', 'bytecodealliance.org', 'lobste.rs']>",
+    "StateHandle<'seen', read>",
+    "LLMClient<inference>",
+    "Notifier<'digest'>",
+    "StateHandle<'seen', read-write>"
+  ],
+  "capabilities": [
+    "Clock",
+    "StateHandle<'subscriptions', read>",
+    "HTTPClient<['simonwillison.net', 'rss.arxiv.org', 'bytecodealliance.org', 'lobste.rs']>",
+    "StateHandle<'seen', read>",
+    "LLMClient<inference>",
+    "Notifier<'digest'>",
+    "StateHandle<'seen', read-write>"
+  ],
+  "nodes": [
+    {
+      "name": "StartRun",
+      "inputs": [
+        "Tick",
+        "Clock"
+      ],
+      "output": "RunInfo",
+      "ensures": [
+        "len(date) == 10",
+        "started >= 0"
+      ]
+    },
+    {
+      "name": "LoadSubscriptions",
+      "inputs": [
+        "RunInfo",
+        "StateHandle<'subscriptions', read>"
+      ],
+      "output": "SubscriptionList",
+      "ensures": [
+        "present(urls)"
+      ]
+    },
+    {
+      "name": "FetchFeeds",
+      "inputs": [
+        "SubscriptionList",
+        "HTTPClient<['simonwillison.net', 'rss.arxiv.org', 'bytecodealliance.org', 'lobste.rs']>"
+      ],
+      "output": "Untrusted<FeedBatch>"
+    },
+    {
+      "name": "ParseFeeds",
+      "inputs": [
+        "Untrusted<FeedBatch>"
+      ],
+      "output": "List<Untrusted<FeedItem>>"
+    },
+    {
+      "name": "DropSeen",
+      "inputs": [
+        "List<Untrusted<FeedItem>>",
+        "StateHandle<'seen', read>"
+      ],
+      "output": "List<Untrusted<FeedItem>>"
+    },
+    {
+      "name": "LimitBatch",
+      "inputs": [
+        "List<Untrusted<FeedItem>>"
+      ],
+      "output": "List<Untrusted<FeedItem>>"
+    },
+    {
+      "name": "TriageItem",
+      "inputs": [
+        "List<Untrusted<FeedItem>>",
+        "LLMClient<inference>"
+      ],
+      "output": "List<ItemVerdict>",
+      "each": true,
+      "discharges_trust": true
+    },
+    {
+      "name": "SelectItems",
+      "inputs": [
+        "List<ItemVerdict>"
+      ],
+      "output": "Selection",
+      "ensures": [
+        "len(entries) <= 12"
+      ]
+    },
+    {
+      "name": "ComposeDigest",
+      "inputs": [
+        "Selection",
+        "RunInfo",
+        "LLMClient<inference>"
+      ],
+      "output": "Digest",
+      "requires": [
+        "len(in1.date) == 10"
+      ],
+      "ensures": [
+        "len(date) == 10",
+        "len(overview) <= 600"
+      ]
+    },
+    {
+      "name": "PublishDigest",
+      "inputs": [
+        "Digest",
+        "Notifier<'digest'>"
+      ],
+      "output": "PublishedDigest",
+      "ensures": [
+        "present(published)"
+      ]
+    },
+    {
+      "name": "RecordSeen",
+      "inputs": [
+        "PublishedDigest",
+        "StateHandle<'seen', read-write>"
+      ],
+      "output": "RunReport",
+      "ensures": [
+        "recorded >= 0"
+      ]
+    }
+  ],
+  "data_edges": [
+    {
+      "from": "StartRun",
+      "to": "LoadSubscriptions"
+    },
+    {
+      "from": "LoadSubscriptions",
+      "to": "FetchFeeds"
+    },
+    {
+      "from": "FetchFeeds",
+      "to": "ParseFeeds"
+    },
+    {
+      "from": "ParseFeeds",
+      "to": "DropSeen"
+    },
+    {
+      "from": "DropSeen",
+      "to": "LimitBatch"
+    },
+    {
+      "from": "LimitBatch",
+      "to": "TriageItem"
+    },
+    {
+      "from": "TriageItem",
+      "to": "SelectItems"
+    },
+    {
+      "from": "SelectItems",
+      "to": "ComposeDigest",
+      "to_input": 0
+    },
+    {
+      "from": "StartRun",
+      "to": "ComposeDigest",
+      "to_input": 1,
+      "label_side": "right"
+    },
+    {
+      "from": "ComposeDigest",
+      "to": "PublishDigest"
+    },
+    {
+      "from": "PublishDigest",
+      "to": "RecordSeen"
+    }
+  ],
+  "layout": {
+    "zones": {
+      "untrusted": {
+        "label": "UNTRUSTED",
+        "color": "#b33",
+        "background": "#fef0f0",
+        "nodes": [
+          "FetchFeeds",
+          "ParseFeeds",
+          "DropSeen",
+          "LimitBatch",
+          "TriageItem"
+        ]
+      },
+      "structured": {
+        "label": "STRUCTURED",
+        "color": "#272",
+        "background": "#f0f7f0",
+        "nodes": [
+          "ComposeDigest",
+          "PublishDigest",
+          "RecordSeen"
+        ]
+      }
+    },
+    "positions": {
+      "StartRun": [
+        0,
+        0
+      ],
+      "LoadSubscriptions": [
+        0,
+        1
+      ],
+      "FetchFeeds": [
+        0,
+        2.2
+      ],
+      "ParseFeeds": [
+        0,
+        3.2
+      ],
+      "DropSeen": [
+        0,
+        4.2
+      ],
+      "LimitBatch": [
+        0,
+        5.2
+      ],
+      "TriageItem": [
+        0,
+        6.2
+      ],
+      "SelectItems": [
+        0,
+        7.4
+      ],
+      "ComposeDigest": [
+        2.2,
+        7.4
+      ],
+      "PublishDigest": [
+        2.2,
+        8.4
+      ],
+      "RecordSeen": [
+        2.2,
+        9.4
+      ]
+    },
+    "untrusted_label_color": "#b33"
+  }
+}
