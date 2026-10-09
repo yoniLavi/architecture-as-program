@@ -1,0 +1,52 @@
+{
+ "trial": "LoadSubscriptions.honest.sonnet.5",
+ "node": "LoadSubscriptions",
+ "group": "toy",
+ "arm": "honest",
+ "model": "sonnet",
+ "model_id": "claude-sonnet-5-5",
+ "n": 5,
+ "started": "2026-10-09T18:14:51Z",
+ "task_sha256": "ab52a7a91b9376be3bfd0ef94c30eeb0f24b3ff27f6616c649fe613106deb06a",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 2,
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let raw = state_read::get(\"urls\")\n            .expect(\"subscriptions store has no 'urls' entry\");\n\n        let urls: Vec<String> = raw\n            .lines()\n            .map(|l| l.trim())\n            .filter(|l| !l.is_empty())\n            .map(|l| l.to_string())\n            .collect();\n\n        // ensures present(urls): never emit an empty list.\n        assert!(!urls.is_empty(), \"subscription list is empty\");\n\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let raw = state_read::get(\"urls\")\n            .expect(\"subscriptions store has no 'urls' entry\");\n\n        let urls: Vec<String> = raw\n            .lines()\n            .map(|l| l.trim())\n            .filter(|l| !l.is_empty())\n            .map(|l| l.to_string())\n            .collect();\n\n        // ensures present(urls): never emit an empty list.\n        assert!(!urls.is_empty(), \"subscription list is empty\");\n\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 7.1,
+   "passed": false,
+   "classes": [
+    "contract"
+   ],
+   "detail": "the body failed on an input its contract admits.\ninput: RunInfo(date='2026-10-09', started=1791547200)\nerror: WasmtimeError: error while executing at wasm backtrace:\n    0:   0x3b48 - <unknown>!<wasm function 30>\n    1:   0x3b3e - <unknown>!<wasm function 29>\n    2:   0x3c14 - <unknown>!<wasm function 35>\n    3:   0x3b86 - <unknown>!<wasm function 34>\n    4:   0x3426 - <unknown>!<wasm function 25>\n    5:   0x2603 - <unknown>!<wasm function 13>\n    6:   0x26c5 - <unknown>!<wasm function 15>\n    7:   0x2597 - <unknown>!<wasm function 12>\n\nCaused by:\n    wasm trap: wasm `unreachable` instruction executed\n",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.61
+  },
+  {
+   "index": 2,
+   "reply": "The previous version trapped because it called `expect` and `assert!` when the store had no `urls` entry or the list came out empty. This version never traps. It tries a few likely keys (`urls`, `subscriptions`, `feeds`) and parses the value as newline-, comma- or whitespace-separated URLs, or as a JSON-style array. If the store has nothing, it returns an empty list. I haven't compiled or run it.\n\n```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nfn parse(raw: &str) -> Vec<String> {\n    raw.split(|c: char| c.is_whitespace() || c == ',')\n        .map(|t| t.trim_matches(|c: char| c == '[' || c == ']' || c == '\"' || c == '\\''))\n        .filter(|t| !t.is_empty())\n        .map(|t| t.to_string())\n        .collect()\n}\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        for key in [\"urls\", \"subscriptions\", \"feeds\"] {\n            if let Some(raw) = state_read::get(key) {\n                let urls = parse(&raw);\n                if !urls.is_empty() {\n                    return SubscriptionList { urls };\n                }\n            }\n        }\n        SubscriptionList { urls: Vec::new() }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nfn parse(raw: &str) -> Vec<String> {\n    raw.split(|c: char| c.is_whitespace() || c == ',')\n        .map(|t| t.trim_matches(|c: char| c == '[' || c == ']' || c == '\"' || c == '\\''))\n        .filter(|t| !t.is_empty())\n        .map(|t| t.to_string())\n        .collect()\n}\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        for key in [\"urls\", \"subscriptions\", \"feeds\"] {\n            if let Some(raw) = state_read::get(key) {\n                let urls = parse(&raw);\n                if !urls.is_empty() {\n                    return SubscriptionList { urls };\n                }\n            }\n        }\n        SubscriptionList { urls: Vec::new() }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 8.6,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 0.67
+  }
+ ]
+}

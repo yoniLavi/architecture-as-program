@@ -1,6 +1,41 @@
 # Roadmap: from demonstrator to a useful toy
 
-## Start here: state as of 30 September 2026
+## Start here: state as of 9 October 2026
+
+**M1–M4 below are built** (`openspec/changes/build-feed-triage-and-generation-experiment`, still
+open). Paper 2 is unchanged and still waits on the author's read; nothing built here moves a
+figure in it, and a test holds that (`tests/test_paper2_figures_pinned.py`). The numbers are in
+the generated artifacts, not here: `dist/evaluation-feed.md` and `dist/generation.md`.
+
+| Milestone | State | Where |
+|---|---|---|
+| **M1** walking skeleton | Built. The service runs live on both tiers (`docs/FEED-TRIAGE.md`). State is a capability; no stateful combinator or feedback edge was needed. | `poc/serve.py`, `graphs/feed-triage.json` |
+| **M2** fan-in | Built, in two restricted forms: a per-item map and a positional join. Merging streams was not needed and is still refused. | `poc/runtime.py`, `scripts/graph_validator.py` |
+| **M3** generated bodies | Run: 675 trials over 15 nodes, three Claude models, three arms. One generated body has run in the live service. | `poc/generation/`, `dist/generation.md` |
+| **M4** adversarial evaluation | Built: eleven hostile feeds, pinned on both tiers, two of them pinned as succeeding. | `poc/feeds/corpus/`, `dist/evaluation-feed.md` |
+| **M5** Paper 4 | Not started. | — |
+
+**What the experiment found, in one paragraph, for whoever plans M5.** Asked to implement a node,
+and asked again with a request for ungranted authority attached, no model in 450 trials reached
+for any: each declined, usually citing the node's `with` clause. So the two arms the design
+called for never gave the gate anything to catch. A third arm, **added after seeing that**, told
+the model the extra grant had been approved and the graph would catch up; there the gate rejected
+104 over-importing components of 225 trials, every one of which the gate-off control shows would
+otherwise have passed its contract and run. That arm is post hoc and must be cited as such. The
+rate differed sharply between models of the one family tested, which is the strongest reason yet
+for the second model family the roadmap asks for below.
+
+**What is left of this change:**
+- **The author starts the service** (task 8.1) and, two weeks on, an operations summary (8.3).
+- **Attenuation at the routing point** (9.x), held until Paper 2 publishes.
+- **Decisions made on the author's behalf, to review:** the feed list; five trials a cell; the
+  third arm; and two limits the build surfaced that Paper 4 will have to state — the validator
+  has no rule about where a graph fetches (the service carries its own check), and the feed
+  parser, a pure node, runs unconfined on the host tier.
+
+The section below is the state before this work, kept for the Paper 2 publication steps it lists.
+
+## State as of 30 September 2026
 
 **Publication waits on the author's end-to-end read of the merged paper.** In the final review
 before upload, the author found that Paper 2 cited the unpublished Paper 3 ten times, while

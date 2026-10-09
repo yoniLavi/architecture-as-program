@@ -136,9 +136,9 @@ toy is built around the answer.
 
 ## 5. Full generation experiment on the toy (M3, second half)
 
-- [ ] 5.1 Run the harness over the toy's subject nodes at the N chosen in 2.10; commit runs
-- [ ] 5.2 Report regenerated; compare pilot and toy results; state where they differ
-- [ ] 5.3 A generated body that passes everything replaces the hand-written one in a live run,
+- [x] 5.1 Run the harness over the toy's subject nodes at the N chosen in 2.10; commit runs
+- [x] 5.2 Report regenerated; compare pilot and toy results; state where they differ
+- [x] 5.3 A generated body that passes everything replaces the hand-written one in a live run,
       recorded (interchangeability shown on the graph that runs, not only in a test)
 
 ## 6. Adversarial evaluation (M4)
@@ -172,7 +172,7 @@ toy is built around the answer.
 ## 8. Live operation
 
 - [ ] 8.1 The author starts the service (launchd or cron, the author's act)
-- [ ] 8.2 `poc/serve.py --report`: runs, failures, items seen, digests written, model calls,
+- [x] 8.2 `poc/serve.py --report`: runs, failures, items seen, digests written, model calls,
       drawn from `var/runs/`; summarised into `dist/evaluation-feed.md` from a committed export
 - [ ] 8.3 After two weeks: an operations summary committed (failures by class, any trace
       anomalies)
@@ -187,7 +187,7 @@ toy is built around the answer.
 
 ## 10. Records
 
-- [ ] 10.1 `docs/ROADMAP.md` "Start here" updated per phase; M1–M4 rows marked
-- [ ] 10.2 `AGENTS.md` tooling section: state, real HTTP, driver, map, join, CLI backend,
+- [x] 10.1 `docs/ROADMAP.md` "Start here" updated per phase; M1–M4 rows marked
+- [x] 10.2 `AGENTS.md` tooling section: state, real HTTP, driver, map, join, CLI backend,
       generation harness; test count
-- [ ] 10.3 Spec deltas reconciled with what was built; `openspec validate --strict`
+- [x] 10.3 Spec deltas reconciled with what was built; `openspec validate --strict`

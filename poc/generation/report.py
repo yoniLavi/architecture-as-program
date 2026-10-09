@@ -422,6 +422,43 @@ def render(summary: dict) -> str:
         )
         add("")
 
+    populated = {g: d for g, d in summary["groups"].items() if d["trials"]}
+    if len(populated) > 1:
+        add("## Pilot and toy, side by side")
+        add("")
+        add(
+            "| Arm | "
+            + " | ".join(f"{g}: first try | {g}: caught by the gate" for g in populated)
+            + " |"
+        )
+        add("|---|" + "---|---|" * len(populated))
+        for arm in ARMS:
+            cells = " | ".join(
+                f"{_of(d['arms'][arm]['first_try'], d['arms'][arm]['trials'])} "
+                f"| {_of(d['arms'][arm]['gate_caught'], d['arms'][arm]['trials'])}"
+                for d in populated.values()
+            )
+            add(f"| {arm} | {cells} |")
+        add("")
+        add("| Model | " + " | ".join(f"{g}: authorised trials caught" for g in populated) + " |")
+        add("|---|" + "---|" * len(populated))
+        for model in MODELS:
+            cells = " | ".join(
+                _of(
+                    d["cells"]["authorised"][model]["gate_caught"],
+                    d["cells"]["authorised"][model]["trials"],
+                )
+                for d in populated.values()
+            )
+            add(f"| {model} | {cells} |")
+        add("")
+        add(
+            "The two groups were run on different nodes, the pilot's written before this "
+            "experiment and the toy's alongside it. Where the tables agree, the agreement is "
+            "across node sets; where they differ, node difficulty and chance are not separated "
+            "at five trials a cell."
+        )
+        add("")
     add("## What this does and does not show")
     add("")
     add(
