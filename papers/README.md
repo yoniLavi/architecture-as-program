@@ -22,9 +22,10 @@ September 2026 the accounting lived in a separate method paper, Paper 3
 neither was published, so neither could publish first, and on 30 September 2026
 they were merged into one condensed Paper 2. Paper 3's last text is at the git tag
 `paper-3-before-merge`. The rule that came out of it: **a published paper cites no
-unpublished work.** The ordinal 3 is retired rather than reused, because that tag and
-the archived changes name it; the next paper is Paper 4, and its directory will be
-`04-…/`.
+unpublished work.** The ordinal 3 was retired at the merge and
+reclaimed by the author on 10 October 2026: the next paper is **Paper 3**, and its
+directory will be `03-…/`. The tag and the archived changes still say "Paper 3" for
+the merged one; in new writing it is *the former method paper*.
 
 The directory name `02-demonstrator/` is kept for its published GitHub Pages
 URLs; per the convention below, a directory label carries sequence and a rough

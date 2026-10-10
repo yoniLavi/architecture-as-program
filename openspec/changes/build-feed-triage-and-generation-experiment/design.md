@@ -28,7 +28,7 @@ sentence false in either direction, is out of bounds until that paper publishes.
 - Principal binding.
 - Multi-model-family results, since only Claude is available without paid API calls.
 - A user study.
-- Paper 4's text.
+- Paper 3's text.
 
 ## Decision 1: the graph
 
@@ -92,7 +92,7 @@ own position. Edges gain an optional `"to_input": <index>`.
 **Not decided:** merging a variable number of same-typed streams (a fold over arrivals). That
 is the case where order matters, and the survey's rule (commutative combinators need no
 journal; order-sensitive ones journal the realised choice) still needs a combinator language to
-apply to. It stays open, and Paper 4 says so.
+apply to. It stays open, and Paper 3 says so.
 
 **Alternatives rejected:**
 - A list-processing body in one node. That hides the per-item isolation that makes cross-item
@@ -250,7 +250,7 @@ publishes, together with the Paper 2 v1.1 prose change. Until then it stays unch
   service records failures as data.
 - **Scope.** The order of the phases puts the walking skeleton and the generation pilot first,
   so a stop at any phase boundary leaves something runnable and something measured.
-- **One family, one author, one service.** These are stated in the results, and Paper 4's
+- **One family, one author, one service.** These are stated in the results, and Paper 3's
   external-validity section will carry them.
 
 ## Open questions for the author

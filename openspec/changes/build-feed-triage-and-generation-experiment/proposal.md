@@ -15,7 +15,7 @@ still untested at any useful scale, and §5 of Paper 2 records both:
 `docs/ROADMAP.md` names the cheapest way to attack both together: a small service someone
 actually runs, with the generation experiment run on its nodes. This change builds that
 service and runs the experiment as far as one change can, so that there is a working
-artifact and measured numbers to show. It covers roadmap milestones M1–M4. M5, Paper 4 itself,
+artifact and measured numbers to show. It covers roadmap milestones M1–M4. M5, Paper 3 itself,
 stays out of scope.
 
 ## What Changes
@@ -76,9 +76,9 @@ This is **held until Paper 2 publishes**: it makes Paper 2's "checked, not enfor
 understatement, so it lands together with Paper 2 version 1.1.
 
 **A demo.** The inspector renders the feed-triage graph, the per-item map, and the join, and
-links each day's digest. It gets a mention in Paper 4, never a section.
+links each day's digest. It gets a mention in Paper 3, never a section.
 
-**Not in this change:** principal binding (a one-user service does not exercise it), Paper 4's
+**Not in this change:** principal binding (a one-user service does not exercise it), Paper 3's
 prose, general FRP combinators, stream merge, and any paid API call.
 
 ## Impact

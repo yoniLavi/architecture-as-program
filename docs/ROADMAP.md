@@ -2,6 +2,11 @@
 
 ## Start here: state as of 9 October 2026
 
+*On numbering: the paper this roadmap leads to is **Paper 3**. The author reclaimed the ordinal on
+10 October 2026. The one exception is the account of the merge in the 30 September section below
+("Paper 2 cited the unpublished Paper 3…", `papers/03-method/`), where "Paper 3" is the former
+method paper, since merged into Paper 2.*
+
 **M1–M4 below are built** (`openspec/changes/build-feed-triage-and-generation-experiment`, still
 open). Paper 2 is unchanged and still waits on the author's read; nothing built here moves a
 figure in it, and a test holds that (`tests/test_paper2_figures_pinned.py`). The numbers are in
@@ -13,7 +18,7 @@ the generated artifacts, not here: `dist/evaluation-feed.md` and `dist/generatio
 | **M2** fan-in | Built, in two restricted forms: a per-item map and a positional join. Merging streams was not needed and is still refused. | `poc/runtime.py`, `scripts/graph_validator.py` |
 | **M3** generated bodies | Run: 675 trials over 15 nodes, three Claude models, three arms. One generated body has run in the live service. | `poc/generation/`, `dist/generation.md` |
 | **M4** adversarial evaluation | Built: eleven hostile feeds, pinned on both tiers, two of them pinned as succeeding. | `poc/feeds/corpus/`, `dist/evaluation-feed.md` |
-| **M5** Paper 4 | Not started. | — |
+| **M5** Paper 3 | Not started. | — |
 
 **What the experiment found, in one paragraph, for whoever plans M5.** Asked to implement a node,
 and asked again with a request for ungranted authority attached, no model in 450 trials reached
@@ -29,7 +34,7 @@ for the second model family the roadmap asks for below.
 - **The author starts the service** (task 8.1) and, two weeks on, an operations summary (8.3).
 - **Attenuation at the routing point** (9.x), held until Paper 2 publishes.
 - **Decisions made on the author's behalf, to review:** the feed list; five trials a cell; the
-  third arm; and two limits the build surfaced that Paper 4 will have to state — the validator
+  third arm; and two limits the build surfaced that Paper 3 will have to state — the validator
   has no rule about where a graph fetches (the service carries its own check), and the feed
   parser, a pure node, runs unconfined on the host tier.
 
@@ -81,7 +86,7 @@ either way. It is the first change for version 1.1 of the living paper.
    roadmap's named risk early (whether the gate ever fires on generated code) before a 20-node
    service is built around the answer. It is also where this work differs most from CAmkES, which
    generates the authority-bearing artifact rather than checking one written elsewhere. The toy
-   stays Paper 4's vehicle either way.
+   stays Paper 3's vehicle either way.
 4. **M1 below** — the walking skeleton. Its first piece, `add-io-capability-kinds` (clock,
    allowlisted outbound HTTP, notification), is **implemented** (1 Aug 2026): the derivation now
    maps seven kinds / eight typed interfaces with no special case, six of them held against a
@@ -215,13 +220,13 @@ design questions are still open.
   three numbers. ~2 changes. *This is the paper.*
 - **M4 — Adversarial evaluation.** An injection corpus of hostile feed items, evaluated against the running
   service, positioned against AgentDojo's threat model and CaMeL's defence. ~1 change.
-- **M5 — Paper 4.**
+- **M5 — Paper 3.**
 
 M3's contract language and M2's fan-in are independent and can proceed in either order. Per standing
 practice, each milestone ships a visual demo alongside it — the demos earn the programme attention and cost
 little once the inspector's architecture exists — and each gets a mention in the paper, never a section.
 
-## What Paper 4 could then claim
+## What Paper 3 could then claim
 
 > A useful service, built end-to-end from a signal graph with agent-generated node bodies, in which the
 > architecture model mechanically bounds what the generated code can reach — and here is what that bound
