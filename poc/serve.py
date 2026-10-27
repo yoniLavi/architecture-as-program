@@ -187,10 +187,12 @@ class Lock:
     """An exclusive advisory lock on `var/serve.lock`, held for a driver's life.
 
     `flock`, not a pid file: the kernel releases it when the process dies, so a
-    crashed driver cannot leave the service locked out of itself."""
+    crashed driver cannot leave the service locked out of itself. The feed
+    recorder holds one of its own, by the same mechanism under another name, so
+    that a recorder and a driver do not exclude each other but two recorders do."""
 
-    def __init__(self, var_dir: Path):
-        self._path = var_dir / "serve.lock"
+    def __init__(self, var_dir: Path, name: str = "serve.lock"):
+        self._path = var_dir / name
         self._fd: int | None = None
 
     def __enter__(self) -> Lock:
