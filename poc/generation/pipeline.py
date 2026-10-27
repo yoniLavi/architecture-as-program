@@ -45,6 +45,8 @@ from . import task
 from .subjects import Subject, graph_for
 
 CARGO_TIMEOUT_S = 600
+# Bounded build parallelism: the machine is shared (design Decision 9).
+CARGO_JOBS = 2
 CHECK_TIMEOUT_S = 90
 TARGET = "wasm32-unknown-unknown"
 
@@ -140,6 +142,8 @@ def build(files: dict[str, str], crate: Path, target_dir: Path) -> tuple[Path | 
         "build",
         "--release",
         "--offline",
+        "-j",
+        str(CARGO_JOBS),
         "--color",
         "never",
         "--target",

@@ -42,7 +42,9 @@ from queue import Queue
 
 from ..graph import REPO_ROOT
 from ..llm import ClaudeCLIBackend, LLMRequest, ModelCallError, UsageLimitReached
-from . import pipeline, task
+from ..polite import lower_priority
+from . import pipeline, registration, task
+from .registration import RegistrationError
 from .subjects import BY_NODE, Subject, graph_for, subjects
 
 HERE = Path(__file__).resolve().parent
@@ -61,7 +63,11 @@ SYSTEM = (
 )
 
 EXIT_OK = 0
+EXIT_REFUSED = 2
 EXIT_USAGE_LIMIT = 4
+
+# Two trials at once, not three: the machine is shared (design Decision 9).
+DEFAULT_JOBS = 2
 
 
 def trial_id(node: str, arm: str, model: str, n: int) -> str:
@@ -90,9 +96,18 @@ def run_trial(
     backend: ClaudeCLIBackend,
     crate: Path,
     target_dir: Path,
+    *,
+    expected_model: str | None = None,
+    extra: dict | None = None,
 ) -> dict:
     """Run one trial to green or to `MAX_ITERATIONS`. Raises `UsageLimitReached`
-    if the backend stops; a trial is only ever recorded whole."""
+    if the backend stops; a trial is only ever recorded whole.
+
+    `expected_model`, for a registered run: the model ID the call must resolve to.
+    A call that resolves to any other raises `RegistrationError` and the trial is
+    not recorded — an alias that moved mid-run would otherwise split the run
+    silently. `extra` is merged into the record (the registration's commit, `HEAD`,
+    the priority the trial ran at)."""
     the_task = _task_for(subject, arm)
     prompt = the_task.text
     iterations: list[dict] = []
@@ -104,6 +119,10 @@ def run_trial(
         try:
             reply = backend.generate(LLMRequest(system=SYSTEM, prompt=prompt)).text
             model_id = backend.usage[-1]["model"] if backend.usage else model
+            if expected_model is not None and model_id != expected_model:
+                raise RegistrationError(
+                    f"the call resolved to {model_id!r}, not the registered {expected_model!r}"
+                )
         except UsageLimitReached:
             raise
         except ModelCallError as e:
@@ -141,6 +160,7 @@ def run_trial(
         "system": SYSTEM,
         "outcome": "green" if green else "failed",
         "iterations_to_green": len(iterations) if green else None,
+        **(extra or {}),
         "iterations": iterations,
     }
 
@@ -190,7 +210,16 @@ def run(
     *,
     jobs: int,
     ceiling: float,
+    model_ids: dict[str, str] | None = None,
+    guard=None,
+    annotate=None,
 ) -> int:
+    """Run (or resume) every planned trial not yet recorded.
+
+    For a registered run: `model_ids` maps each model alias to the full ID it is
+    called by and must resolve to; `guard()` runs before every trial and raises
+    `RegistrationError` to stop the run; `annotate()` returns what each record
+    carries besides its trial (the registration's commit, `HEAD`, the priority)."""
     run_dir = RUNS_DIR / run_id
     tasks_dir = run_dir / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
@@ -215,7 +244,11 @@ def run(
     windows: dict[str, float] = {}
     backends = {
         m: ClaudeCLIBackend(
-            model=m, workdir=WORK_DIR / "llm", timeout=900.0, ceiling=ceiling, windows=windows
+            model=(model_ids or {}).get(m, m),
+            workdir=WORK_DIR / "llm",
+            timeout=900.0,
+            ceiling=ceiling,
+            windows=windows,
         )
         for m in models
     }
@@ -233,6 +266,8 @@ def run(
             return
         slot = slots.get()
         try:
+            if guard is not None:
+                guard()
             name = trial_id(subject.node, arm, model, rep)
             record = run_trial(
                 subject,
@@ -242,6 +277,8 @@ def run(
                 backends[model],
                 WORK_DIR / "build" / f"slot-{slot}",
                 WORK_DIR / "target" / f"slot-{slot}",
+                expected_model=(model_ids or {}).get(model),
+                extra=annotate() if annotate is not None else None,
             )
             _write(run_dir / f"{name}.json", record)
             with lock:
@@ -252,9 +289,9 @@ def run(
             if not stop.is_set():
                 print(f"stopping: {e}", flush=True)
             stop.set()
-        except pipeline.HarnessFault:
-            # The instrument is wrong. Stop every worker; record nothing for this
-            # trial; let the error surface.
+        except (pipeline.HarnessFault, RegistrationError):
+            # The instrument is wrong, or the run is no longer the registered one.
+            # Stop every worker; record nothing for this trial; let the error surface.
             stop.set()
             raise
         finally:
@@ -288,6 +325,58 @@ def handwritten(chosen: tuple[Subject, ...]) -> int:
         )
         failed += not verdict["passed"]
     return 1 if failed else 0
+
+
+def preflight(chosen: tuple[Subject, ...]) -> None:
+    """The hand-written control, at this commit, before a registered run's first
+    trial. Evaluated and not written: writing would change the committed control
+    records, and the tree guard would then refuse every trial."""
+    failing = []
+    for subject in chosen:
+        record = run_handwritten(
+            subject, WORK_DIR / "build" / "preflight", WORK_DIR / "target" / "slot-0"
+        )
+        if not record["iterations"][0]["passed"]:
+            failing.append(f"{subject.node} ({','.join(record['iterations'][0]['classes'])})")
+    if failing:
+        raise RegistrationError(
+            "the hand-written control does not pass at this commit, so the instrument is "
+            "wrong: " + ", ".join(failing)
+        )
+
+
+def registered(*, jobs: int, ceiling: float, priority: dict, skip_preflight: bool = False) -> int:
+    """Run (or resume) the registered replication, exactly as registered."""
+    try:
+        commit = registration.check_ready()
+        design = registration.load()
+        chosen = tuple(BY_NODE[n] for n in design["nodes"])
+        if not skip_preflight:
+            print("preflight: the hand-written control at this commit…", flush=True)
+            preflight(chosen)
+    except RegistrationError as e:
+        print(f"refused: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+    def annotate() -> dict:
+        return {"registration": commit, "head": registration.head(), "priority": priority}
+
+    try:
+        return run(
+            design["run_id"],
+            chosen,
+            list(design["conditions"]),
+            list(design["models"]),
+            design["n"],
+            jobs=jobs,
+            ceiling=ceiling,
+            model_ids=design["models"],
+            guard=registration.check_tree,
+            annotate=annotate,
+        )
+    except RegistrationError as e:
+        print(f"stopped: {e}", file=sys.stderr)
+        return EXIT_REFUSED
 
 
 # ── results.json: derived from the runs ──────────────────────────────
@@ -384,12 +473,26 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--arms", nargs="+", default=list(task.ARMS), choices=task.ARMS)
     p_run.add_argument("--models", nargs="+", default=list(MODELS))
     p_run.add_argument("-n", type=int, default=5, help="trials per (node, arm, model)")
-    p_run.add_argument("--jobs", type=int, default=3)
-    p_run.add_argument(
-        "--ceiling",
-        type=float,
-        default=0.6,
-        help="stop when any usage window of the subscription reaches this fraction",
+
+    def running(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--jobs", type=int, default=DEFAULT_JOBS)
+        p.add_argument(
+            "--ceiling",
+            type=float,
+            default=0.6,
+            help="stop when any usage window of the subscription reaches this fraction",
+        )
+        p.add_argument(
+            "--no-nice",
+            action="store_true",
+            help="do not lower priority (for an idle machine); the default runs at the lowest",
+        )
+
+    running(p_run)
+    running(
+        commands.add_parser(
+            "registered", help="run (or resume) the registered replication, as registered"
+        )
     )
 
     scope(commands.add_parser("handwritten", help="the control: hand-written bodies"))
@@ -402,10 +505,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "results":
         return write_results()
+    # Everything below builds crates or calls models: lowered here, once, so every
+    # child process inherits it (poc/polite.py).
+    priority = lower_priority(not getattr(args, "no_nice", False))
     if args.command == "rebuild":
         return rebuild(args.run_id, args.trial, args.out)
     if args.command == "handwritten":
         return handwritten(_chosen(args))
+    if args.command == "registered":
+        return registered(jobs=args.jobs, ceiling=args.ceiling, priority=priority)
     return run(
         args.run_id,
         _chosen(args),
