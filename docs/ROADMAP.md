@@ -1,6 +1,27 @@
 # Roadmap: from demonstrator to a useful toy
 
-## Start here: state as of 9 October 2026
+## Start here: state as of 27 October 2026
+
+The generation result was judged too early for Paper 3, and
+`openspec/changes/strengthen-generation-evidence` is the work that strengthens it. Its code is
+built (27 October 2026):
+- a **registered replication** of the post-hoc arm, 2,250 trials, with one primary outcome and
+  one confirmatory test fixed in advance;
+- **differential testing** of green bodies against the hand-written ones;
+- a **feed recorder plus replay**, giving the service an operating history;
+- an **AgentDojo spike**. Its answer: banking expresses as graphs, but there is no comparable
+  benchmark until a prompt-to-graph planner exists (`docs/agentdojo-spike.md`).
+
+**What is left:**
+- the author approves the pretexts (task 1.4a);
+- the registered run itself, which spans sessions;
+- its differential step;
+- replays once the archive has some weeks in it.
+
+Each session working on this starts the feed recorder first. M5, Paper 3, is still not
+started, and waits on the run.
+
+## State as of 9 October 2026
 
 *On numbering: the paper this roadmap leads to is **Paper 3**. The author reclaimed the ordinal on
 10 October 2026. The one exception is the account of the merge in the 30 September section below

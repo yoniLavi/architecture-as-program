@@ -108,7 +108,34 @@ def _body(transform, *, notify=True):
 
 def test_equal_bodies_are_equal_on_every_input():
     c = differential.compare(_Subject(), _body(lambda v: v * 2), _body(lambda v: v + v))
-    assert c.to_dict() == {"inputs": 3, "equal_on": 3, "equal": True, "first_difference": None}
+    assert c.to_dict() == {
+        "inputs": 3,
+        "equal_on": 3,
+        "equal": True,
+        "labels_differ": False,
+        "first_difference": None,
+    }
+
+
+def test_a_different_task_label_is_flagged_apart():
+    """Two bodies asking the model under different labels: the task never says
+    which label to use, so the report counts this kind of difference apart."""
+
+    @dataclass
+    class _ModelSubject(_Subject):
+        def handles(self):
+            return (InferenceLLM(object()),)  # type: ignore[arg-type]
+
+    def asks(label):
+        def call(value, llm):
+            return llm.infer(system="s", prompt=str(value), task=label)
+
+        return call
+
+    same = differential.compare(_ModelSubject(), asks("triage"), asks("triage"))
+    other = differential.compare(_ModelSubject(), asks("triage"), asks("classify"))
+    assert same.equal and not same.labels_differ
+    assert not other.equal and other.labels_differ
 
 
 def test_a_different_output_is_found_and_the_first_kept():
@@ -181,9 +208,15 @@ def test_results_carry_the_differential_without_its_detail(tmp_path):
         }
     ]
     summary = report.summarise_differential(derived["differential"])
-    assert summary["total"] == {"compared": 1, "equal": 0, "differs": 1, "error": 0}
+    assert summary["total"] == {
+        "compared": 1,
+        "equal": 0,
+        "differs": 1,
+        "differs_labels": 0,
+        "error": 0,
+    }
     text = "\n".join(report.render_differential(summary))
-    assert "| toy/honest | 1 | 0 | 1 | 0 |" in text and "not a gate" in text
+    assert "| toy/honest | 1 | 0 | 1 | 0 | 0 |" in text and "not a gate" in text
 
 
 def test_nothing_compared_is_said_plainly():

@@ -288,10 +288,12 @@ def summarise_differential(compared: list[dict]) -> dict:
     did not terminate), with the number of inputs each node was compared on."""
 
     def tally(items: list[dict]) -> dict:
+        differs = [c for c in items if c.get("equal") is False]
         return {
             "compared": len(items),
             "equal": sum(1 for c in items if c.get("equal") is True),
-            "differs": sum(1 for c in items if c.get("equal") is False),
+            "differs": len(differs),
+            "differs_labels": sum(1 for c in differs if c.get("labels_differ")),
             "error": sum(1 for c in items if "error" in c),
         }
 
@@ -580,21 +582,27 @@ def render_differential(d: dict) -> list[str]:
     t = d["total"]
     add(
         f"{t['compared']} green bodies compared: {t['equal']} equal on every input, "
-        f"{t['differs']} differ on at least one, {t['error']} could not be compared."
+        f"{t['differs']} differ on at least one, {t['error']} could not be compared. Of those "
+        f"that differ, {t['differs_labels']} asked the model under a different task label than "
+        f"the hand-written body on some input. The task does not tell a model which label to "
+        f"pass, so those differences are partly the task's, not only the body's."
     )
     add("")
-    add("| Run / arm | Compared | Equal | Differs | Not compared |")
-    add("|---|---|---|---|---|")
-    for key, c in d["by_arm"].items():
-        add(f"| {key} | {c['compared']} | {c['equal']} | {c['differs']} | {c['error']} |")
-    add("")
-    add("| Node | Inputs | Compared | Equal | Differs | Not compared |")
+    add("| Run / arm | Compared | Equal | Differs | of which, labels differ | Not compared |")
     add("|---|---|---|---|---|---|")
+    for key, c in d["by_arm"].items():
+        add(
+            f"| {key} | {c['compared']} | {c['equal']} | {c['differs']} "
+            f"| {c['differs_labels']} | {c['error']} |"
+        )
+    add("")
+    add("| Node | Inputs | Compared | Equal | Differs | of which, labels differ | Not compared |")
+    add("|---|---|---|---|---|---|---|")
     for node, c in d["by_node"].items():
         inputs = ", ".join(str(i) for i in c["inputs"]) or "—"
         add(
             f"| `{node}` | {inputs} | {c['compared']} | {c['equal']} | {c['differs']} "
-            f"| {c['error']} |"
+            f"| {c['differs_labels']} | {c['error']} |"
         )
     add("")
     add(

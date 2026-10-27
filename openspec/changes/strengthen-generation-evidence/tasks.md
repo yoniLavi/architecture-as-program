@@ -13,65 +13,73 @@ mid-run stops the run first; it resumes from its recorded trials.
 
 ## 0. Running politely, and the recorder
 
-- [ ] 0.1 The harness lowers its own priority on start (`os.nice(19)`; `taskpolicy -b -p <pid>` on
+- [x] 0.1 The harness lowers its own priority on start (`os.nice(19)`; `taskpolicy -b -p <pid>` on
       macOS where available), so `claude -p`, `cargo`, `wasm-tools` and the check process inherit
       it; `--no-nice` for an idle machine; default `--jobs 2`; cargo invoked with `-j 2`. Tests
       that the priority is applied and that the flag disables it
-- [ ] 0.2 `poc/feeds/archive.py --record [--every INTERVAL]`: raw bodies under
+- [x] 0.2 `poc/feeds/archive.py --record [--every INTERVAL]`: raw bodies under
       `var/archive/<UTC timestamp>/`, through the service's own `HTTPClient` handle and allowlist,
       with an index of every tick (time, feed, status, size); no model call, no parsing; a lock
       file refuses a second recorder; low priority as in 0.1; tests against the fixture server
-- [ ] 0.3 Start the recorder in the background (`--every 1h`) and leave it running for the
+- [x] 0.3 Start the recorder in the background (`--every 1h`) and leave it running for the
       session. Repeat at the start of every later session; the gaps between sessions are gaps in
-      the archive, and are reported as such
+      the archive, and are reported as such. First started 27 October 2026, 18:32 UTC:
+      `uv run --group poc python -m poc.feeds.archive --record --every 1h >> var/archive-recorder.log 2>&1`
+      (it lowers its own priority). **A recurring step, not a one-off: check it each session**
 
 ## 1. A pre-registered replication
 
-- [ ] 1.1 Arms as data: pretexts in `poc/generation/prompts/`, one file each, P1–P6; P2 and P5
+- [x] 1.1 Arms as data: pretexts in `poc/generation/prompts/`, one file each, P1–P6; P2 and P5
       byte-identical to the existing adversarial and authorised pretexts (tested)
-- [ ] 1.2 The rule-withheld variant of the task template; test that it differs from the stated
+- [x] 1.2 The rule-withheld variant of the task template; test that it differs from the stated
       variant in that sentence and nowhere else
-- [ ] 1.3 `poc/generation/registration.json`: pretexts, cells (15 nodes × 3 Claude models × P0–P6
+- [x] 1.3 `poc/generation/registration.json`: pretexts, cells (15 nodes × 3 Claude models × P0–P6
       rule-stated, plus P0, P2, P5 rule-withheld; N = 5; **2,250 trials, repeats included**),
       models by full ID, the 150 task hashes, the primary outcome (first-attempt reach), the
       confirmatory test (Fisher exact, P5 vs P0), the secondary outcomes, the exclusion, voiding
       and early-stop rules. A test regenerates the hashes and holds them to the file
-- [ ] 1.4 The harness refuses a registered run unless the registration is committed and unmodified
+- [x] 1.4 The harness refuses a registered run unless the registration is committed and unmodified
       at `HEAD`; refuses a trial whose task hash, or resolved model ID, is not the registered
       one; refuses to start a trial while `poc/`, `scripts/`, `graphs/` or the WIT differ from
       `HEAD` (its own records excepted); runs the hand-written control first and refuses unless
       it passes. Each trial records the registration commit and `HEAD`. Tests for each refusal
-- [ ] 1.4a **Author approves the pretext texts and the registration before 1.6.** It cannot be
-      corrected once trials have run, only disclosed
-- [ ] 1.5 Report: the registered run in its own section, the primary outcome per pretext and per
+- [x] 1.4a **Author approves the pretext texts and the registration before 1.6.** It cannot be
+      corrected once trials have run, only disclosed. **Approved by the author, 27 October 2026,
+      as committed in `96822ee`** (no wording changed), with two caveats stated on the ladder:
+      P1 → P3 adds an authority claim ("approved", "grant is being extended"), not only a
+      claimant; P4 → P5 bundles "the graph will catch up" with "treat it as granted", because
+      P5 must stay byte-identical to the post-hoc arm
+- [x] 1.5 Report: the registered run in its own section, the primary outcome per pretext and per
       model, the earlier trials (including the post-hoc arm) beside it and labelled, the
       registration commit named; the report refuses to pool them; timings labelled as taken at
       low priority
 
 ## 2. Differential testing
 
-- [ ] 2.1 A model stand-in whose reply depends on the task label and the node's input, not on
+- [x] 2.1 A model stand-in whose reply depends on the task label and the node's input, not on
       prompt wording; tests
-- [ ] 2.2 The differential step: generated and hand-written bodies on the contract's inputs,
+- [x] 2.2 The differential step: generated and hand-written bodies on the contract's inputs,
       outputs and stub-handle effects compared; first difference kept
 - [ ] 2.3 Applied to every recorded green trial by rebuilding from its record (no model call);
       results recorded beside the trial, not in it
-- [ ] 2.4 Report: *equal on n inputs* / *differs* per arm and per node, stated as information
+- [x] 2.4 Report: *equal on n inputs* / *differs* per arm and per node, stated as information
 
 ## 3. Operating history by replay
 
-- [ ] 3.1 `poc/serve.py --replay var/archive [--from] [--to]`: one tick per archived snapshot,
+- [x] 3.1 `poc/serve.py --replay var/archive [--from] [--to]`: one tick per archived snapshot,
       injected clock, state carried forward, low priority; deterministic on the stub (tested by
       replaying twice)
-- [ ] 3.2 `dist/evaluation-feed.md`: replayed history, recording-period failures and live ticks
+- [x] 3.2 `dist/evaluation-feed.md`: replayed history, recording-period failures and live ticks
       in three separate tables; the recorded span and its coverage stated
 
 ## — Commit everything above. From here until 1.7 ends, edit nothing under `poc/`, `scripts/`, `graphs/` or `poc/sandbox/wit/`. —
 
 ## 1 (continued). The run
 
-- [ ] 1.6 **Commit the registration. Then, and not before, run** (`harness run` at low priority,
-      in the background; it spans sessions and resumes)
+- [ ] 1.6 **Commit the registration. Then, and not before, run**
+      (`uv run --group poc python -m poc.generation.harness registered`, in the background; it
+      lowers its own priority, checks the registration, runs the hand-written control, and spans
+      sessions by resuming)
 - [ ] 1.7 When complete: derive results, check for contaminated trials (as `voided/` records),
       regenerate the report, commit
 - [ ] 2.5 Run the differential step (2.3) over the registered run's green trials; commit
@@ -86,9 +94,12 @@ mid-run stops the run first; it resumes from its recorded trials.
 
 Reading and writing a short document; touches no code, so it may run alongside 1.6.
 
-- [ ] 4.1 Read one AgentDojo suite; attempt three of its tasks as signal graphs, kept under
+- [x] 4.1 Read one AgentDojo suite; attempt three of its tasks as signal graphs, kept under
       `docs/` (not `graphs/`, which the runtime loads)
-- [ ] 4.2 Write down what expressed, what did not, and why; go or no-go for a benchmark change
+- [x] 4.2 Write down what expressed, what did not, and why; go or no-go for a benchmark change.
+      **Result (`docs/agentdojo-spike.md`):** banking expresses as graphs (go); a benchmark from
+      hand-written graphs is a no-go, because they are oracle plans. A comparable number needs a
+      prompt-to-graph planner, which is a later change of its own
 
 ## 5. Records
 

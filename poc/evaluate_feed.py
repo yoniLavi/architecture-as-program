@@ -97,6 +97,13 @@ DATA_PATH = REPO_ROOT / "dist" / "evaluation-feed.json"
 # corpus against a real model, and an export of the live service's run log.
 LIVE_CORPUS_PATH = REPO_ROOT / "poc" / "feeds" / "corpus" / "live-run.json"
 OPERATIONS_PATH = REPO_ROOT / "poc" / "feeds" / "operations.json"
+# Operating history, kept in three places because it comes from three sources and
+# supports three different kinds of claim: the live run log (above) for the
+# scheduler, the lock and real ticks; the recording period for what the feeds did;
+# and replays of the recording for what the service does with a history.
+HISTORY_DIR = REPO_ROOT / "poc" / "feeds" / "history"
+RECORDING_PATH = HISTORY_DIR / "recording.json"
+REPLAYS_DIR = HISTORY_DIR / "replays"
 
 PARENT_STEM, CHILD_STEM = "feed-triage", "triage-item"
 FIXED = WallTime(seconds=1791547200, nanoseconds=0)  # 2026-10-09T12:00:00Z
@@ -771,6 +778,8 @@ def serialise(ev: FeedEvaluation) -> dict:
         },
         "live_corpus": _committed(LIVE_CORPUS_PATH),
         "operations": _committed(OPERATIONS_PATH),
+        "recording": _committed(RECORDING_PATH),
+        "replays": [json.loads(p.read_text()) for p in sorted(REPLAYS_DIR.glob("*.json"))],
     }
 
 
@@ -1075,7 +1084,90 @@ def render(data: dict) -> str:
     else:
         add("No export of the live service's run log is committed yet.")
     add("")
+    add(
+        "Only this section speaks for the scheduler, the lock, a tick overrunning its interval "
+        "or the usage ceiling: the two below are not operation."
+    )
+    add("")
+    lines.extend(_render_recording(data.get("recording")))
+    lines.extend(_render_replays(data.get("replays") or []))
     return "\n".join(lines)
+
+
+def _render_recording(rec: dict | None) -> list[str]:
+    lines: list[str] = []
+    add = lines.append
+    add("## The recording period")
+    add("")
+    if not rec or not rec.get("ticks"):
+        add("No recording of the feeds is committed yet.")
+        add("")
+        return lines
+    add(
+        "From `poc/feeds/history/recording.json`, an export of the feed recorder's index "
+        "(`python -m poc.feeds.archive --coverage --export …`). The recorder fetches each feed "
+        "through the graph's own allowlisted `HTTPClient` and archives the raw body; it calls no "
+        "model. It is run by working sessions, not installed, so it records only while one runs."
+    )
+    add("")
+    add(
+        f"{rec['ticks']} recording ticks from {rec['first']} to {rec['last']}, nominally every "
+        f"{rec['interval_hours']} h: a span of {rec['span_hours']} h, of which "
+        f"**{round(100 * rec['covered_fraction'])}% is covered**. Nothing is claimed about the "
+        f"rest."
+    )
+    add("")
+    if rec["gaps"]:
+        add("| Gap from | to | Hours |")
+        add("|---|---|---|")
+        for g in rec["gaps"]:
+            add(f"| {g['from']} | {g['to']} | {g['hours']} |")
+        add("")
+    add("| Feed | Failed fetches, by reason |")
+    add("|---|---|")
+    if rec["failures"]:
+        for url, reasons in rec["failures"].items():
+            add(f"| {url} | " + "; ".join(f"{r} ({n})" for r, n in reasons.items()) + " |")
+    else:
+        add("| (every feed) | none recorded |")
+    add("")
+    return lines
+
+
+def _render_replays(replays: list[dict]) -> list[str]:
+    lines: list[str] = []
+    add = lines.append
+    add("## Replayed history")
+    add("")
+    if not replays:
+        add("No replay of the recording is committed yet.")
+        add("")
+        return lines
+    add(
+        "The service run once per recorded snapshot, in order, with that snapshot's bodies as its "
+        "fetches and its time as its clock, state carried from tick to tick "
+        "(`python -m poc.serve --replay …`). **A replay is not operation:** it shows what the "
+        "service does with a history, under the backend and tier named in each row, and nothing "
+        "about scheduling, locking or real network failure. On the stub it is deterministic."
+    )
+    add("")
+    add(
+        "| Backend | Model | Tier | Snapshots | Ticks ok | Items new | Triaged | Kept "
+        "| Model calls | Digests |"
+    )
+    add("|---|---|---|---|---|---|---|---|---|---|")
+    for r in replays:
+        meta = r.get("replay") or {}
+        totals = r["totals"]
+        add(
+            f"| {meta.get('backend', '?')} | {meta.get('model') or '—'} | {meta.get('tier', '?')} "
+            f"| {meta.get('archive_ticks', r['runs'])} | {r['outcomes'].get('ok', 0)} "
+            f"| {totals.get('items_new', 0)} | {totals.get('items_triaged', 0)} "
+            f"| {totals.get('items_kept', 0)} | {totals.get('model_calls', 0)} "
+            f"| {len(r['digests'])} |"
+        )
+    add("")
+    return lines
 
 
 # ── A live run of the corpus (not a build step) ──────────────────────

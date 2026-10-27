@@ -266,12 +266,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--var", type=Path, default=VAR_DIR)
     parser.add_argument("--no-nice", action="store_true", help="do not lower priority")
+    parser.add_argument("--export", type=Path, help="with --coverage: also write it here")
     args = parser.parse_args(argv)
 
     if args.coverage:
         ticks = read_index(args.var)
-        summary = {**coverage(ticks, args.every), "failures": failures(ticks)}
-        print(json.dumps(summary, indent=2))
+        summary = {
+            **coverage(ticks, args.every),
+            "interval_hours": round(args.every / 3600, 3),
+            "failures": failures(ticks),
+        }
+        text = json.dumps(summary, indent=2) + "\n"
+        if args.export:
+            args.export.parent.mkdir(parents=True, exist_ok=True)
+            args.export.write_text(text)
+        print(text, end="")
         return EXIT_OK
 
     lower_priority(not args.no_nice)

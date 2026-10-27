@@ -37,7 +37,7 @@ import time
 import traceback
 from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -474,6 +474,87 @@ def run_every(config: Config, interval: float, *, limit: int | None = None) -> i
         return EXIT_OK
 
 
+# ── Replay ─────────────────────────────────────────────────────────
+
+
+def replay(
+    config: Config,
+    archive_var: Path,
+    *,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    label: dict | None = None,
+) -> int:
+    """Run the service once per archived snapshot (`poc/feeds/archive.py`), in
+    order, each with that snapshot's bodies as its fetches and its time as its
+    clock. State carries from tick to tick under `config.var_dir`, exactly as it
+    would live; a feed that failed when it was recorded is absent from that
+    tick's bodies, and fails again.
+
+    A replay is not operation. It shows what the service *does* with a history —
+    items seen, triaged, kept, de-duplicated across ticks — and, given a stub
+    backend, it is deterministic, so the same history can be run under another
+    model, tier or body. It cannot show the scheduler, the lock, a tick overrunning
+    its interval, or a real network failing: those come from the recording period
+    and the live service, and the evaluation keeps the three apart.
+
+    `config.var_dir` must not be the live service's: a replay writes its own
+    state, digests and run records. `label` (backend, tier, model) is written to
+    `replay.json` there, so an export says what it was replayed on."""
+    from .feeds import archive
+
+    if config.var_dir.resolve() == VAR_DIR.resolve():
+        print("error: a replay must not write into the live service's var/", file=sys.stderr)
+        return EXIT_CONFIG
+    ticks = [
+        t
+        for t in archive.read_index(archive_var)
+        if (start is None or t["seconds"] >= start.timestamp())
+        and (end is None or t["seconds"] < end.timestamp())
+    ]
+    root = archive.archive_dir(archive_var)
+    try:
+        with Lock(config.var_dir):
+            for entry in ticks:
+                web = {
+                    f["url"]: (root / entry["tick"] / f["file"]).read_text()
+                    for f in entry["feeds"]
+                    if f["ok"]
+                }
+                moment = WallTime(entry["seconds"], entry["nanoseconds"])
+                record = tick(
+                    replace(
+                        config,
+                        web=web,
+                        live_http=False,
+                        clock=lambda moment=moment: moment,
+                        subscriptions=tuple(f["url"] for f in entry["feeds"]),
+                    )
+                )
+                print(describe(record), flush=True)
+                if record.outcome == "usage-limit":
+                    return EXIT_USAGE_LIMIT
+            (config.var_dir / "replay.json").write_text(
+                json.dumps(
+                    {
+                        **(label or {}),
+                        "archive_ticks": len(ticks),
+                        "first": ticks[0]["tick"] if ticks else None,
+                        "last": ticks[-1]["tick"] if ticks else None,
+                    },
+                    indent=1,
+                )
+                + "\n"
+            )
+    except LockHeld as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_LOCKED
+    except (ConfigError, AssemblyError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_CONFIG
+    return EXIT_OK
+
+
 def describe(record: RunRecord) -> str:
     c = record.counts
     if record.outcome != "ok":
@@ -522,6 +603,9 @@ def report(var_dir: Path = VAR_DIR) -> dict:
         "digests": digests,
         "backends": sorted({r["backend"] for r in records}),
         "tiers": sorted({r["tier"] for r in records}),
+        # Present only for a replay's directory: what it was replayed on, and from
+        # which recorded span. Its absence is what marks a live run log.
+        "replay": _committed_json(var_dir / "replay.json"),
     }
 
 
@@ -536,12 +620,32 @@ def _interval(text: str) -> float:
         raise argparse.ArgumentTypeError(f"not an interval like 30m or 1h: {text!r}") from e
 
 
+def _committed_json(path: Path) -> dict | None:
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def _moment(text: str) -> datetime:
+    """An ISO date or date-time, taken as UTC if it names no zone."""
+    moment = datetime.fromisoformat(text)
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="poc.serve", description=__doc__.split("\n\n")[0])
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--once", action="store_true", help="run one tick and exit")
     mode.add_argument("--every", type=_interval, metavar="INTERVAL", help="tick every 30m, 1h, …")
     mode.add_argument("--report", action="store_true", help="summarise the recorded runs")
+    mode.add_argument(
+        "--replay",
+        type=Path,
+        metavar="VAR",
+        help="run once per snapshot archived under VAR/archive (poc/feeds/archive.py); writes "
+        "to var/replays/<backend>-<tier>[-<model>] unless --var names another directory",
+    )
+    parser.add_argument("--from", dest="start", type=_moment, help="with --replay: first tick")
+    parser.add_argument("--to", dest="end", type=_moment, help="with --replay: before this")
+    parser.add_argument("--no-nice", action="store_true", help="with --replay: full priority")
     parser.add_argument(
         "--backend",
         choices=("claude", "stub"),
@@ -567,6 +671,13 @@ def main(argv: list[str] | None = None) -> int:
         "repeatable). The component is held to the node's `with` clause first.",
     )
     args = parser.parse_args(argv)
+    label = {
+        "backend": args.backend,
+        "tier": args.tier,
+        "model": args.model if args.backend == "claude" else None,
+    }
+    if args.replay is not None and args.var == VAR_DIR:
+        args.var = VAR_DIR / "replays" / "-".join(v for v in label.values() if v)
 
     if args.report:
         summary = report(args.var)
@@ -593,6 +704,11 @@ def main(argv: list[str] | None = None) -> int:
         confined=args.tier == "confined",
         substitute=substitute,
     )
+    if args.replay is not None:
+        from .polite import lower_priority
+
+        lower_priority(not args.no_nice)
+        return replay(config, args.replay, start=args.start, end=args.end, label=label)
     if args.once:
         return run_once(config)
     return run_every(config, args.every)

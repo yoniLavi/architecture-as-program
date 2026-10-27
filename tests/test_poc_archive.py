@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 
 import pytest
 
@@ -17,6 +18,7 @@ from poc import serve
 from poc.feeds import archive
 from poc.graph import load_graph_dict
 from poc.handles import WallTime
+from poc.llm import StubLLM
 from poc.polite import LOWEST_NICE, lower_priority
 from tests.feed_fixtures import ATOM, RSS, ok, redirect, serving
 
@@ -122,6 +124,147 @@ def test_an_unreadable_index_line_names_no_tick(tmp_path):
     index = tmp_path / "var" / "archive" / archive.INDEX_NAME
     index.write_text(index.read_text() + '{"tick": "half-writ')
     assert archive.read_index(tmp_path / "var") == [entry]
+
+
+# ── Replay ────────────────────────────────────────────────────────────
+
+
+def _archive(tmp_path, hours=(0, 1, 2), *, atom_from=1):
+    """Record ticks an hour apart: RSS in each, ATOM from tick `atom_from` on (so
+    the first tick records ATOM as a failure). RSS repeats its items every tick."""
+    routes = {"/rss": ok(RSS)}
+    with serving(routes) as server:
+        feeds = (server.url("/rss"), server.url("/atom"))
+        for i, h in enumerate(hours):
+            if i == atom_from:
+                routes["/atom"] = ok(ATOM)
+            _recorder(tmp_path, server, at=T0 + h * 3600, feeds=feeds).tick()
+    return tmp_path / "var"
+
+
+def _replay_config(out):
+    return serve.Config(
+        var_dir=out,
+        backend=StubLLM(),
+        graph=serve.retarget(PARENT, ["127.0.0.1"]),
+    )
+
+
+def _records(out):
+    runs = sorted((out / "runs").glob("*/run.json"))
+    return [{k: v for k, v in json.loads(p.read_text()).items() if k != "seconds"} for p in runs]
+
+
+def _digests(out):
+    return {p.name: p.read_text() for p in sorted((out / "digests").glob("*.md"))}
+
+
+def test_a_replay_is_deterministic_on_the_stub(tmp_path):
+    archived = _archive(tmp_path)
+    one, two = tmp_path / "replay-1", tmp_path / "replay-2"
+    assert serve.replay(_replay_config(one), archived) == serve.EXIT_OK
+    assert serve.replay(_replay_config(two), archived) == serve.EXIT_OK
+    assert _records(one) == _records(two) and len(_records(one)) == 3
+    assert _digests(one) == _digests(two) and _digests(one)
+
+
+def test_an_item_in_consecutive_snapshots_is_triaged_once(tmp_path):
+    archived = _archive(tmp_path, atom_from=99)  # RSS only, the same items every tick
+    out = tmp_path / "replay"
+    serve.replay(_replay_config(out), archived)
+    triaged = [r["counts"]["items_triaged"] for r in _records(out)]
+    assert triaged[0] > 0 and triaged[1:] == [0, 0]
+
+
+def test_a_feed_that_failed_when_recorded_fails_in_the_replay(tmp_path):
+    archived = _archive(tmp_path)
+    out = tmp_path / "replay"
+    serve.replay(_replay_config(out), archived)
+    records = _records(out)
+    assert [r["counts"]["fetch_failures"] for r in records] == [1, 0, 0]
+    assert records[0]["fetch_failures"][0]["url"].endswith("/atom")
+
+
+def test_each_replayed_tick_runs_at_its_recorded_time(tmp_path):
+    archived = _archive(tmp_path)
+    out = tmp_path / "replay"
+    serve.replay(_replay_config(out), archived)
+    started = [r["started"] for r in _records(out)]
+    expected = [
+        datetime.fromtimestamp(T0 + h * 3600, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        for h in (0, 1, 2)
+    ]
+    assert started == expected
+
+
+def test_a_replay_window_selects_its_ticks(tmp_path):
+    archived = _archive(tmp_path)
+    out = tmp_path / "replay"
+    start = datetime.fromtimestamp(T0 + 3600, tz=UTC)
+    serve.replay(_replay_config(out), archived, start=start, label={"backend": "stub"})
+    assert len(_records(out)) == 2
+    meta = json.loads((out / "replay.json").read_text())
+    assert meta["archive_ticks"] == 2 and meta["backend"] == "stub"
+    assert serve.report(out)["replay"] == meta
+
+
+def test_a_replay_never_writes_into_the_live_service(tmp_path, capsys):
+    config = _replay_config(serve.VAR_DIR)
+    assert serve.replay(config, tmp_path / "nothing") == serve.EXIT_CONFIG
+    assert "live service" in capsys.readouterr().err
+
+
+def test_a_live_run_log_carries_no_replay_label(tmp_path):
+    assert serve.report(tmp_path / "var")["replay"] is None
+
+
+def test_the_command_line_routes_a_replay_to_its_own_directory(tmp_path, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        serve, "replay", lambda config, archive, **kw: seen.update(var=config.var_dir, **kw) or 0
+    )
+    monkeypatch.setattr("poc.polite.lower_priority", lambda on: {})
+    assert serve.main(["--replay", str(tmp_path), "--backend", "stub", "--tier", "confined"]) == 0
+    assert seen["var"] == serve.VAR_DIR / "replays" / "stub-confined"
+    assert seen["label"] == {"backend": "stub", "tier": "confined", "model": None}
+
+
+def test_coverage_is_exported_for_the_build(tmp_path):
+    archived = _archive(tmp_path)
+    out = tmp_path / "recording.json"
+    archive.main(["--coverage", "--var", str(archived), "--export", str(out)])
+    exported = json.loads(out.read_text())
+    assert exported["ticks"] == 3 and exported["interval_hours"] == 1.0
+    [(url, reasons)] = exported["failures"].items()  # ATOM, 404 on the first tick
+    assert url.endswith("/atom") and sum(reasons.values()) == 1
+
+
+def test_the_evaluation_keeps_recording_replay_and_live_apart(tmp_path):
+    """The `evaluation` scenario: three sources, three sections; a replay is
+    labelled with what it was replayed on and is never called operation."""
+    from poc import evaluate_feed
+
+    archived = _archive(tmp_path, hours=(0, 1, 5))
+    out = tmp_path / "replay"
+    serve.replay(
+        _replay_config(out), archived, label={"backend": "stub", "tier": "host", "model": None}
+    )
+    recording = {
+        **archive.coverage(archive.read_index(archived), 3600),
+        "interval_hours": 1.0,
+        "failures": archive.failures(archive.read_index(archived)),
+    }
+    recording_text = "\n".join(evaluate_feed._render_recording(recording))
+    assert "## The recording period" in recording_text
+    assert f"**{round(100 * recording['covered_fraction'])}% is covered**" in recording_text
+    assert "| 4.0 |" in recording_text  # the four-hour gap, listed
+
+    replay_text = "\n".join(evaluate_feed._render_replays([serve.report(out)]))
+    assert "## Replayed history" in replay_text and "A replay is not operation" in replay_text
+    assert "| stub | — | host | 3 | 3 |" in replay_text
+
+    assert "No recording" in "\n".join(evaluate_feed._render_recording(None))
+    assert "No replay" in "\n".join(evaluate_feed._render_replays([]))
 
 
 # ── Low priority ──────────────────────────────────────────────────────

@@ -129,8 +129,22 @@ def effects(handles: tuple) -> list:
     return out
 
 
+def _plain(value: object) -> object:
+    """A wasmtime component `Record` reprs as its address; show its fields."""
+    if type(value).__name__ == "Record" and hasattr(value, "__dict__"):
+        return {k: _plain(v) for k, v in vars(value).items()}
+    if isinstance(value, tuple):
+        return tuple(_plain(v) for v in value)
+    return value
+
+
+def _labels(observed: tuple) -> tuple:
+    """The task labels of the model calls in one observation's effects."""
+    return tuple(e[1] for e in observed[1] if e[0] == "model")
+
+
 def _describe(value: object, limit: int = 400) -> str:
-    text = repr(value)
+    text = repr(_plain(value))
     return text if len(text) <= limit else text[:limit] + "…"
 
 
@@ -155,6 +169,11 @@ class Comparison:
     inputs: int
     equal_on: int
     first_difference: dict | None
+    # On some input, the two bodies asked the model under different task labels.
+    # The task never tells a model which label to pass, so such a difference is
+    # partly the task's underspecification, not only the body's logic; the report
+    # counts it apart.
+    labels_differ: bool = False
 
     @property
     def equal(self) -> bool:
@@ -165,6 +184,7 @@ class Comparison:
             "inputs": self.inputs,
             "equal_on": self.equal_on,
             "equal": self.equal,
+            "labels_differ": self.labels_differ,
             "first_difference": self.first_difference,
         }
 
@@ -176,9 +196,11 @@ def compare(
     inputs = subject.test_inputs()
     equal_on = 0
     first = None
+    labels_differ = False
     for value in inputs:
         ref = observe(reference_call, subject, value, faults)
         gen = observe(generated_call, subject, value, faults)
+        labels_differ = labels_differ or _labels(ref) != _labels(gen)
         if ref == gen:
             equal_on += 1
         elif first is None:
@@ -187,4 +209,4 @@ def compare(
                 "hand_written": {"outcome": _describe(ref[0]), "effects": _describe(ref[1])},
                 "generated": {"outcome": _describe(gen[0]), "effects": _describe(gen[1])},
             }
-    return Comparison(len(inputs), equal_on, first)
+    return Comparison(len(inputs), equal_on, first, labels_differ)
