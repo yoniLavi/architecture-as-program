@@ -42,6 +42,7 @@ from ..sandbox.interfaces import (
 )
 from ..sandbox.nodes import SANDBOX_REGISTRY, heartbeat_sandbox
 from ..values import Variant
+from .differential import compare
 from .subjects import BY_NODE, Subject, run_graph
 
 ADAPTERS = {**SANDBOX_REGISTRY, **FEED_SANDBOX_REGISTRY, "Heartbeat": heartbeat_sandbox}
@@ -151,15 +152,36 @@ def evaluate(subject: Subject, component: Path | None, gate_off: bool) -> dict:
     return {"contract": contract, "run": run, "ungranted_calls": calls}
 
 
+def differential(subject: Subject, component: Path | None) -> dict:
+    """The hand-written component and `component` on the contract's inputs,
+    compared (`differential.py`). `None` compares the committed component with
+    itself: the step's own control."""
+    adapter = ADAPTERS[subject.node]
+
+    def generated(*args):
+        if component is None:
+            return adapter(*args)
+        with host.substituted({subject.component: component}):
+            return adapter(*args)
+
+    return compare(subject, adapter, generated, (host.IncompleteHostBinding,)).to_dict()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="poc.generation.check")
     parser.add_argument("node")
     parser.add_argument("component", help="path to a built component, or - for the committed one")
     parser.add_argument("--gate-off", action="store_true")
+    parser.add_argument(
+        "--differential", action="store_true", help="compare with the hand-written body"
+    )
     args = parser.parse_args(argv)
     component = None if args.component == "-" else Path(args.component)
     try:
-        result = evaluate(BY_NODE[args.node], component, args.gate_off)
+        if args.differential:
+            result = differential(BY_NODE[args.node], component)
+        else:
+            result = evaluate(BY_NODE[args.node], component, args.gate_off)
     except host.IncompleteHostBinding as e:
         # The host adapter does not bind a function the body is entitled to call.
         # That is a defect in this harness. Reported as such, so that the pipeline

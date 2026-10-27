@@ -260,6 +260,34 @@ def check(subject: Subject, component: Path | None, *, gate_off: bool = False) -
         }
 
 
+def differential(subject: Subject, component: Path | None) -> dict:
+    """Run the differential step (`differential.py`) in the check process, with
+    the same deadline: a generated body may not terminate. Never gates."""
+    command = [sys.executable, "-m", "poc.generation.check", subject.node]
+    command += ["-" if component is None else str(component), "--differential"]
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join([str(REPO_ROOT / "scripts"), str(REPO_ROOT)])
+    try:
+        done = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            env=env,
+            timeout=CHECK_TIMEOUT_S * 2,  # two bodies per input
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {"error": "did not terminate within the deadline"}
+    try:
+        outcome = json.loads(done.stdout)
+    except json.JSONDecodeError:
+        return {"error": (done.stderr or done.stdout).strip()[-1500:]}
+    if "harness_fault" in outcome:
+        raise HarnessFault(outcome["harness_fault"])
+    return outcome
+
+
 _REFERENCE: dict[str, object] = {}
 
 

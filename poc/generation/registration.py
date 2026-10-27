@@ -51,7 +51,11 @@ CONDITIONS = STATED + WITHHELD
 # What the trials import, and so what must not change while they run. The run's
 # own records are excepted: they are written under `runs/` as it goes.
 GUARDED = ("poc", "scripts", "graphs")
-EXCEPTED = ("poc/generation/runs", "poc/generation/results.json")
+EXCEPTED = (
+    "poc/generation/runs",
+    "poc/generation/differential",
+    "poc/generation/results.json",
+)
 
 
 class RegistrationError(RuntimeError):

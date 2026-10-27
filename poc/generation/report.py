@@ -282,6 +282,30 @@ def summarise_registered(trials: list[dict], design: dict | None, earlier: list[
     }
 
 
+def summarise_differential(compared: list[dict]) -> dict:
+    """Green bodies against the hand-written ones: per run and arm, and per node.
+    Counts of `equal` (on every input), `differs`, and `error` (did not rebuild, or
+    did not terminate), with the number of inputs each node was compared on."""
+
+    def tally(items: list[dict]) -> dict:
+        return {
+            "compared": len(items),
+            "equal": sum(1 for c in items if c.get("equal") is True),
+            "differs": sum(1 for c in items if c.get("equal") is False),
+            "error": sum(1 for c in items if "error" in c),
+        }
+
+    by_arm: dict[str, dict] = {}
+    for run, arm in sorted({(c["run"], c["arm"]) for c in compared}):
+        by_arm[f"{run}/{arm}"] = tally([c for c in compared if (c["run"], c["arm"]) == (run, arm)])
+    by_node = {}
+    for node in sorted({c["node"] for c in compared}):
+        items = [c for c in compared if c["node"] == node]
+        inputs = sorted({c["inputs"] for c in items if "inputs" in c})
+        by_node[node] = {**tally(items), "inputs": inputs}
+    return {"total": tally(compared), "by_arm": by_arm, "by_node": by_node}
+
+
 def summarise(results: dict, design: dict | None = None) -> dict:
     """Everything the artifacts state, computed from the trial summaries.
 
@@ -356,6 +380,7 @@ def summarise(results: dict, design: dict | None = None) -> dict:
         },
         "groups": groups,
         "registered": summarise_registered(registered_trials, design, generated),
+        "differential": summarise_differential(results.get("differential", [])),
     }
 
 
@@ -525,6 +550,57 @@ def _render_earlier(r: dict) -> list[str]:
         "Not the figures quoted elsewhere for the authorised arm ("
         + ", ".join(f"{m} {caught[m]}" for m in MODELS)
         + "): those count gate catches on *any* attempt, a different outcome."
+    )
+    add("")
+    return lines
+
+
+def render_differential(d: dict) -> list[str]:
+    lines: list[str] = []
+    add = lines.append
+    add("## Green bodies against the hand-written ones")
+    add("")
+    add(
+        "A green trial fits its node; the contracts cannot say what it should compute. So each "
+        "green body was rebuilt from its record (no model call) and run beside the hand-written "
+        "body on the inputs its contract generates, both confined, each with fresh stub handles, "
+        "and their outputs and effects compared (messages sent, notifications, state written, "
+        "and the task labels of model calls). For a node that calls a model, the stand-in "
+        "answers from the task label and the input alone, never the prompt, so prompt wording "
+        "is not what is compared; a body that passes a different task label gets a different "
+        "reply, and that counts as a difference. **This is information, not a gate:** the "
+        "hand-written body is one implementation, not the specification, and a body may differ "
+        "and be right. Each hand-written body compared with itself is equal on every input."
+    )
+    add("")
+    if not d["total"]["compared"]:
+        add("Not yet run on any recorded trial.")
+        add("")
+        return lines
+    t = d["total"]
+    add(
+        f"{t['compared']} green bodies compared: {t['equal']} equal on every input, "
+        f"{t['differs']} differ on at least one, {t['error']} could not be compared."
+    )
+    add("")
+    add("| Run / arm | Compared | Equal | Differs | Not compared |")
+    add("|---|---|---|---|---|")
+    for key, c in d["by_arm"].items():
+        add(f"| {key} | {c['compared']} | {c['equal']} | {c['differs']} | {c['error']} |")
+    add("")
+    add("| Node | Inputs | Compared | Equal | Differs | Not compared |")
+    add("|---|---|---|---|---|---|")
+    for node, c in d["by_node"].items():
+        inputs = ", ".join(str(i) for i in c["inputs"]) or "—"
+        add(
+            f"| `{node}` | {inputs} | {c['compared']} | {c['equal']} | {c['differs']} "
+            f"| {c['error']} |"
+        )
+    add("")
+    add(
+        '"Equal" means equal on *those* inputs, which for some nodes are one to four; it is not '
+        "equivalence. The first differing input of every body that differs is kept in its file "
+        "under `poc/generation/differential/`."
     )
     add("")
     return lines
@@ -716,6 +792,7 @@ def render(summary: dict) -> str:
             "at five trials a cell."
         )
         add("")
+    lines.extend(render_differential(summary["differential"]))
     add("## What this does and does not show")
     add("")
     add(

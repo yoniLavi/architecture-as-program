@@ -50,6 +50,8 @@ from .subjects import BY_NODE, Subject, graph_for, subjects
 HERE = Path(__file__).resolve().parent
 RUNS_DIR = HERE / "runs"
 RESULTS_PATH = HERE / "results.json"
+# The differential step's results, one file per green trial, beside the runs.
+DIFFERENTIAL_DIR = HERE / "differential"
 # Build products and model working directories: gitignored, rebuildable.
 WORK_DIR = REPO_ROOT / "var" / "generation"
 
@@ -426,18 +428,87 @@ def _summarise(record: dict, run_id: str) -> dict:
     }
 
 
-def derive_results(runs_dir: Path = RUNS_DIR) -> dict:
-    """Every recorded trial, summarised, in a stable order."""
+def derive_results(runs_dir: Path = RUNS_DIR, differential_dir: Path = DIFFERENTIAL_DIR) -> dict:
+    """Every recorded trial, summarised, in a stable order; and every differential
+    result, without its first difference's detail (that stays in its file)."""
     trials = []
     for path in sorted(runs_dir.glob("*/*.json")):
         trials.append(_summarise(json.loads(path.read_text()), path.parent.name))
-    return {"max_iterations": MAX_ITERATIONS, "trials": trials}
+    compared = []
+    for path in sorted(differential_dir.glob("*/*.json")):
+        result = json.loads(path.read_text())
+        compared.append({k: v for k, v in result.items() if k != "first_difference"})
+    return {"max_iterations": MAX_ITERATIONS, "trials": trials, "differential": compared}
 
 
 def write_results() -> int:
     data = derive_results()
     _write(RESULTS_PATH, data)
     print(f"wrote {RESULTS_PATH.relative_to(REPO_ROOT)}: {len(data['trials'])} trials")
+    return EXIT_OK
+
+
+def differential_one(record: dict, run_id: str, slot: int) -> dict:
+    """Rebuild one recorded green trial's body from its record — no model call —
+    and compare it with the hand-written body (`differential.py`)."""
+    final = record["iterations"][-1]
+    crate = WORK_DIR / "build" / f"diff-{slot}"
+    component, error = pipeline.build(final["files"], crate, WORK_DIR / "target" / f"slot-{slot}")
+    result = (
+        {"error": f"the recorded body no longer builds: {error[:500]}"}
+        if component is None
+        else pipeline.differential(BY_NODE[record["node"]], component)
+    )
+    return {
+        "run": run_id,
+        "trial": record["trial"],
+        "node": record["node"],
+        "arm": record["arm"],
+        "model": record["model"],
+        **result,
+    }
+
+
+def run_differential(run_ids: list[str], *, jobs: int) -> int:
+    """The differential step over every recorded green trial of `run_ids`.
+    Resumable: a trial whose result exists is skipped. Results are written beside
+    the trials, under `differential/<run>/`, never into a trial's own record."""
+    todo = []
+    for run_id in run_ids:
+        for path in sorted((RUNS_DIR / run_id).glob("*.json")):
+            out = DIFFERENTIAL_DIR / run_id / path.name
+            if out.exists():
+                continue
+            record = json.loads(path.read_text())
+            if record.get("outcome") == "green" and record["arm"] != HANDWRITTEN:
+                todo.append((record, run_id, out))
+    print(f"differential: {len(todo)} green trials to compare", flush=True)
+    slots: Queue[int] = Queue()
+    for slot in range(jobs):
+        slots.put(slot)
+    lock = threading.Lock()
+    done = 0
+
+    def work(item) -> None:
+        nonlocal done
+        record, run_id, out = item
+        slot = slots.get()
+        try:
+            result = differential_one(record, run_id, slot)
+            _write(out, result)
+            with lock:
+                done += 1
+                state = (
+                    result.get("error")
+                    or f"{'equal' if result['equal'] else 'differs'} on "
+                    f"{result['equal_on']}/{result['inputs']}"
+                )
+                print(f"[{done}/{len(todo)}] {run_id}/{record['trial']}: {state}", flush=True)
+        finally:
+            slots.put(slot)
+
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        list(pool.map(work, todo))
     return EXIT_OK
 
 
@@ -512,6 +583,13 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
 
+    p_diff = commands.add_parser(
+        "differential", help="compare every recorded green body with the hand-written one"
+    )
+    p_diff.add_argument("--run-ids", nargs="+", default=["pilot", "toy"])
+    p_diff.add_argument("--jobs", type=int, default=DEFAULT_JOBS)
+    p_diff.add_argument("--no-nice", action="store_true", help="do not lower priority")
+
     scope(commands.add_parser("handwritten", help="the control: hand-written bodies"))
     commands.add_parser("results", help="derive results.json from the recorded runs")
     p_build = commands.add_parser("rebuild", help="rebuild a recorded passing body to a file")
@@ -529,6 +607,8 @@ def main(argv: list[str] | None = None) -> int:
         return rebuild(args.run_id, args.trial, args.out)
     if args.command == "handwritten":
         return handwritten(_chosen(args))
+    if args.command == "differential":
+        return run_differential(args.run_ids, jobs=args.jobs)
     if args.command == "registered":
         return registered(jobs=args.jobs, ceiling=args.ceiling, priority=priority)
     return run(
