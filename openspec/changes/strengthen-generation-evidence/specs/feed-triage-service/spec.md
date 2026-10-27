@@ -7,6 +7,14 @@ The service SHALL provide a recorder that fetches each subscribed feed through t
 - **WHEN** the recorder runs once
 - **THEN** each feed's raw body is written under the gitignored `var/archive/`, no model is called, and a feed that fails is recorded as a failure with its reason
 
+#### Scenario: A second recorder
+- **WHEN** a recorder starts while another holds the archive's lock
+- **THEN** it exits with an error and records nothing
+
+#### Scenario: A gap in recording
+- **WHEN** no recorder ran for some hours between two ticks
+- **THEN** the index shows the gap, and the evaluation reports the recorded span's coverage rather than treating it as continuous
+
 ### Requirement: The service can be replayed over an archive
 The driver SHALL be able to run the service once per archived snapshot, in order, with that snapshot's bodies as its fetches and that snapshot's time as its clock, carrying state from one tick to the next.
 

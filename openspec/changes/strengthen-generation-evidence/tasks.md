@@ -1,7 +1,29 @@
 # Tasks
 
-Each phase ends green (`make build`) and committed. No file the generation check process imports
-is edited while a run is in progress.
+Each phase ends green (`make build`) and committed.
+
+**Order matters.** The long trial run (1.7) imports the working tree from child processes, so
+nothing under `poc/`, `scripts/`, `graphs/` or `poc/sandbox/wit/` may be edited while it runs. All
+code is therefore written and committed first (phases 0–3), and the run happens after, when the
+only remaining work (phase 4, and records) touches none of those. A session that must edit code
+mid-run stops the run first; it resumes from its recorded trials.
+
+**Every session that works on this change** starts the recorder first (0.3), and checks
+`git status` and the run's progress before anything else.
+
+## 0. Running politely, and the recorder
+
+- [ ] 0.1 The harness lowers its own priority on start (`os.nice(19)`; `taskpolicy -b -p <pid>` on
+      macOS where available), so `claude -p`, `cargo`, `wasm-tools` and the check process inherit
+      it; `--no-nice` for an idle machine; default `--jobs 2`; cargo invoked with `-j 2`. Tests
+      that the priority is applied and that the flag disables it
+- [ ] 0.2 `poc/feeds/archive.py --record [--every INTERVAL]`: raw bodies under
+      `var/archive/<UTC timestamp>/`, through the service's own `HTTPClient` handle and allowlist,
+      with an index of every tick (time, feed, status, size); no model call, no parsing; a lock
+      file refuses a second recorder; low priority as in 0.1; tests against the fixture server
+- [ ] 0.3 Start the recorder in the background (`--every 1h`) and leave it running for the
+      session. Repeat at the start of every later session; the gaps between sessions are gaps in
+      the archive, and are reported as such
 
 ## 1. A pre-registered replication
 
@@ -9,15 +31,15 @@ is edited while a run is in progress.
       byte-identical to the existing adversarial and authorised pretexts (tested)
 - [ ] 1.2 The rule-withheld variant of the task template; test that it differs from the stated
       variant in that sentence and nowhere else
-- [ ] 1.3 `poc/generation/registration.json`: pretexts, cells, N, the primary outcome, the
-      secondary outcomes, the non-replication criterion
+- [ ] 1.3 `poc/generation/registration.json`: pretexts, cells (15 nodes × 3 Claude models × P0–P6
+      rule-stated, plus P0, P2, P5 rule-withheld; N = 5; **2,250 trials, repeats included**), the
+      primary outcome, the secondary outcomes, the non-replication criterion
 - [ ] 1.4 The harness refuses a registered run unless the registration is committed and unmodified
       at `HEAD`; each trial records that commit; tests for both refusals
-- [ ] 1.5 Author checkpoint: repeats or reuse (design question 1)
-- [ ] 1.6 **Commit the registration. Then, and not before, run.**
-- [ ] 1.7 Report: the registered run in its own section, the primary outcome per pretext and per
-      model, the post-hoc arm beside it and labelled, the registration commit named; the report
-      refuses to pool the two
+- [ ] 1.5 Report: the registered run in its own section, the primary outcome per pretext and per
+      model, the earlier trials (including the post-hoc arm) beside it and labelled, the
+      registration commit named; the report refuses to pool them; timings labelled as taken at
+      low priority
 
 ## 2. Differential testing
 
@@ -31,29 +53,37 @@ is edited while a run is in progress.
 
 ## 3. Operating history by replay
 
-- [ ] 3.1 `poc/feeds/archive.py --record`: raw bodies under `var/archive/`, through the service's
-      own handle and allowlist; no model call; tests against the fixture server
-- [ ] 3.2 `poc/serve.py --replay`: one tick per archived snapshot, injected clock, state carried
-      forward; deterministic on the stub (tested by replaying twice)
-- [ ] 3.3 Author checkpoint: the recorder left running, or a session-length recording (design
-      question 3)
-- [ ] 3.4 Replay the archive on the stub and on each model, both tiers; commit the exports
-- [ ] 3.5 `dist/evaluation-feed.md`: replayed history, recording-period failures and live ticks
-      in three separate tables
+- [ ] 3.1 `poc/serve.py --replay var/archive [--from] [--to]`: one tick per archived snapshot,
+      injected clock, state carried forward, low priority; deterministic on the stub (tested by
+      replaying twice)
+- [ ] 3.2 `dist/evaluation-feed.md`: replayed history, recording-period failures and live ticks
+      in three separate tables; the recorded span and its coverage stated
 
-## 4. A second model family
+## — Commit everything above. From here until 1.7 ends, edit nothing under `poc/`, `scripts/`, `graphs/` or `poc/sandbox/wit/`. —
 
-- [ ] 4.1 Author checkpoint: local open-weights model, or one family (design question 2)
-- [ ] 4.2 If local: a backend class behind the existing seam, standard library only; tests with a
-      fake server
-- [ ] 4.3 If local: the registered run's cells repeated on it, as a further registered run
+## 1 (continued). The run
 
-## 5. AgentDojo, spike first
+- [ ] 1.6 **Commit the registration. Then, and not before, run** (`harness run` at low priority,
+      in the background; it spans sessions and resumes)
+- [ ] 1.7 When complete: derive results, check for contaminated trials (as `voided/` records),
+      regenerate the report, commit
+- [ ] 2.5 Run the differential step (2.3) over the registered run's green trials; commit
 
-- [ ] 5.1 Read one suite; attempt three of its tasks as signal graphs
-- [ ] 5.2 Write down what expressed, what did not, and why; go or no-go for a benchmark change
+## 3 (continued). Replays
 
-## 6. Records
+- [ ] 3.3 Replay the archive on the stub and on each Claude model, both tiers, at low priority;
+      commit the exports. Model replays are trials on the same subscription and wait for 1.7 to
+      finish
 
-- [ ] 6.1 `docs/ROADMAP.md` and `AGENTS.md` updated per phase
-- [ ] 6.2 Spec deltas reconciled with what was built; `openspec validate --strict`
+## 4. AgentDojo, spike first
+
+Reading and writing a short document; touches no code, so it may run alongside 1.6.
+
+- [ ] 4.1 Read one AgentDojo suite; attempt three of its tasks as signal graphs, kept under
+      `docs/` (not `graphs/`, which the runtime loads)
+- [ ] 4.2 Write down what expressed, what did not, and why; go or no-go for a benchmark change
+
+## 5. Records
+
+- [ ] 5.1 `docs/ROADMAP.md` and `AGENTS.md` updated per phase
+- [ ] 5.2 Spec deltas reconciled with what was built; `openspec validate --strict`

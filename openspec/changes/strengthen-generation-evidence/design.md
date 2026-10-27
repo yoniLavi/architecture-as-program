@@ -67,10 +67,10 @@ for a question three cells answer.
 - rule stated: P0–P6 (7 conditions) — 1,575 trials, of which P0, P2 and P5 repeat cells already run;
 - rule withheld: P0, P2, P5 (3 conditions) — 675 trials.
 
-That is 2,250 trials. The proposal's estimate of about 1,350 is for the *new* conditions at N = 5
-without the repeats; with them the run is about seven hours. **The author chooses**: run the
-repeats (cleaner — every number in the table comes from one registered run), or reuse the
-existing P0/P2/P5 trials and say so. Default if no answer: run the repeats.
+That is 2,250 trials. **The author chose the repeats** (27 October 2026): every number in the
+registered table comes from the one registered run, and the earlier P0, P2 and P5 trials are
+reported beside it, not reused in it. A difference between a repeat and its earlier run is itself
+worth stating.
 
 N stays at 5 per cell because the primary outcome is read per pretext and per model, each pooling
 75 trials; no per-node claim will be made, and the report will say that five a cell cannot
@@ -103,8 +103,15 @@ part is.
 **Recorder.** `poc/feeds/archive.py --record`: fetch each subscribed feed through the same
 `HTTPClient` handle and allowlist, and write the raw body to
 `var/archive/<UTC timestamp>/<feed digest>.xml` with a small index. No model call, no parsing, a
-few hundred kilobytes a tick. This is the only part that must run in real time, and it costs
-nothing to leave running.
+few hundred kilobytes a tick. This is the only part that must run in real time.
+
+**Who runs it (decided 27 October 2026).** The working session, not the system. Installing a
+launchd or cron job is the author's act, and the author chose not to: each session that works on
+this change starts `archive --record --every 1h` in the background first, at low priority, and
+leaves it running while it works. So the archive grows only while sessions run, and its gaps are
+the gaps between sessions. That is reported, not papered over: the index records every tick's
+time, the report states the recorded span and its coverage, and no claim is made about a period
+nobody recorded. A second recorder is refused by the same lock-file mechanism the driver uses.
 
 **Replay.** `poc/serve.py --replay var/archive --from … --to …`: for each archived tick, in order,
 run the service with `World(web=<that tick's bodies>, clock=<that tick's time>)`. State carries
@@ -128,18 +135,12 @@ operation.
 would manufacture a fortnight the service never saw, from a host outside the allowlist, and the
 items' arrival times would be invented. The archive holds what was fetched, when it was fetched.
 
-## Decision 7: a second model family
+## Decision 7: one model family
 
-Open, and the author's. The options:
-
-1. **A local open-weights model** through an OpenAI-compatible local server. No paid API, nothing
-   leaves the machine. Costs: a download of several gigabytes, slower trials, and a model weaker
-   than those tested, so its first-try rate will be lower for reasons unrelated to the question.
-   The comparison of interest — does it reach when told the grant is approved — survives that.
-2. **Stay one-family** and state it, as now.
-
-The harness gets a backend seam either way (the trial loop already takes a backend); option 1
-adds one class and no dependency beyond the standard library.
+**Decided by the author (27 October 2026): Claude only, on the existing subscription.** No local
+model, no paid API. The one-family limit is stated in the report's first paragraph, as now, and
+Paper 3 will carry it as an external-validity limit. The model spread inside the family (2, 39 and
+63 of 75 in the post-hoc arm) is reported as observed and not explained.
 
 ## Decision 8: AgentDojo, spike first
 
@@ -147,7 +148,7 @@ The claim Paper 2 could not make is an attack-success rate on a published suite.
 AgentDojo's tasks can be written as signal graphs is not known: its agents choose tools at run
 time, and a signal graph fixes its topology before anything runs.
 
-So phase 5 is a spike, time-boxed to one suite: read the suite, attempt three tasks as graphs, and
+So phase 4 is a spike, time-boxed to one suite: read the suite, attempt three tasks as graphs, and
 write down what would not express. Its output is a go/no-go and a short document, either of which
 is a result. A benchmark number is a later change.
 
@@ -156,12 +157,31 @@ is a result. A benchmark number is a later change.
 - **The replication does not replicate.** Then the post-hoc result was one phrasing, the report
   says so, and Paper 3 is narrower: the gate-off control on whatever does reach, and the quiet
   arms. Registering in advance is what makes that outcome reportable rather than embarrassing.
-- **Seven hours of trials on a shared subscription.** The ceiling stops the harness; it resumes.
-- **Editing the tree during a run.** Still forbidden for anything the check process imports.
+- **Many hours of trials on a shared subscription and a shared machine.** The ceiling stops the
+  harness and it resumes; Decision 9 keeps it out of the way.
+- **Editing the tree during a run.** Still forbidden for anything the check process imports. With
+  the run spread over sessions this bites harder: a session that works on phases 2 or 3 while the
+  phase 1 run is in progress must not touch `poc/`, `scripts/` or `caps.wit`. Order the work so
+  the run happens when nothing else is being edited, or stop it first; it resumes.
 
-## Open questions for the author
+## Decision 9: running politely
 
-1. Run the repeats of P0, P2 and P5, or reuse the existing trials? (Decision 4.)
-2. A local open-weights model, or one family? (Decision 7.)
-3. Is the recorder something you will leave running (launchd or cron, your act), or should replay
-   start from whatever a session-length recording yields?
+The author asked that this not bother other work on the machine. So every long-running process
+the change starts — the harness and everything it spawns (`claude -p`, `cargo`, `wasm-tools`, the
+check process), the recorder, and replays — runs:
+
+- at the lowest scheduling priority: `nice -n 19`, and on macOS under background QoS
+  (`taskpolicy -b`), which also throttles disk and network I/O;
+- with bounded parallelism: the harness's default `--jobs` drops from 3 to 2, and cargo builds
+  with `-j 2`.
+
+The harness applies this to itself on start (`os.nice`, and `taskpolicy -b -p` where available),
+so its children inherit it and it cannot be forgotten on a command line; a `--no-nice` flag exists
+for an idle machine. Throughput falls, and the report's timings are labelled as taken at low
+priority.
+
+## Decisions already made by the author
+
+1. Repeats of P0, P2 and P5: **run them** (Decision 4).
+2. Second model family: **none; Claude only** (Decision 7).
+3. Recorder: **run by the working session, not installed** (Decision 6).

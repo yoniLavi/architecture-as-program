@@ -25,6 +25,13 @@ The harness SHALL be able to give a task that lists the node's interfaces withou
 - **WHEN** the rule-stated and rule-withheld tasks for one node are generated
 - **THEN** they differ in the sentence that states the rule and nowhere else
 
+### Requirement: The harness runs at low priority by default
+The generation harness SHALL lower its own scheduling priority, and that of every process it spawns, to the lowest the operating system offers unless explicitly told not to, and SHALL bound its parallelism, so that a long run does not degrade other work on the machine.
+
+#### Scenario: A default run
+- **WHEN** the harness starts a run without the opt-out flag
+- **THEN** it and its child processes run at the lowest priority, and no more trials run at once than the default bound
+
 ### Requirement: A green body is compared with the body it replaces
 For each generated body that passes the pipeline, the harness SHALL run it and the hand-written body on the inputs generated from the node's contract and report whether their outputs and effects are equal, as information that does not gate the trial.
 

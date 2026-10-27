@@ -40,14 +40,18 @@ wording. Bodies are reported as *behaviourally equal on those inputs* or not. It
 gating: a body may differ and be right.
 
 **Operating history by replay (phase 3).** A recorder archives the raw feeds on a timer, making no
-model call. The service is then run over the archive with an injected clock, as many times and
-under as many configurations as wanted. What replay cannot show — the scheduler, the lock, real
-network failure — is taken from the recording period and reported separately.
+model call. It is run by the working session, not installed as a system service: each session
+starts it first and leaves it running while it works, so the archive grows across sessions and
+the gaps between them are visible in it. The service is then run over the archive with an injected
+clock, as many times and under as many configurations as wanted. What replay cannot show — the
+scheduler, the lock, real network failure — is taken from the recording period and reported
+separately.
 
-**A second model family (phase 4), on a decision the author has not yet made.** Either a local
-open-weights model, or the experiment stays one-family and says so. No paid API is used either way.
+**One model family, stated (decided 27 October 2026).** The author chose to stay on the Claude
+models of the existing subscription: no local model and no paid API. The report says so in its
+first paragraph, as it already does.
 
-**A slice of AgentDojo as graphs (phase 5), after a spike.** Whether one suite's tasks can be
+**A slice of AgentDojo as graphs (phase 4), after a spike.** Whether one suite's tasks can be
 expressed as signal graphs at all is itself unknown. The phase opens with a time-boxed spike and a
 go/no-go; it does not commit to a benchmark number.
 
@@ -57,10 +61,14 @@ Paper 2); any change to Paper 2 or to a figure it typesets.
 ## Impact
 
 - **Specs:** `node-generation` (pre-registration, the rule-withheld condition, differential
-  testing, a second backend); `feed-triage-service` (recorder, replay); `evaluation` (replayed
+  testing, running politely); `feed-triage-service` (recorder, replay); `evaluation` (replayed
   operating history reported apart from live).
-- **Code:** `poc/generation/` (arms as data, a registration record, a differential step, a
-  backend seam); `poc/serve.py` and a new `poc/feeds/archive.py` (record and replay).
-- **Cost:** the author's subscription only. Phase 1 is about 1,350 trials, roughly four hours of
-  wall clock at the rate the last run achieved; the harness stops at its usage ceiling and resumes.
+- **Code:** `poc/generation/` (arms as data, a registration record, a differential step, low
+  priority by default); `poc/serve.py` and a new `poc/feeds/archive.py` (record and replay).
+- **Cost:** the author's subscription only. Phase 1 is 2,250 trials, including repeats of the
+  three conditions already run (the author's choice). At the last run's rate that was about seven
+  hours; run politely, as the author asked, it will be slower and span several sessions. The
+  harness stops at its usage ceiling and resumes.
+- **The machine is shared.** Every long-running process this change starts runs at the lowest
+  priority the OS offers, with bounded parallelism (Decision 9).
 - **Paper 2 is unchanged.** The pin in `tests/test_paper2_figures_pinned.py` stays as it is.
