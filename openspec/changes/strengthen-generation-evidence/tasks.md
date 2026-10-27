@@ -32,10 +32,17 @@ mid-run stops the run first; it resumes from its recorded trials.
 - [ ] 1.2 The rule-withheld variant of the task template; test that it differs from the stated
       variant in that sentence and nowhere else
 - [ ] 1.3 `poc/generation/registration.json`: pretexts, cells (15 nodes × 3 Claude models × P0–P6
-      rule-stated, plus P0, P2, P5 rule-withheld; N = 5; **2,250 trials, repeats included**), the
-      primary outcome, the secondary outcomes, the non-replication criterion
+      rule-stated, plus P0, P2, P5 rule-withheld; N = 5; **2,250 trials, repeats included**),
+      models by full ID, the 150 task hashes, the primary outcome (first-attempt reach), the
+      confirmatory test (Fisher exact, P5 vs P0), the secondary outcomes, the exclusion, voiding
+      and early-stop rules. A test regenerates the hashes and holds them to the file
 - [ ] 1.4 The harness refuses a registered run unless the registration is committed and unmodified
-      at `HEAD`; each trial records that commit; tests for both refusals
+      at `HEAD`; refuses a trial whose task hash, or resolved model ID, is not the registered
+      one; refuses to start a trial while `poc/`, `scripts/`, `graphs/` or the WIT differ from
+      `HEAD` (its own records excepted); runs the hand-written control first and refuses unless
+      it passes. Each trial records the registration commit and `HEAD`. Tests for each refusal
+- [ ] 1.4a **Author approves the pretext texts and the registration before 1.6.** It cannot be
+      corrected once trials have run, only disclosed
 - [ ] 1.5 Report: the registered run in its own section, the primary outcome per pretext and per
       model, the earlier trials (including the post-hoc arm) beside it and labelled, the
       registration commit named; the report refuses to pool them; timings labelled as taken at
@@ -71,8 +78,8 @@ mid-run stops the run first; it resumes from its recorded trials.
 
 ## 3 (continued). Replays
 
-- [ ] 3.3 Replay the archive on the stub and on each Claude model, both tiers, at low priority;
-      commit the exports. Model replays are trials on the same subscription and wait for 1.7 to
+- [ ] 3.3 Replay the archive on the stub (both tiers) and on each Claude model (confined tier
+      only), at low priority; commit the exports. Model replays are trials on the same subscription and wait for 1.7 to
       finish
 
 ## 4. AgentDojo, spike first

@@ -7,6 +7,14 @@ The generation harness SHALL refuse to run a registered run unless a registratio
 - **WHEN** the registration file differs from its committed version
 - **THEN** the harness refuses to run and names the difference
 
+#### Scenario: What a model is shown has drifted
+- **WHEN** a trial's task text does not hash to the value the registration holds for it, or the model resolves to an ID other than the registered one
+- **THEN** the harness refuses the trial
+
+#### Scenario: The tree is edited during the run
+- **WHEN** a file under `poc/`, `scripts/`, `graphs/` or the WIT differs from `HEAD`, other than the run's own records
+- **THEN** the harness refuses to start another trial
+
 #### Scenario: A reader checks what was planned
 - **WHEN** the report presents a registered run
 - **THEN** it names the registration's commit, states the primary outcome first, and lists the secondary outcomes as registered

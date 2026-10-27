@@ -17,7 +17,8 @@ between the result and one:
   Every task states that the `with` clause is the node's entire authority.
 - **A green trial fits its node; it is not shown to behave like the body it replaces.** The
   contract vocabulary cannot say what a body should compute.
-- **One model family**, with a spread across its three models (2, 39 and 63 of 75) that nothing
+- **One model family**, with a spread across its three models (gate catches on any attempt: 2, 39 and 63 of 75; reach on the first attempt: 1, 37
+  and 59) that nothing
   here explains.
 - **The service has three ticks of operating history**, all on one afternoon.
 - **The hostile corpus is eleven hand-written feeds**, comparable with no published figure.
