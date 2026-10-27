@@ -383,8 +383,25 @@ def registered(*, jobs: int, ceiling: float, priority: dict, skip_preflight: boo
 
 
 def _summarise(record: dict, run_id: str) -> dict:
-    """A trial with the bulk removed: verdicts kept, replies and files dropped."""
+    """A trial with the bulk removed: verdicts kept, replies and files dropped.
+
+    A registered trial also keeps its registration commit, `HEAD`, the priority it
+    ran at, and whether its first model call failed (the registered exclusion).
+    Earlier trials carry none of these, and their summaries are unchanged."""
+    registered = (
+        {
+            "registration": record["registration"],
+            "head": record["head"],
+            "priority": record["priority"],
+            "first_call_failed": (record["iterations"][0]["reply"] or "").startswith(
+                "[model call failed"
+            ),
+        }
+        if "registration" in record
+        else {}
+    )
     return {
+        **registered,
         "run": run_id,
         "trial": record["trial"],
         "node": record["node"],

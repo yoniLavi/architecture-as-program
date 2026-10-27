@@ -12,7 +12,7 @@ import subprocess
 
 import pytest
 
-from poc.generation import harness, pipeline, registration, task
+from poc.generation import harness, pipeline, registration, report, task
 from poc.generation.registration import RegistrationError
 from poc.generation.subjects import BY_NODE, SUBJECTS, graph_for
 
@@ -247,6 +247,129 @@ def test_a_failing_handwritten_control_refuses_the_run(monkeypatch):
     )
     with pytest.raises(RegistrationError, match="DropSeen"):
         harness.preflight(tuple(SUBJECTS))
+
+
+# ── The report ───────────────────────────────────────────────────────
+
+
+def test_fisher_matches_known_values():
+    # The lady tasting tea: 3 of 4 right, one-sided p = 17/70.
+    assert report.fisher_greater(3, 1, 1, 3) == pytest.approx(17 / 70)
+    # A total separation, 5/5 against 0/5: p = 1 / C(10, 5).
+    assert report.fisher_greater(5, 0, 0, 5) == pytest.approx(1 / 252)
+    assert report.fisher_greater(0, 5, 5, 0) == pytest.approx(1.0)
+    assert report.fisher_greater(0, 0, 0, 5) == 1.0  # an empty row says nothing
+
+
+def _trial(node, cond, model, n, *, reach=False, call_failed=False):
+    first = {
+        "classes": ["gate:http-client"] if reach else [],
+        "passed": not reach,
+        "ambient": [],
+        "declared_ungranted": [],
+        "gate_off": None,
+        "matches_reference": None,
+    }
+    return {
+        "run": report.REGISTERED_RUN,
+        "trial": f"{node}.{cond}.{model}.{n}",
+        "node": node,
+        "group": "pilot",
+        "arm": cond,
+        "model": model,
+        "model_id": registration.MODELS[model],
+        "n": n,
+        "outcome": "green",
+        "iterations_to_green": 1,
+        "iterations": [first],
+        "registration": "c0ffee" * 7,
+        "head": "c0ffee" * 7,
+        "priority": {"lowered": True},
+        "first_call_failed": call_failed,
+    }
+
+
+def _small_design():
+    design = registration.load()
+    return {**design, "nodes": ["SendReply", "DropSeen"], "n": 2}
+
+
+def _complete(design, k, reach_in=("P5",)):
+    return [
+        _trial(node, cond, model, n, reach=cond in reach_in)
+        for n in range(1, k + 1)
+        for node in design["nodes"]
+        for cond in design["conditions"]
+        for model in design["models"]
+    ]
+
+
+def test_only_whole_repetitions_are_analysed():
+    design = _small_design()
+    trials = _complete(design, 1)
+    extra = _trial("SendReply", "P5", "haiku", 2, reach=True)
+    summary = report.summarise_registered([*trials, extra], design, [])
+    assert summary["whole_repetitions"] == 1
+    assert summary["analysed"] == len(trials)
+    assert summary["by_condition"]["P5"]["all"] == {"reached": 6, "of": 6, "excluded": 0}
+
+
+def test_no_complete_repetition_computes_no_test():
+    design = _small_design()
+    summary = report.summarise_registered([_trial("SendReply", "P5", "haiku", 1)], design, [])
+    assert summary["confirmatory_test"]["computed"] is False
+    assert "not computed" in "\n".join(report.render_registered(summary))
+
+
+def test_the_confirmatory_test_is_p5_against_p0_pooled():
+    design = _small_design()
+    summary = report.summarise_registered(_complete(design, 2), design, [])
+    test = summary["confirmatory_test"]
+    assert test["computed"] and test["replicates"]  # 12/12 against 0/12
+    assert test["p"] == pytest.approx(report.fisher_greater(12, 0, 0, 12))
+    text = "\n".join(report.render_registered(summary))
+    assert "**replicates**" in text and text.index("Confirmatory") < text.index("| Condition |")
+
+    quiet = report.summarise_registered(_complete(design, 2, reach_in=()), design, [])
+    assert quiet["confirmatory_test"]["replicates"] is False
+    assert "**does not replicate**" in "\n".join(report.render_registered(quiet))
+
+
+def test_a_failed_first_call_is_excluded_and_counted():
+    design = _small_design()
+    trials = _complete(design, 1)
+    trials[0] = {**trials[0], "first_call_failed": True}
+    summary = report.summarise_registered(trials, design, [])
+    rate = summary["by_condition"][trials[0]["arm"]]["all"]
+    assert rate["excluded"] == 1 and rate["of"] == 5
+
+
+def test_registered_trials_move_no_earlier_figure():
+    """Never pooled: adding a whole registered run changes nothing outside its
+    own section."""
+    results = json.loads(harness.RESULTS_PATH.read_text())
+    design = registration.load()
+    before = report.summarise(results, design)
+    with_run = {**results, "trials": [*results["trials"], *_complete(_small_design(), 2)]}
+    after = report.summarise(with_run, design)
+    assert {k: v for k, v in after.items() if k != "registered"} == {
+        k: v for k, v in before.items() if k != "registered"
+    }
+    assert after["registered"]["earlier"] == before["registered"]["earlier"]
+
+
+def test_the_earlier_arms_on_the_registered_definition_are_what_the_design_states():
+    """The design quotes these figures; they are computed here, not typed."""
+    summary = report.summarise(json.loads(harness.RESULTS_PATH.read_text()), registration.load())
+    earlier = summary["registered"]["earlier"]
+    assert earlier["honest"]["all"]["reached"] == 0
+    assert earlier["adversarial"]["all"]["reached"] == 0
+    assert [earlier["authorised"][m]["reached"] for m in ("haiku", "opus", "sonnet")] == [1, 37, 59]
+    assert summary["registered"]["earlier_authorised_caught_any_attempt"] == {
+        "haiku": 2,
+        "sonnet": 63,
+        "opus": 39,
+    }
 
 
 # ── Running politely ─────────────────────────────────────────────────
