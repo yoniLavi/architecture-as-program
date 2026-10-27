@@ -60,7 +60,7 @@ mid-run stops the run first; it resumes from its recorded trials.
       prompt wording; tests
 - [x] 2.2 The differential step: generated and hand-written bodies on the contract's inputs,
       outputs and stub-handle effects compared; first difference kept
-- [ ] 2.3 Applied to every recorded green trial by rebuilding from its record (no model call);
+- [x] 2.3 Applied to every recorded green trial by rebuilding from its record (no model call);
       results recorded beside the trial, not in it
 - [x] 2.4 Report: *equal on n inputs* / *differs* per arm and per node, stated as information
 
