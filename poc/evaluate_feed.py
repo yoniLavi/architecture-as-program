@@ -1113,7 +1113,7 @@ def _render_recording(rec: dict | None) -> list[str]:
     add(
         f"{rec['ticks']} recording ticks from {rec['first']} to {rec['last']}, nominally every "
         f"{rec['interval_hours']} h: a span of {rec['span_hours']} h, of which "
-        f"**{round(100 * rec['covered_fraction'])}% is covered**. Nothing is claimed about the "
+        f"**{100 * rec['covered_fraction']:.1f}% is covered**. Nothing is claimed about the "
         f"rest."
     )
     add("")
@@ -1153,9 +1153,9 @@ def _render_replays(replays: list[dict]) -> list[str]:
     add("")
     add(
         "| Backend | Model | Tier | Snapshots | Ticks ok | Items new | Triaged | Kept "
-        "| Model calls | Digests |"
+        "| Model calls | Ticks that published | Digest files (one per day) |"
     )
-    add("|---|---|---|---|---|---|---|---|---|---|")
+    add("|---|---|---|---|---|---|---|---|---|---|---|")
     for r in replays:
         meta = r.get("replay") or {}
         totals = r["totals"]
@@ -1164,7 +1164,7 @@ def _render_replays(replays: list[dict]) -> list[str]:
             f"| {meta.get('archive_ticks', r['runs'])} | {r['outcomes'].get('ok', 0)} "
             f"| {totals.get('items_new', 0)} | {totals.get('items_triaged', 0)} "
             f"| {totals.get('items_kept', 0)} | {totals.get('model_calls', 0)} "
-            f"| {len(r['digests'])} |"
+            f"| {totals.get('published', 0)} | {len(r['digests'])} |"
         )
     add("")
     return lines

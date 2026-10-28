@@ -256,7 +256,7 @@ def test_the_evaluation_keeps_recording_replay_and_live_apart(tmp_path):
     }
     recording_text = "\n".join(evaluate_feed._render_recording(recording))
     assert "## The recording period" in recording_text
-    assert f"**{round(100 * recording['covered_fraction'])}% is covered**" in recording_text
+    assert f"**{100 * recording['covered_fraction']:.1f}% is covered**" in recording_text
     assert "| 4.0 |" in recording_text  # the four-hour gap, listed
 
     replay_text = "\n".join(evaluate_feed._render_replays([serve.report(out)]))

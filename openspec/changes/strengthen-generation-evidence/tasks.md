@@ -95,7 +95,10 @@ mid-run stops the run first; it resumes from its recorded trials.
 
 - [ ] 3.3 Replay the archive on the stub (both tiers) and on each Claude model (confined tier
       only), at low priority; commit the exports. Model replays are trials on the same subscription and wait for 1.7 to
-      finish
+      finish. **Stub part done 28 Oct 2026 on the first 21 ticks** (21 h, 99.9% covered, no
+      failed fetch): host and confined agree exactly (285 triaged, 169 kept, 16 publishing
+      ticks). To redo, with the model replays, once the archive spans weeks; the exports are
+      snapshots and are re-exported then
 
 ## 4. AgentDojo, spike first
 

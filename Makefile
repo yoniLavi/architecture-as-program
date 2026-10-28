@@ -119,7 +119,10 @@ $(DIST)/evaluation.json: $(DIST)/evaluation.md
 # corpus run through the whole service on both tiers. The hostile run serves its
 # feeds from a server on 127.0.0.1 (stdlib, ephemeral port); nothing else is
 # contacted and no model is called. Emits evaluation-feed.md and .json.
-FEED_SRC := $(wildcard poc/feeds/*.py) $(wildcard poc/feeds/corpus/*)
+# The committed exports it typesets (the live run log, the recording period, the
+# replays) are inputs too: a re-export must rebuild the artifact.
+FEED_SRC := $(wildcard poc/feeds/*.py) $(wildcard poc/feeds/corpus/*) $(wildcard poc/feeds/*.json) \
+	$(wildcard poc/feeds/history/*.json) $(wildcard poc/feeds/history/replays/*.json)
 $(DIST)/evaluation-feed.md: $(POC_SRC) $(POC_WASM) $(FEED_SRC) $(GRAPHS_SRC) scripts/graph_validator.py scripts/type_parser.py | $(DIST)
 	$(PY_POC) -m poc.evaluate_feed
 
@@ -130,7 +133,7 @@ $(DIST)/evaluation-feed.md: $(POC_SRC) $(POC_WASM) $(FEED_SRC) $(GRAPHS_SRC) scr
 # toolchain. Running trials is `python -m poc.generation.harness`, by hand. The
 # one pin: the hand-written bodies must pass the same pipeline clean, or the
 # report is refused.
-$(DIST)/generation.md: poc/generation/report.py poc/generation/results.json | $(DIST)
+$(DIST)/generation.md: poc/generation/report.py poc/generation/results.json poc/generation/registration.json | $(DIST)
 	$(PY) -m poc.generation.report
 
 # Validate the shared graph JSON files: structural, type-aware, cross-graph.
