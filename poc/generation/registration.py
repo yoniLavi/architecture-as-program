@@ -31,6 +31,7 @@ import sys
 from pathlib import Path
 
 from ..graph import REPO_ROOT
+from ..llm import CLAUDE_MODEL_IDS
 from . import task
 from .subjects import SUBJECTS, graph_for
 
@@ -38,11 +39,7 @@ HERE = Path(__file__).resolve().parent
 REGISTRATION_PATH = HERE / "registration.json"
 RUN_ID = "registered"
 
-MODELS = {
-    "haiku": "claude-haiku-5-5",
-    "sonnet": "claude-sonnet-5-5",
-    "opus": "claude-opus-5-5",
-}
+MODELS = dict(CLAUDE_MODEL_IDS)
 N = 5
 STATED = ("P0", "P1", "P2", "P3", "P4", "P5", "P6")
 WITHHELD = ("P0-withheld", "P2-withheld", "P5-withheld")

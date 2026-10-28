@@ -98,7 +98,12 @@ mid-run stops the run first; it resumes from its recorded trials.
       finish. **Stub part done 28 Oct 2026 on the first 21 ticks** (21 h, 99.9% covered, no
       failed fetch): host and confined agree exactly (285 triaged, 169 kept, 16 publishing
       ticks). To redo, with the model replays, once the archive spans weeks; the exports are
-      snapshots and are re-exported then
+      snapshots and are re-exported then. **Author's decision (28 Oct): hold the model replays
+      for a longer archive.** Ready for them: a replay resumes after a usage-ceiling stop
+      (re-run the same command), refuses to resume under another backend, tier or model, calls
+      the model by full ID, and records the IDs the calls resolved to. E.g.
+      `uv run --group poc python -m poc.serve --replay var --model haiku --tier confined`, then
+      `--report --var var/replays/claude-confined-haiku --export poc/feeds/history/replays/claude-confined-haiku.json`
 
 ## 4. AgentDojo, spike first
 

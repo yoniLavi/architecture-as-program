@@ -18,7 +18,7 @@ from poc import serve
 from poc.feeds import archive
 from poc.graph import load_graph_dict
 from poc.handles import WallTime
-from poc.llm import StubLLM
+from poc.llm import StubLLM, UsageLimitReached
 from poc.polite import LOWEST_NICE, lower_priority
 from tests.feed_fixtures import ATOM, RSS, ok, redirect, serving
 
@@ -216,6 +216,96 @@ def test_a_replay_never_writes_into_the_live_service(tmp_path, capsys):
 
 def test_a_live_run_log_carries_no_replay_label(tmp_path):
     assert serve.report(tmp_path / "var")["replay"] is None
+
+
+class _Ceiling(StubLLM):
+    """The stub, until the usage window runs out after `limit` calls."""
+
+    def __init__(self, limit):
+        super().__init__()
+        self.limit = limit
+
+    def generate(self, request):
+        if len(self.calls) >= self.limit:
+            raise UsageLimitReached("the five-hour window is at 100%")
+        return super().generate(request)
+
+
+STUB = {"backend": "stub", "tier": "host", "model": None}
+
+
+def test_a_replay_stopped_at_the_ceiling_resumes_to_the_same_history(tmp_path):
+    archived = _archive(tmp_path)
+    whole = tmp_path / "whole"
+    serve.replay(_replay_config(whole), archived, label=STUB)
+    first_tick_calls = _records(whole)[0]["counts"]["model_calls"]
+
+    resumed = tmp_path / "resumed"
+    stopped = serve.Config(
+        var_dir=resumed,
+        backend=_Ceiling(first_tick_calls + 1),  # dies inside the second tick
+        graph=serve.retarget(PARENT, ["127.0.0.1"]),
+    )
+    assert serve.replay(stopped, archived, label=STUB) == serve.EXIT_USAGE_LIMIT
+    assert json.loads((resumed / "replay.json").read_text())["complete"] is False
+    assert serve.replay(_replay_config(resumed), archived, label=STUB) == serve.EXIT_OK
+
+    def history(out):  # the first tick ran on the `_Ceiling` stand-in, which names itself
+        return [{k: v for k, v in r.items() if k != "backend"} for r in _records(out)]
+
+    assert history(resumed) == history(whole)  # the stopped tick, redone; nothing twice
+    assert _digests(resumed) == _digests(whole)
+    assert len(list((resumed / "superseded").glob("*/run.json"))) == 1
+    assert json.loads((resumed / "replay.json").read_text())["complete"] is True
+
+
+def test_a_finished_replay_run_again_does_nothing(tmp_path):
+    archived = _archive(tmp_path)
+    out = tmp_path / "replay"
+    serve.replay(_replay_config(out), archived, label=STUB)
+    before = _records(out)
+    assert serve.replay(_replay_config(out), archived, label=STUB) == serve.EXIT_OK
+    assert _records(out) == before
+
+
+def test_a_replay_is_not_resumed_under_another_label(tmp_path, capsys):
+    archived = _archive(tmp_path)
+    out = tmp_path / "replay"
+    serve.replay(_replay_config(out), archived, label=STUB)
+    other = {**STUB, "tier": "confined"}
+    assert serve.replay(_replay_config(out), archived, label=other) == serve.EXIT_CONFIG
+    assert "another directory" in capsys.readouterr().err
+
+
+def test_a_replay_records_the_models_its_calls_resolved_to(tmp_path):
+    class Resolving(StubLLM):
+        def __init__(self):
+            super().__init__()
+            self.usage = []
+
+        def generate(self, request):
+            self.usage.append({"model": "claude-haiku-5-5"})
+            return super().generate(request)
+
+    archived = _archive(tmp_path)
+    out = tmp_path / "replay"
+    config = serve.Config(
+        var_dir=out, backend=Resolving(), graph=serve.retarget(PARENT, ["127.0.0.1"])
+    )
+    serve.replay(config, archived, label=STUB)
+    assert json.loads((out / "replay.json").read_text())["resolved_models"] == ["claude-haiku-5-5"]
+
+
+def test_a_model_replay_names_the_full_model_id(tmp_path, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        serve, "replay", lambda config, archive, **kw: seen.update(config=config, **kw) or 0
+    )
+    monkeypatch.setattr("poc.polite.lower_priority", lambda on: {})
+    serve.main(["--replay", str(tmp_path), "--model", "haiku", "--tier", "confined"])
+    assert seen["label"]["model"] == "claude-haiku-5-5"
+    assert seen["config"].backend.model == "claude-haiku-5-5"
+    assert seen["config"].var_dir == serve.VAR_DIR / "replays" / "claude-confined-haiku"
 
 
 def test_the_command_line_routes_a_replay_to_its_own_directory(tmp_path, monkeypatch):

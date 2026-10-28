@@ -49,7 +49,7 @@ from .feed_nodes import SUBSCRIPTIONS_KEY
 from .feed_values import Tick
 from .graph import REPO_ROOT, AssemblyError, assemble, load_graph_dict
 from .handles import WallTime, World
-from .llm import ClaudeCLIBackend, LLMBackend, StubLLM, UsageLimitReached
+from .llm import CLAUDE_MODEL_IDS, ClaudeCLIBackend, LLMBackend, StubLLM, UsageLimitReached
 from .runtime import ExecutionResult, execute
 
 VAR_DIR = REPO_ROOT / "var"
@@ -500,11 +500,30 @@ def replay(
 
     `config.var_dir` must not be the live service's: a replay writes its own
     state, digests and run records. `label` (backend, tier, model) is written to
-    `replay.json` there, so an export says what it was replayed on."""
+    `replay.json` there, so an export says what it was replayed on.
+
+    **Resumable.** A model replay can stop at the usage ceiling. Run again into
+    the same directory, it skips every snapshot that already has a finished record
+    (`ok` or `failed`) and carries on from the state it left. The record of a tick
+    that stopped at the ceiling is moved to `superseded/` and the tick is redone;
+    such a tick wrote no state, since a run that fails records nothing seen. A
+    directory replayed under one label refuses to be resumed under another: a
+    history half on one model and half on another is not a replay of either.
+    `replay.json` also records the model IDs the calls actually resolved to."""
     from .feeds import archive
 
     if config.var_dir.resolve() == VAR_DIR.resolve():
         print("error: a replay must not write into the live service's var/", file=sys.stderr)
+        return EXIT_CONFIG
+    label = dict(label or {})
+    meta_path = config.var_dir / "replay.json"
+    previous = _committed_json(meta_path) or {}
+    if previous and {k: previous.get(k) for k in label} != label:
+        print(
+            f"error: {config.var_dir} was replayed as "
+            f"{ {k: previous.get(k) for k in label} }, not {label}; use another directory",
+            file=sys.stderr,
+        )
         return EXIT_CONFIG
     ticks = [
         t
@@ -513,9 +532,38 @@ def replay(
         and (end is None or t["seconds"] < end.timestamp())
     ]
     root = archive.archive_dir(archive_var)
+    resolved: set[str] = set(previous.get("resolved_models") or ())
+
+    def write_meta(complete: bool) -> None:
+        for call in getattr(config.backend, "usage", []) or []:
+            if call.get("model"):
+                resolved.add(call["model"])
+        config.var_dir.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text(
+            json.dumps(
+                {
+                    **label,
+                    "archive_ticks": len(ticks),
+                    "first": ticks[0]["tick"] if ticks else None,
+                    "last": ticks[-1]["tick"] if ticks else None,
+                    "resolved_models": sorted(resolved),
+                    "complete": complete,
+                },
+                indent=1,
+            )
+            + "\n"
+        )
+
     try:
         with Lock(config.var_dir):
+            done = _finished_ticks(config.var_dir)
+            write_meta(complete=False)
             for entry in ticks:
+                started = datetime.fromtimestamp(entry["seconds"], tz=UTC).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )
+                if started in done:
+                    continue
                 web = {
                     f["url"]: (root / entry["tick"] / f["file"]).read_text()
                     for f in entry["feeds"]
@@ -533,19 +581,10 @@ def replay(
                 )
                 print(describe(record), flush=True)
                 if record.outcome == "usage-limit":
+                    write_meta(complete=False)
+                    print("usage ceiling reached; run the same command again later to resume")
                     return EXIT_USAGE_LIMIT
-            (config.var_dir / "replay.json").write_text(
-                json.dumps(
-                    {
-                        **(label or {}),
-                        "archive_ticks": len(ticks),
-                        "first": ticks[0]["tick"] if ticks else None,
-                        "last": ticks[-1]["tick"] if ticks else None,
-                    },
-                    indent=1,
-                )
-                + "\n"
-            )
+            write_meta(complete=True)
     except LockHeld as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_LOCKED
@@ -553,6 +592,22 @@ def replay(
         print(f"error: {e}", file=sys.stderr)
         return EXIT_CONFIG
     return EXIT_OK
+
+
+def _finished_ticks(var_dir: Path) -> set[str]:
+    """The start times of every tick in `var_dir` that finished (`ok` or
+    `failed`). A tick stopped at the usage ceiling did not finish: its record is
+    moved to `superseded/`, out of the run log, so the redo is the only record."""
+    done = set()
+    for path in sorted((var_dir / "runs").glob("*/run.json")):
+        record = json.loads(path.read_text())
+        if record["outcome"] in ("ok", "failed"):
+            done.add(record["started"])
+        else:
+            target = var_dir / "superseded" / path.parent.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.rename(target)
+    return done
 
 
 def describe(record: RunRecord) -> str:
@@ -671,13 +726,19 @@ def main(argv: list[str] | None = None) -> int:
         "repeatable). The component is held to the node's `with` clause first.",
     )
     args = parser.parse_args(argv)
+    if args.replay is not None and args.backend == "claude":
+        # A replay names what it ran: the full model ID, never an alias that
+        # could resolve to another model on a later day.
+        args.model = CLAUDE_MODEL_IDS.get(args.model, args.model)
     label = {
         "backend": args.backend,
         "tier": args.tier,
         "model": args.model if args.backend == "claude" else None,
     }
     if args.replay is not None and args.var == VAR_DIR:
-        args.var = VAR_DIR / "replays" / "-".join(v for v in label.values() if v)
+        alias = {v: k for k, v in CLAUDE_MODEL_IDS.items()}.get(args.model, args.model)
+        parts = [args.backend, args.tier] + ([alias] if args.backend == "claude" else [])
+        args.var = VAR_DIR / "replays" / "-".join(parts)
 
     if args.report:
         summary = report(args.var)

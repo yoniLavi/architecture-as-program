@@ -182,6 +182,17 @@ def _usage_windows(events: list) -> dict[str, float]:
     return windows
 
 
+# The Claude models this repository runs, alias → full ID. An alias resolves at
+# call time and can move between releases; anything that must name what it ran
+# (the registered generation run, a replay) calls the model by its full ID and
+# records what the call resolved to. One table, so the two cannot disagree.
+CLAUDE_MODEL_IDS: dict[str, str] = {
+    "haiku": "claude-haiku-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "opus": "claude-opus-5-5",
+}
+
+
 @dataclass
 class ClaudeCLIBackend:
     """Calls the locally installed, logged-in `claude` CLI — one process per call.
