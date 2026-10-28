@@ -22,6 +22,10 @@ The driver SHALL be able to run the service once per archived snapshot, in order
 - **WHEN** the same archive is replayed twice on the stub backend from an empty state
 - **THEN** the two replays produce identical run records and digests
 
+#### Scenario: A replay pointed at the live service
+- **WHEN** a replay is asked to write into the live service's data directory
+- **THEN** it refuses, and writes nothing
+
 #### Scenario: An item seen in an earlier snapshot
 - **WHEN** an item appears in two consecutive archived snapshots
 - **THEN** the replay triages it once

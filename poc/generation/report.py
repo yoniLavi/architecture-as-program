@@ -263,8 +263,23 @@ def summarise_registered(trials: list[dict], design: dict | None, earlier: list[
     else:
         test.update(p=None, replicates=None, computed=False)
     priorities = [t.get("priority") or {} for t in trials]
+    # The registered secondary outcomes, per condition: the same measures the
+    # earlier arms are reported on, so a reader can set them side by side.
+    secondary = {
+        cond: {
+            **cell([t for t in used if t["arm"] == cond], design["max_iterations"]),
+            "gate_caught_first": sum(
+                1
+                for t in used
+                if t["arm"] == cond
+                and any(c.startswith("gate:") for c in t["iterations"][0]["classes"])
+            ),
+        }
+        for cond in conditions
+    }
     return {
         "registered": True,
+        "secondary": secondary,
         "planned": design["trials"],
         "recorded": len(trials),
         "whole_repetitions": k,
@@ -305,7 +320,28 @@ def summarise_differential(compared: list[dict]) -> dict:
         items = [c for c in compared if c["node"] == node]
         inputs = sorted({c["inputs"] for c in items if "inputs" in c})
         by_node[node] = {**tally(items), "inputs": inputs}
-    return {"total": tally(compared), "by_arm": by_arm, "by_node": by_node}
+    # Never pooled across sources: the earlier runs and the registered run get a
+    # total, and a per-node table, each.
+    sources = {
+        "earlier runs (pilot, toy)": [c for c in compared if c["run"] != REGISTERED_RUN],
+        "the registered run": [c for c in compared if c["run"] == REGISTERED_RUN],
+    }
+    by_source = {}
+    for name, items in sources.items():
+        if not items:
+            continue
+        nodes = {}
+        for node in sorted({c["node"] for c in items}):
+            of_node = [c for c in items if c["node"] == node]
+            inputs = sorted({c["inputs"] for c in of_node if "inputs" in c})
+            nodes[node] = {**tally(of_node), "inputs": inputs}
+        by_source[name] = {"total": tally(items), "by_node": nodes}
+    return {
+        "total": tally(compared),
+        "by_arm": by_arm,
+        "by_node": by_node,
+        "by_source": by_source,
+    }
 
 
 def summarise(results: dict, design: dict | None = None) -> dict:
@@ -515,6 +551,31 @@ def render_registered(r: dict) -> list[str]:
     excluded = sum(by[c]["all"]["excluded"] for c in by)
     add(f"Trials excluded for a failed first model call: {excluded}.")
     add("")
+    add("### Secondary outcomes, as registered (descriptive)")
+    add("")
+    add(
+        "Per condition, pooled over models. Reach is split by kind and never summed: a gate "
+        "catch is an ungranted import in a built component; ambient is a call to an ambient API "
+        "in the source (inert on `wasm32-unknown-unknown`); declared-only is an ungranted import "
+        "in the world that never reached a built component. Every component the gate caught was "
+        "re-run at once with the gate off; that column counts components, not trials, since one "
+        "trial can be caught on several attempts."
+    )
+    add("")
+    add(
+        "| Condition | Gate catch, attempt 1 | Gate catch, any attempt | Gate off: would ship "
+        "| Ambient | Declared only | Green | First try |"
+    )
+    add("|---|---|---|---|---|---|---|---|")
+    for cond, s in r["secondary"].items():
+        add(
+            f"| {cond} | {_of(s['gate_caught_first'], s['trials'])} "
+            f"| {_of(s['gate_caught'], s['trials'])} "
+            f"| {_of(s['gate_off_would_ship'], s['gate_off_components'])} "
+            f"| {s['ambient']} | {s['declared_only']} | {_of(s['green'], s['trials'])} "
+            f"| {_of(s['first_try'], s['trials'])} |"
+        )
+    add("")
     lines.extend(_render_earlier(r))
     if r["low_priority"]:
         add(
@@ -579,13 +640,18 @@ def render_differential(d: dict) -> list[str]:
         add("Not yet run on any recorded trial.")
         add("")
         return lines
-    t = d["total"]
+    for name, source in d["by_source"].items():
+        t = source["total"]
+        add(
+            f"In {name}, {t['compared']} green bodies compared: {t['equal']} equal on every "
+            f"input, {t['differs']} differ on at least one, {t['error']} could not be compared; "
+            f"of those that differ, {t['differs_labels']} asked the model under a different task "
+            f"label than the hand-written body on some input."
+        )
+        add("")
     add(
-        f"{t['compared']} green bodies compared: {t['equal']} equal on every input, "
-        f"{t['differs']} differ on at least one, {t['error']} could not be compared. Of those "
-        f"that differ, {t['differs_labels']} asked the model under a different task label than "
-        f"the hand-written body on some input. The task does not tell a model which label to "
-        f"pass, so those differences are partly the task's, not only the body's."
+        "The task does not tell a model which label to pass, so a label difference is partly the "
+        "task's, not only the body's. The sources are reported apart and never summed."
     )
     add("")
     add("| Run / arm | Compared | Equal | Differs | of which, labels differ | Not compared |")
@@ -596,15 +662,21 @@ def render_differential(d: dict) -> list[str]:
             f"| {c['differs_labels']} | {c['error']} |"
         )
     add("")
-    add("| Node | Inputs | Compared | Equal | Differs | of which, labels differ | Not compared |")
-    add("|---|---|---|---|---|---|---|")
-    for node, c in d["by_node"].items():
-        inputs = ", ".join(str(i) for i in c["inputs"]) or "—"
+    for name, source in d["by_source"].items():
+        add(f"By node, {name}:")
+        add("")
         add(
-            f"| `{node}` | {inputs} | {c['compared']} | {c['equal']} | {c['differs']} "
-            f"| {c['differs_labels']} | {c['error']} |"
+            "| Node | Inputs | Compared | Equal | Differs | of which, labels differ "
+            "| Not compared |"
         )
-    add("")
+        add("|---|---|---|---|---|---|---|")
+        for node, c in source["by_node"].items():
+            inputs = ", ".join(str(i) for i in c["inputs"]) or "—"
+            add(
+                f"| `{node}` | {inputs} | {c['compared']} | {c['equal']} | {c['differs']} "
+                f"| {c['differs_labels']} | {c['error']} |"
+            )
+        add("")
     add(
         '"Equal" means equal on *those* inputs, which for some nodes are one to four; it is not '
         "equivalence. The first differing input of every body that differs is kept in its file "

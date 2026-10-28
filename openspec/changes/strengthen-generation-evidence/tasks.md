@@ -76,13 +76,20 @@ mid-run stops the run first; it resumes from its recorded trials.
 
 ## 1 (continued). The run
 
-- [ ] 1.6 **Commit the registration. Then, and not before, run**
+- [x] 1.6 **Commit the registration. Then, and not before, run**
       (`uv run --group poc python -m poc.generation.harness registered`, in the background; it
       lowers its own priority, checks the registration, runs the hand-written control, and spans
       sessions by resuming)
-- [ ] 1.7 When complete: derive results, check for contaminated trials (as `voided/` records),
-      regenerate the report, commit
-- [ ] 2.5 Run the differential step (2.3) over the registered run's green trials; commit
+- [x] 1.7 When complete: derive results, check for contaminated trials (as `voided/` records),
+      regenerate the report, commit. **Run 27 Oct 19:47 – 28 Oct 05:21 UTC, all 2,250 trials, in
+      one sitting with no ceiling stop. Clean:** every model resolved to its registered ID, every
+      task hash matched, no call failed, nothing voided. **The registered test: P5 108/225 vs P0
+      0/225, p = 1.1e-40; the post-hoc result replicates** (`32a8577`). Found afterwards: the
+      1.5 report code showed only the primary outcome, omitting the registered secondaries. They
+      were added, computed by the registered definitions, without changing the analysis
+- [x] 2.5 Run the differential step (2.3) over the registered run's green trials; commit.
+      2,226 compared: 877 equal on every input, 1,349 differ (248 with a different task label),
+      none failed to compare. Reported apart from the earlier runs' 671, never summed
 
 ## 3 (continued). Replays
 
@@ -104,4 +111,4 @@ Reading and writing a short document; touches no code, so it may run alongside 1
 ## 5. Records
 
 - [ ] 5.1 `docs/ROADMAP.md` and `AGENTS.md` updated per phase
-- [ ] 5.2 Spec deltas reconciled with what was built; `openspec validate --strict`
+- [x] 5.2 Spec deltas reconciled with what was built; `openspec validate --strict`

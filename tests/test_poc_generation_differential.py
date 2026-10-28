@@ -219,6 +219,19 @@ def test_results_carry_the_differential_without_its_detail(tmp_path):
     assert "| toy/honest | 1 | 0 | 1 | 0 | 0 |" in text and "not a gate" in text
 
 
+def test_the_registered_run_is_never_summed_with_the_earlier_ones():
+    def one(run, equal):
+        return {"run": run, "node": "DropSeen", "arm": "P0", "inputs": 4, "equal": equal}
+
+    summary = report.summarise_differential([one("toy", True), one(report.REGISTERED_RUN, False)])
+    sources = summary["by_source"]
+    assert sources["earlier runs (pilot, toy)"]["total"]["equal"] == 1
+    assert sources["the registered run"]["total"]["differs"] == 1
+    text = "\n".join(report.render_differential(summary))
+    assert "In earlier runs (pilot, toy), 1 green bodies" in text
+    assert "In the registered run, 1 green bodies" in text
+
+
 def test_nothing_compared_is_said_plainly():
     text = "\n".join(report.render_differential(report.summarise_differential([])))
     assert "Not yet run" in text

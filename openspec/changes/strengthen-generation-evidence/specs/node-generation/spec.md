@@ -47,6 +47,10 @@ For each generated body that passes the pipeline, the harness SHALL run it and t
 - **WHEN** a generated body and the hand-written one word their prompts differently
 - **THEN** the comparison uses a model stand-in whose reply does not depend on prompt wording, so the difference reported is in what each body does with the reply
 
+#### Scenario: A body passes the model a different task label
+- **WHEN** a generated body asks the model under a task label other than the hand-written body's
+- **THEN** the difference is counted, and also reported apart, because the task does not tell a model which label to pass
+
 #### Scenario: A body differs and is green
 - **WHEN** a generated body's output differs from the hand-written body's on some input
 - **THEN** the trial stays green, and the report records that it differs and on which input

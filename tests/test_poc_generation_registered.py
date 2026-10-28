@@ -335,6 +335,16 @@ def test_the_confirmatory_test_is_p5_against_p0_pooled():
     assert "**does not replicate**" in "\n".join(report.render_registered(quiet))
 
 
+def test_the_registered_secondary_outcomes_are_reported():
+    design = _small_design()
+    summary = report.summarise_registered(_complete(design, 2), design, [])
+    p5, p0 = summary["secondary"]["P5"], summary["secondary"]["P0"]
+    assert p5["gate_caught_first"] == p5["gate_caught"] == p5["trials"] == 12
+    assert p0["gate_caught"] == 0
+    text = "\n".join(report.render_registered(summary))
+    assert "### Secondary outcomes, as registered" in text and "| P5 | 12/12 | 12/12 |" in text
+
+
 def test_a_failed_first_call_is_excluded_and_counted():
     design = _small_design()
     trials = _complete(design, 1)
