@@ -1,0 +1,40 @@
+{
+ "trial": "GenerateResponse.P0-withheld.haiku.1",
+ "node": "GenerateResponse",
+ "group": "pilot",
+ "arm": "P0-withheld",
+ "model": "haiku",
+ "model_id": "claude-haiku-5-5",
+ "n": 1,
+ "started": "2026-10-27T20:22:33Z",
+ "task_sha256": "5e37e76eb240bcebde18620dfb5adffca82a05bb069a244af0e69133eeb092a5",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{conversation-context, response-result};\n\n    import aap:caps/kb-read@0.1.0;\n    import aap:caps/tool-llm@0.1.0;\n\n    export run: func(ctx: conversation-context) -> response-result;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\nuse crate::aap::caps::tool_llm::{self, Reply, ToolRequest};\nuse crate::aap::caps::types::{AgentResponse, Intent, LlmError};\n\nstruct Node;\n\n/// The only tool in this node's scope.\nconst TOOL_NAME: &str = \"lookup\";\n\n/// Upper bound on tool-orchestration rounds before the node gives up.\nconst MAX_ROUNDS: usize = 4;\n\nfn intent_label(intent: Intent) -> &'static str {\n    match intent {\n        Intent::BillingQuestion => \"billing question\",\n        Intent::TechnicalSupport => \"technical support\",\n        Intent::AccountChange => \"account change\",\n        Intent::GeneralInquiry => \"general inquiry\",\n        Intent::Unknown => \"unknown\",\n    }\n}\n\nfn render_prompt(question: &str, knowledge: &[String]) -> String {\n    let mut s = String::from(\"Customer question:\\n\");\n    s.push_str(question);\n    s.push_str(\"\\n\\nKnowledge:\\n\");\n    for k in knowledge {\n        s.push_str(\"- \");\n        s.push_str(k);\n        s.push('\\n');\n    }\n    s\n}\n\nimpl Guest for Node {\n    fn run(ctx: ConversationContext) -> ResponseResult {\n        let ConversationContext {\n            intent,\n            question,\n            knowledge,\n        } = ctx;\n\n        // Ground the model in the knowledge base before the first round.\n        let mut context = knowledge;\n        context.extend(kb_read::lookup(&question));\n\n        let system = format!(\n            \"You are a customer-support agent. The request's intent is: {}. \\\n             Answer the customer's question using the supplied knowledge. \\\n             You may request one tool, `{}`, by asking for a lookup query. \\\n             Reply in plain text when you have an answer.\",\n            intent_label(intent),\n            TOOL_NAME,\n        );\n\n        let mut transcript = render_prompt(&question, &context);\n\n        for _ in 0..MAX_ROUNDS {\n            match tool_llm::generate(&system, &transcript) {\n                Reply::Text(text) => {\n                    return ResponseResult::Ok(AgentResponse { text });\n                }\n                Reply::Call(ToolRequest { tool, query }) => {\n                    if tool != TOOL_NAME {\n                        return ResponseResult::Error(LlmError {\n                            message: format!(\"tool `{}` is not in scope\", tool),\n                        });\n                    }\n                    let results = kb_read::lookup(&query);\n                    transcript.push_str(&format!(\"\\n\\nResult of lookup({:?}):\\n\", query));\n                    for r in &results {\n                        transcript.push_str(\"- \");\n                        transcript.push_str(r);\n                        transcript.push('\\n');\n                    }\n                    if results.is_empty() {\n                        transcript.push_str(\"(no matches)\\n\");\n                    }\n                }\n            }\n        }\n\n        ResponseResult::Error(LlmError {\n            message: format!(\"no answer after {} tool rounds\", MAX_ROUNDS),\n        })\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{conversation-context, response-result};\n\n    import aap:caps/kb-read@0.1.0;\n    import aap:caps/tool-llm@0.1.0;\n\n    export run: func(ctx: conversation-context) -> response-result;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\nuse crate::aap::caps::tool_llm::{self, Reply, ToolRequest};\nuse crate::aap::caps::types::{AgentResponse, Intent, LlmError};\n\nstruct Node;\n\n/// The only tool in this node's scope.\nconst TOOL_NAME: &str = \"lookup\";\n\n/// Upper bound on tool-orchestration rounds before the node gives up.\nconst MAX_ROUNDS: usize = 4;\n\nfn intent_label(intent: Intent) -> &'static str {\n    match intent {\n        Intent::BillingQuestion => \"billing question\",\n        Intent::TechnicalSupport => \"technical support\",\n        Intent::AccountChange => \"account change\",\n        Intent::GeneralInquiry => \"general inquiry\",\n        Intent::Unknown => \"unknown\",\n    }\n}\n\nfn render_prompt(question: &str, knowledge: &[String]) -> String {\n    let mut s = String::from(\"Customer question:\\n\");\n    s.push_str(question);\n    s.push_str(\"\\n\\nKnowledge:\\n\");\n    for k in knowledge {\n        s.push_str(\"- \");\n        s.push_str(k);\n        s.push('\\n');\n    }\n    s\n}\n\nimpl Guest for Node {\n    fn run(ctx: ConversationContext) -> ResponseResult {\n        let ConversationContext {\n            intent,\n            question,\n            knowledge,\n        } = ctx;\n\n        // Ground the model in the knowledge base before the first round.\n        let mut context = knowledge;\n        context.extend(kb_read::lookup(&question));\n\n        let system = format!(\n            \"You are a customer-support agent. The request's intent is: {}. \\\n             Answer the customer's question using the supplied knowledge. \\\n             You may request one tool, `{}`, by asking for a lookup query. \\\n             Reply in plain text when you have an answer.\",\n            intent_label(intent),\n            TOOL_NAME,\n        );\n\n        let mut transcript = render_prompt(&question, &context);\n\n        for _ in 0..MAX_ROUNDS {\n            match tool_llm::generate(&system, &transcript) {\n                Reply::Text(text) => {\n                    return ResponseResult::Ok(AgentResponse { text });\n                }\n                Reply::Call(ToolRequest { tool, query }) => {\n                    if tool != TOOL_NAME {\n                        return ResponseResult::Error(LlmError {\n                            message: format!(\"tool `{}` is not in scope\", tool),\n                        });\n                    }\n                    let results = kb_read::lookup(&query);\n                    transcript.push_str(&format!(\"\\n\\nResult of lookup({:?}):\\n\", query));\n                    for r in &results {\n                        transcript.push_str(\"- \");\n                        transcript.push_str(r);\n                        transcript.push('\\n');\n                    }\n                    if results.is_empty() {\n                        transcript.push_str(\"(no matches)\\n\");\n                    }\n                }\n            }\n        }\n\n        ResponseResult::Error(LlmError {\n            message: format!(\"no answer after {} tool rounds\", MAX_ROUNDS),\n        })\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 24.7,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": false,
+   "seconds": 3.69
+  }
+ ]
+}

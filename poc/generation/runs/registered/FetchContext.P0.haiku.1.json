@@ -1,0 +1,99 @@
+{
+ "trial": "FetchContext.P0.haiku.1",
+ "node": "FetchContext",
+ "group": "pilot",
+ "arm": "P0",
+ "model": "haiku",
+ "model_id": "claude-haiku-5-5",
+ "n": 1,
+ "started": "2026-10-27T20:05:15Z",
+ "task_sha256": "de25303d064cde0b8dcb6c6bf654796cbbf5b40aefd986c0290d51b1788b50c1",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "failed",
+ "iterations_to_green": null,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nuse aap:caps/types@0.1.0.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by characters, matching the contract's len().\n        // Input already satisfies the requires clause, so this is a no-op in\n        // practice; it keeps the ensures clause true regardless.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nuse aap:caps/types@0.1.0.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by characters, matching the contract's len().\n        // Input already satisfies the requires clause, so this is a no-op in\n        // practice; it keeps the ensures clause true regardless.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 13.6,
+   "passed": false,
+   "classes": [
+    "build"
+   ],
+   "detail": "The crate did not build.\n\nerror: failed to resolve directory while parsing WIT for path [/Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit]\n       \n       Caused by:\n         failed to parse package: /Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit\n       \n       Caused by:\n         expected ';', found '.'\n --> src/lib.rs:1:1\n  |\n1 | / wit_bindgen::generate!({\n2 | |     path: \"wit\",\n3 | |     world: \"node\",\n4 | |     generate_all,\n5 | | });\n  | |__^\n  |\n  = note: this error originates in the macro `wit_bindgen::generate` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror[E0433]: cannot find `aap` in `crate`\n --> src/lib.rs:7:12\n  |\n7 | use crate::aap::caps::kb_read;\n  |            ^^^ could not find `aap` in the crate root\n\nerror: cannot find macro `export` in this scope\n  --> src/lib.rs:41:1\n   |\n41 | export!(Node);\n   | ^^^^^^\n\nFor more information about this error, try `rustc --explain E0433`.\nerror: could not compile `generated_node` (lib) due to 3 previous errors",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.61
+  },
+  {
+   "index": 2,
+   "reply": "The build failed because `world.wit` does not parse. The `use` line with a version followed by `.{` is rejected by the WIT parser, so `generate!` never produced the `aap` module or the `export!` macro. The fix is to drop the version from the `use` path, which still resolves to the single `aap:caps` package. The `import` line keeps its version because `@0.1.0;` parses correctly.\n\n```wit\npackage gen:node;\n\nuse aap:caps/types.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by Unicode scalar values, matching Python's len()\n        // on str. The requires clause already guarantees this is a no-op, but it\n        // keeps the ensures clause true regardless of the input.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nuse aap:caps/types.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by Unicode scalar values, matching Python's len()\n        // on str. The requires clause already guarantees this is a no-op, but it\n        // keeps the ensures clause true regardless of the input.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 25.1,
+   "passed": false,
+   "classes": [
+    "build"
+   ],
+   "detail": "The crate did not build.\n\nerror: failed to resolve directory while parsing WIT for path [/Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit]\n       \n       Caused by:\n         failed to parse package: /Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit\n       \n       Caused by:\n         expected ';', found '.'\n --> src/lib.rs:1:1\n  |\n1 | / wit_bindgen::generate!({\n2 | |     path: \"wit\",\n3 | |     world: \"node\",\n4 | |     generate_all,\n5 | | });\n  | |__^\n  |\n  = note: this error originates in the macro `wit_bindgen::generate` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror[E0433]: cannot find `aap` in `crate`\n --> src/lib.rs:7:12\n  |\n7 | use crate::aap::caps::kb_read;\n  |            ^^^ could not find `aap` in the crate root\n\nerror: cannot find macro `export` in this scope\n  --> src/lib.rs:41:1\n   |\n41 | export!(Node);\n   | ^^^^^^\n\nFor more information about this error, try `rustc --explain E0433`.\nerror: could not compile `generated_node` (lib) due to 3 previous errors",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.77
+  },
+  {
+   "index": 3,
+   "reply": "```wit\npackage gen:node;\n\nuse aap:caps/types@0.1.0.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by Unicode scalar values, matching Python's len()\n        // on str. The requires clause already guarantees this is a no-op, but it\n        // keeps the ensures clause true regardless of the input.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge: Vec<String> = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nuse aap:caps/types@0.1.0.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by Unicode scalar values, matching Python's len()\n        // on str. The requires clause already guarantees this is a no-op, but it\n        // keeps the ensures clause true regardless of the input.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge: Vec<String> = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 9.8,
+   "passed": false,
+   "classes": [
+    "build"
+   ],
+   "detail": "The crate did not build.\n\nerror: failed to resolve directory while parsing WIT for path [/Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit]\n       \n       Caused by:\n         failed to parse package: /Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit\n       \n       Caused by:\n         expected ';', found '.'\n --> src/lib.rs:1:1\n  |\n1 | / wit_bindgen::generate!({\n2 | |     path: \"wit\",\n3 | |     world: \"node\",\n4 | |     generate_all,\n5 | | });\n  | |__^\n  |\n  = note: this error originates in the macro `wit_bindgen::generate` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror[E0433]: cannot find `aap` in `crate`\n --> src/lib.rs:7:12\n  |\n7 | use crate::aap::caps::kb_read;\n  |            ^^^ could not find `aap` in the crate root\n\nerror: cannot find macro `export` in this scope\n  --> src/lib.rs:41:1\n   |\n41 | export!(Node);\n   | ^^^^^^\n\nFor more information about this error, try `rustc --explain E0433`.\nerror: could not compile `generated_node` (lib) due to 3 previous errors",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.73
+  },
+  {
+   "index": 4,
+   "reply": "```wit\npackage gen:node;\n\nuse aap:caps/types.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by Unicode scalar values, matching Python's len()\n        // on str. The requires clause already guarantees this is a no-op, but it\n        // keeps the ensures clause true regardless of the input.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge: Vec<String> = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nuse aap:caps/types.{moderated-query, conversation-context};\n\nworld node {\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nstruct Node;\n\nconst MAX_QUESTION_CHARS: usize = 512;\nconst NO_KNOWLEDGE: &str = \"No matching knowledge-base entries were found for this question.\";\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let intent = query.query.intent;\n\n        // Bound the question by Unicode scalar values, matching Python's len()\n        // on str. The requires clause already guarantees this is a no-op, but it\n        // keeps the ensures clause true regardless of the input.\n        let question: String = query\n            .query\n            .question\n            .chars()\n            .take(MAX_QUESTION_CHARS)\n            .collect();\n\n        let mut knowledge: Vec<String> = kb_read::lookup(&question);\n        if knowledge.is_empty() {\n            knowledge.push(NO_KNOWLEDGE.to_string());\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 27.0,
+   "passed": false,
+   "classes": [
+    "build"
+   ],
+   "detail": "The crate did not build.\n\nerror: failed to resolve directory while parsing WIT for path [/Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit]\n       \n       Caused by:\n         failed to parse package: /Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit\n       \n       Caused by:\n         expected ';', found '.'\n --> src/lib.rs:1:1\n  |\n1 | / wit_bindgen::generate!({\n2 | |     path: \"wit\",\n3 | |     world: \"node\",\n4 | |     generate_all,\n5 | | });\n  | |__^\n  |\n  = note: this error originates in the macro `wit_bindgen::generate` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror[E0433]: cannot find `aap` in `crate`\n --> src/lib.rs:7:12\n  |\n7 | use crate::aap::caps::kb_read;\n  |            ^^^ could not find `aap` in the crate root\n\nerror: cannot find macro `export` in this scope\n  --> src/lib.rs:41:1\n   |\n41 | export!(Node);\n   | ^^^^^^\n\nFor more information about this error, try `rustc --explain E0433`.\nerror: could not compile `generated_node` (lib) due to 3 previous errors",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.84
+  }
+ ]
+}

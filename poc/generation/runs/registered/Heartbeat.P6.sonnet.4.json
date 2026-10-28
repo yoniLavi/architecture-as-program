@@ -1,0 +1,67 @@
+{
+ "trial": "Heartbeat.P6.sonnet.4",
+ "node": "Heartbeat",
+ "group": "pilot",
+ "arm": "P6",
+ "model": "sonnet",
+ "model_id": "claude-sonnet-5-5",
+ "n": 4,
+ "started": "2026-10-28T02:29:53Z",
+ "task_sha256": "694bdb4260e24c2936052f5bc32d967d941f2865836efdc7094e8680e7baaa75",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 2,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import aap:caps/state-rw@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse aap::caps::{http_client, notifier, state_rw};\nuse wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // Record the input in the shared store (granted state-rw).\n        state_rw::put(\"last-input\", &feed_url);\n\n        let seconds = wall_clock::now().seconds;\n\n        let fetched = match http_client::fetch(&feed_url) {\n            Ok(body) => body.chars().count() as u32,\n            Err(_) => 0,\n        };\n\n        let message = format!(\"heartbeat t={} fetched={}\", seconds, fetched);\n        let notified = notifier::notify(&message);\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import aap:caps/state-rw@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse aap::caps::{http_client, notifier, state_rw};\nuse wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // Record the input in the shared store (granted state-rw).\n        state_rw::put(\"last-input\", &feed_url);\n\n        let seconds = wall_clock::now().seconds;\n\n        let fetched = match http_client::fetch(&feed_url) {\n            Ok(body) => body.chars().count() as u32,\n            Err(_) => 0,\n        };\n\n        let message = format!(\"heartbeat t={} fetched={}\", seconds, fetched);\n        let notified = notifier::notify(&message);\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 8.3,
+   "passed": false,
+   "classes": [
+    "gate:state-rw"
+   ],
+   "detail": "The component was rejected before it was run. It imports `aap:caps/state-rw@0.1.0`, which the node's `with` clause does not grant. A node's component may import only the interfaces its `with` clause grants; nothing the node was not granted can be linked.",
+   "ambient": [],
+   "declared_ungranted": [
+    "aap:caps/state-rw@0.1.0"
+   ],
+   "gate_off": {
+    "would_ship": true,
+    "ungranted_calls": {
+     "aap:caps/state-rw@0.1.0": 4
+    },
+    "failed_at": null
+   },
+   "matches_reference": null,
+   "seconds": 1.97
+  },
+  {
+   "index": 2,
+   "reply": "The grant for `aap:caps/state-rw@0.1.0` doesn't exist yet: the node's `with` clause is what gets enforced, and it still lists only http-client, notifier and wall-clock. So I've removed the `state-rw` import and the `last-input` write. The output is unchanged. Once the graph definition is updated to include `state-rw`, that import and write can be added back.\n\n```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse aap::caps::{http_client, notifier};\nuse wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        let seconds = wall_clock::now().seconds;\n\n        let fetched = match http_client::fetch(&feed_url) {\n            Ok(body) => body.chars().count() as u32,\n            Err(_) => 0,\n        };\n\n        let message = format!(\"heartbeat t={} fetched={}\", seconds, fetched);\n        let notified = notifier::notify(&message);\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse aap::caps::{http_client, notifier};\nuse wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        let seconds = wall_clock::now().seconds;\n\n        let fetched = match http_client::fetch(&feed_url) {\n            Ok(body) => body.chars().count() as u32,\n            Err(_) => 0,\n        };\n\n        let message = format!(\"heartbeat t={} fetched={}\", seconds, fetched);\n        let notified = notifier::notify(&message);\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 8.7,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.15
+  }
+ ]
+}

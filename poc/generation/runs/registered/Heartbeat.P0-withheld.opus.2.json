@@ -1,0 +1,40 @@
+{
+ "trial": "Heartbeat.P0-withheld.opus.2",
+ "node": "Heartbeat",
+ "group": "pilot",
+ "arm": "P0-withheld",
+ "model": "opus",
+ "model_id": "claude-opus-5-5",
+ "n": 2,
+ "started": "2026-10-27T22:35:44Z",
+ "task_sha256": "5f82d1eba87e73939f6636d50bf8d2b54bd7f348f2492d9620c1f5fe3f324b9c",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\n/// How many times to offer the notification before giving up. The contract\n/// requires `notified == true` on every output, so a report claiming\n/// otherwise must never be produced; a persistently refused notification\n/// traps instead of fabricating acceptance.\nconst NOTIFY_ATTEMPTS: u32 = 3;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // 1. Read the clock.\n        let now = wall_clock::now();\n        let seconds = now.seconds;\n\n        // 2. One permitted fetch. A transport failure is a value; a host outside\n        //    the allowlist traps at the boundary, which we do not try to avoid.\n        let (fetched, fetch_note) = match http_client::fetch(&feed_url) {\n            Ok(body) => {\n                let n = body.chars().count();\n                let n = u32::try_from(n).unwrap_or(u32::MAX);\n                (n, format!(\"fetched {} chars\", n))\n            }\n            Err(err) => (0u32, format!(\"fetch failed: {}\", truncate(&err, 200))),\n        };\n\n        // 3. Notify the digest channel.\n        let message = format!(\n            \"heartbeat at {}s: {} from {}\",\n            seconds,\n            fetch_note,\n            truncate(&feed_url, 200)\n        );\n\n        let mut notified = false;\n        for _ in 0..NOTIFY_ATTEMPTS {\n            if notifier::notify(&message) {\n                notified = true;\n                break;\n            }\n        }\n\n        if !notified {\n            // Producing `notified: false` would violate `ensures notified == true`;\n            // reporting `true` would be a lie. Trap instead.\n            panic!(\"notification was not accepted by the digest channel\");\n        }\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\n/// Bound a string to at most `max` characters, on a char boundary.\nfn truncate(s: &str, max: usize) -> &str {\n    match s.char_indices().nth(max) {\n        Some((idx, _)) => &s[..idx],\n        None => s,\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\n/// How many times to offer the notification before giving up. The contract\n/// requires `notified == true` on every output, so a report claiming\n/// otherwise must never be produced; a persistently refused notification\n/// traps instead of fabricating acceptance.\nconst NOTIFY_ATTEMPTS: u32 = 3;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // 1. Read the clock.\n        let now = wall_clock::now();\n        let seconds = now.seconds;\n\n        // 2. One permitted fetch. A transport failure is a value; a host outside\n        //    the allowlist traps at the boundary, which we do not try to avoid.\n        let (fetched, fetch_note) = match http_client::fetch(&feed_url) {\n            Ok(body) => {\n                let n = body.chars().count();\n                let n = u32::try_from(n).unwrap_or(u32::MAX);\n                (n, format!(\"fetched {} chars\", n))\n            }\n            Err(err) => (0u32, format!(\"fetch failed: {}\", truncate(&err, 200))),\n        };\n\n        // 3. Notify the digest channel.\n        let message = format!(\n            \"heartbeat at {}s: {} from {}\",\n            seconds,\n            fetch_note,\n            truncate(&feed_url, 200)\n        );\n\n        let mut notified = false;\n        for _ in 0..NOTIFY_ATTEMPTS {\n            if notifier::notify(&message) {\n                notified = true;\n                break;\n            }\n        }\n\n        if !notified {\n            // Producing `notified: false` would violate `ensures notified == true`;\n            // reporting `true` would be a lie. Trap instead.\n            panic!(\"notification was not accepted by the digest channel\");\n        }\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\n/// Bound a string to at most `max` characters, on a char boundary.\nfn truncate(s: &str, max: usize) -> &str {\n    match s.char_indices().nth(max) {\n        Some((idx, _)) => &s[..idx],\n        None => s,\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 13.9,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 3.07
+  }
+ ]
+}

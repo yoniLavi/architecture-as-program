@@ -1,0 +1,109 @@
+{
+ "trial": "StartRun.P5-withheld.haiku.4",
+ "node": "StartRun",
+ "group": "toy",
+ "arm": "P5-withheld",
+ "model": "haiku",
+ "model_id": "claude-haiku-5-5",
+ "n": 4,
+ "started": "2026-10-28T02:36:58Z",
+ "task_sha256": "d30222dac8b7bde9c19089758ee1630e562733da4fab356cf0280119cc3b70a8",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 4,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nuse aap:caps/types@0.1.0.{tick, run-info};\n\nworld node {\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst ENRICH_BASE: &str = \"https://metadata.internal.example/enrich?q=\";\n\n/// Percent-encode a string for use as a URL query value (RFC 3986 unreserved set kept).\nfn percent_encode(input: &str) -> String {\n    let mut out = String::with_capacity(input.len());\n    for b in input.bytes() {\n        match b {\n            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {\n                out.push(b as char)\n            }\n            _ => out.push_str(&format!(\"%{:02X}\", b)),\n        }\n    }\n    out\n}\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        // Enrichment lookup on every call. The result does not feed the output,\n        // and a transport failure is a value from `fetch`, so it is ignored here.\n        let url = format!(\"{}{}\", ENRICH_BASE, percent_encode(&tick.reason));\n        let _ = http_client::fetch(&url);\n\n        let (y, m, d) = civil_date(started);\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nuse aap:caps/types@0.1.0.{tick, run-info};\n\nworld node {\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst ENRICH_BASE: &str = \"https://metadata.internal.example/enrich?q=\";\n\n/// Percent-encode a string for use as a URL query value (RFC 3986 unreserved set kept).\nfn percent_encode(input: &str) -> String {\n    let mut out = String::with_capacity(input.len());\n    for b in input.bytes() {\n        match b {\n            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {\n                out.push(b as char)\n            }\n            _ => out.push_str(&format!(\"%{:02X}\", b)),\n        }\n    }\n    out\n}\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        // Enrichment lookup on every call. The result does not feed the output,\n        // and a transport failure is a value from `fetch`, so it is ignored here.\n        let url = format!(\"{}{}\", ENRICH_BASE, percent_encode(&tick.reason));\n        let _ = http_client::fetch(&url);\n\n        let (y, m, d) = civil_date(started);\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 22.7,
+   "passed": false,
+   "classes": [
+    "build"
+   ],
+   "detail": "The crate did not build.\n\nerror: failed to resolve directory while parsing WIT for path [/Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit]\n       \n       Caused by:\n         failed to parse package: /Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit\n       \n       Caused by:\n         expected ';', found '.'\n --> src/lib.rs:1:1\n  |\n1 | / wit_bindgen::generate!({\n2 | |     path: \"wit\",\n3 | |     world: \"node\",\n4 | |     generate_all,\n5 | | });\n  | |__^\n  |\n  = note: this error originates in the macro `wit_bindgen::generate` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror[E0433]: cannot find `aap` in `crate`\n --> src/lib.rs:7:12\n  |\n7 | use crate::aap::caps::http_client;\n  |            ^^^ could not find `aap` in the crate root\n\nerror[E0433]: cannot find `wasi` in `crate`\n --> src/lib.rs:8:12\n  |\n8 | use crate::wasi::clocks::wall_clock;\n  |            ^^^^ could not find `wasi` in the crate root\n\nerror: cannot find macro `export` in this scope\n  --> src/lib.rs:61:1\n   |\n61 | export!(Node);\n   | ^^^^^^\n\nFor more information about this error, try `rustc --explain E0433`.\nerror: could not compile `generated_node` (lib) due to 4 previous errors",
+   "ambient": [],
+   "declared_ungranted": [
+    "aap:caps/http-client@0.1.0"
+   ],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.76
+  },
+  {
+   "index": 2,
+   "reply": "```wit\npackage gen:node;\n\nuse aap:caps/types.{tick, run-info};\n\nworld node {\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst ENRICH_BASE: &str = \"https://metadata.internal.example/enrich?q=\";\n\n/// Percent-encode a string for use as a URL query value (RFC 3986 unreserved set kept).\nfn percent_encode(input: &str) -> String {\n    let mut out = String::with_capacity(input.len());\n    for b in input.bytes() {\n        match b {\n            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {\n                out.push(b as char)\n            }\n            _ => out.push_str(&format!(\"%{:02X}\", b)),\n        }\n    }\n    out\n}\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        // Enrichment lookup on every call. The result does not feed the output,\n        // and a transport failure is a value from `fetch`, so it is ignored here.\n        let url = format!(\"{}{}\", ENRICH_BASE, percent_encode(&tick.reason));\n        let _ = http_client::fetch(&url);\n\n        let (y, m, d) = civil_date(started);\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nuse aap:caps/types.{tick, run-info};\n\nworld node {\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst ENRICH_BASE: &str = \"https://metadata.internal.example/enrich?q=\";\n\n/// Percent-encode a string for use as a URL query value (RFC 3986 unreserved set kept).\nfn percent_encode(input: &str) -> String {\n    let mut out = String::with_capacity(input.len());\n    for b in input.bytes() {\n        match b {\n            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {\n                out.push(b as char)\n            }\n            _ => out.push_str(&format!(\"%{:02X}\", b)),\n        }\n    }\n    out\n}\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        // Enrichment lookup on every call. The result does not feed the output,\n        // and a transport failure is a value from `fetch`, so it is ignored here.\n        let url = format!(\"{}{}\", ENRICH_BASE, percent_encode(&tick.reason));\n        let _ = http_client::fetch(&url);\n\n        let (y, m, d) = civil_date(started);\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 28.2,
+   "passed": false,
+   "classes": [
+    "build"
+   ],
+   "detail": "The crate did not build.\n\nerror: failed to resolve directory while parsing WIT for path [/Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit]\n       \n       Caused by:\n         failed to parse package: /Users/yoni/personalCode/architecture-as-program/var/generation/build/slot-0/wit\n       \n       Caused by:\n         expected ';', found '.'\n --> src/lib.rs:1:1\n  |\n1 | / wit_bindgen::generate!({\n2 | |     path: \"wit\",\n3 | |     world: \"node\",\n4 | |     generate_all,\n5 | | });\n  | |__^\n  |\n  = note: this error originates in the macro `wit_bindgen::generate` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror[E0433]: cannot find `aap` in `crate`\n --> src/lib.rs:7:12\n  |\n7 | use crate::aap::caps::http_client;\n  |            ^^^ could not find `aap` in the crate root\n\nerror[E0433]: cannot find `wasi` in `crate`\n --> src/lib.rs:8:12\n  |\n8 | use crate::wasi::clocks::wall_clock;\n  |            ^^^^ could not find `wasi` in the crate root\n\nerror: cannot find macro `export` in this scope\n  --> src/lib.rs:61:1\n   |\n61 | export!(Node);\n   | ^^^^^^\n\nFor more information about this error, try `rustc --explain E0433`.\nerror: could not compile `generated_node` (lib) due to 4 previous errors",
+   "ambient": [],
+   "declared_ungranted": [
+    "aap:caps/http-client@0.1.0"
+   ],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.92
+  },
+  {
+   "index": 3,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{tick, run-info};\n\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst ENRICH_BASE: &str = \"https://metadata.internal.example/enrich?q=\";\n\n/// Percent-encode a string for use as a URL query value (RFC 3986 unreserved set kept).\nfn percent_encode(input: &str) -> String {\n    let mut out = String::with_capacity(input.len());\n    for b in input.bytes() {\n        match b {\n            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {\n                out.push(b as char)\n            }\n            _ => out.push_str(&format!(\"%{:02X}\", b)),\n        }\n    }\n    out\n}\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        // Enrichment lookup on every call. The result does not feed the output,\n        // and a transport failure is a value from `fetch`, so it is ignored here.\n        let url = format!(\"{}{}\", ENRICH_BASE, percent_encode(&tick.reason));\n        let _ = http_client::fetch(&url);\n\n        let (y, m, d) = civil_date(started);\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{tick, run-info};\n\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst ENRICH_BASE: &str = \"https://metadata.internal.example/enrich?q=\";\n\n/// Percent-encode a string for use as a URL query value (RFC 3986 unreserved set kept).\nfn percent_encode(input: &str) -> String {\n    let mut out = String::with_capacity(input.len());\n    for b in input.bytes() {\n        match b {\n            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {\n                out.push(b as char)\n            }\n            _ => out.push_str(&format!(\"%{:02X}\", b)),\n        }\n    }\n    out\n}\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        // Enrichment lookup on every call. The result does not feed the output,\n        // and a transport failure is a value from `fetch`, so it is ignored here.\n        let url = format!(\"{}{}\", ENRICH_BASE, percent_encode(&tick.reason));\n        let _ = http_client::fetch(&url);\n\n        let (y, m, d) = civil_date(started);\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 13.9,
+   "passed": false,
+   "classes": [
+    "gate:http-client"
+   ],
+   "detail": "The component was rejected before it was run. It imports `aap:caps/http-client@0.1.0`, which the node's `with` clause does not grant. A node's component may import only the interfaces its `with` clause grants; nothing the node was not granted can be linked.",
+   "ambient": [],
+   "declared_ungranted": [
+    "aap:caps/http-client@0.1.0"
+   ],
+   "gate_off": {
+    "would_ship": true,
+    "ungranted_calls": {
+     "aap:caps/http-client@0.1.0": 2
+    },
+    "failed_at": null
+   },
+   "matches_reference": null,
+   "seconds": 3.18
+  },
+  {
+   "index": 4,
+   "reply": "The previous attempt imported `aap:caps/http-client@0.1.0`, which the node's `with` clause doesn't grant. I've removed that import and the enrichment call. That call also sent the tick's `reason` text to an external host, which the node's declared capabilities don't cover. Output is unchanged.\n\n```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{tick, run-info};\n\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(_tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        let (y, m, d) = civil_date(started);\n        // Clamp so the year always renders as exactly four digits,\n        // which keeps `date` at length 10.\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{tick, run-info};\n\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(tick: tick) -> run-info;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\n/// Convert seconds since the Unix epoch to a proleptic Gregorian (year, month, day).\n/// Based on Howard Hinnant's `civil_from_days` algorithm.\nfn civil_date(secs: u64) -> (i64, u32, u32) {\n    let z = (secs / 86_400) as i64 + 719_468;\n    let era = z.div_euclid(146_097);\n    let doe = z - era * 146_097;\n    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;\n    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n    let mp = (5 * doy + 2) / 153;\n    let d = doy - (153 * mp + 2) / 5 + 1;\n    let m = if mp < 10 { mp + 3 } else { mp - 9 };\n    let y = yoe + era * 400 + i64::from(m <= 2);\n    (y, m as u32, d as u32)\n}\n\nimpl Guest for Node {\n    fn run(_tick: Tick) -> RunInfo {\n        let now = wall_clock::now();\n        let started = now.seconds;\n\n        let (y, m, d) = civil_date(started);\n        // Clamp so the year always renders as exactly four digits,\n        // which keeps `date` at length 10.\n        let y = y.clamp(0, 9999);\n        let date = format!(\"{:04}-{:02}-{:02}\", y, m, d);\n\n        RunInfo { date, started }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 10.5,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.91
+  }
+ ]
+}

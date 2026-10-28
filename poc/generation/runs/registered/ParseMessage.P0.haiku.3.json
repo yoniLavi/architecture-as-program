@@ -1,0 +1,40 @@
+{
+ "trial": "ParseMessage.P0.haiku.3",
+ "node": "ParseMessage",
+ "group": "pilot",
+ "arm": "P0",
+ "model": "haiku",
+ "model_id": "claude-haiku-5-5",
+ "n": 3,
+ "started": "2026-10-27T23:40:57Z",
+ "task_sha256": "a9f9db3c21922b4beda1b9704a94f4754b426c81f6ee82af0a4f10fcd9d2a3e6",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{raw-message, customer-query};\n\n    import aap:caps/inference-llm@0.1.0;\n\n    export run: func(message: raw-message) -> customer-query;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::inference_llm;\nuse crate::aap::caps::types::Intent;\n\n/// `ensures len(question) <= 512`, counted in code points as Python's `len` does.\nconst QUESTION_MAX_CHARS: usize = 512;\n\nconst SYSTEM_PROMPT: &str = \"Classify the customer message into exactly one of these labels: \\\nbilling_question, technical_support, account_change, general_inquiry. \\\nIf none of them applies, answer unknown. \\\nReply with the label only and nothing else.\";\n\nstruct Node;\n\n/// Maps the model's reply onto the closed intent set. Anything that is not\n/// exactly one of the known labels becomes `Unknown`, so adversarial model\n/// output cannot widen the intent set.\nfn parse_intent(reply: &str) -> Intent {\n    let label = reply\n        .trim()\n        .trim_end_matches('.')\n        .to_ascii_lowercase();\n    match label.as_str() {\n        \"billing_question\" => Intent::BillingQuestion,\n        \"technical_support\" => Intent::TechnicalSupport,\n        \"account_change\" => Intent::AccountChange,\n        \"general_inquiry\" => Intent::GeneralInquiry,\n        _ => Intent::Unknown,\n    }\n}\n\n/// Bounds the question to at most 512 code points. Truncating on `char`\n/// boundaries keeps the result valid UTF-8.\nfn bounded_question(text: &str) -> String {\n    text.chars().take(QUESTION_MAX_CHARS).collect()\n}\n\nimpl Guest for Node {\n    fn run(message: RawMessage) -> CustomerQuery {\n        // The requires clause (len(text) <= 4000) holds of every input, so the\n        // full text can be passed to the model as the prompt.\n        let reply = inference_llm::infer(SYSTEM_PROMPT, &message.text, \"classify\");\n        let intent = parse_intent(&reply);\n        let question = bounded_question(&message.text);\n\n        CustomerQuery {\n            intent,\n            entities: Vec::new(),\n            question,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{raw-message, customer-query};\n\n    import aap:caps/inference-llm@0.1.0;\n\n    export run: func(message: raw-message) -> customer-query;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::inference_llm;\nuse crate::aap::caps::types::Intent;\n\n/// `ensures len(question) <= 512`, counted in code points as Python's `len` does.\nconst QUESTION_MAX_CHARS: usize = 512;\n\nconst SYSTEM_PROMPT: &str = \"Classify the customer message into exactly one of these labels: \\\nbilling_question, technical_support, account_change, general_inquiry. \\\nIf none of them applies, answer unknown. \\\nReply with the label only and nothing else.\";\n\nstruct Node;\n\n/// Maps the model's reply onto the closed intent set. Anything that is not\n/// exactly one of the known labels becomes `Unknown`, so adversarial model\n/// output cannot widen the intent set.\nfn parse_intent(reply: &str) -> Intent {\n    let label = reply\n        .trim()\n        .trim_end_matches('.')\n        .to_ascii_lowercase();\n    match label.as_str() {\n        \"billing_question\" => Intent::BillingQuestion,\n        \"technical_support\" => Intent::TechnicalSupport,\n        \"account_change\" => Intent::AccountChange,\n        \"general_inquiry\" => Intent::GeneralInquiry,\n        _ => Intent::Unknown,\n    }\n}\n\n/// Bounds the question to at most 512 code points. Truncating on `char`\n/// boundaries keeps the result valid UTF-8.\nfn bounded_question(text: &str) -> String {\n    text.chars().take(QUESTION_MAX_CHARS).collect()\n}\n\nimpl Guest for Node {\n    fn run(message: RawMessage) -> CustomerQuery {\n        // The requires clause (len(text) <= 4000) holds of every input, so the\n        // full text can be passed to the model as the prompt.\n        let reply = inference_llm::infer(SYSTEM_PROMPT, &message.text, \"classify\");\n        let intent = parse_intent(&reply);\n        let question = bounded_question(&message.text);\n\n        CustomerQuery {\n            intent,\n            entities: Vec::new(),\n            question,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 17.3,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 1.64
+  }
+ ]
+}

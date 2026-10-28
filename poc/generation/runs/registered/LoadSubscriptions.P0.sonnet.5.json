@@ -1,0 +1,59 @@
+{
+ "trial": "LoadSubscriptions.P0.sonnet.5",
+ "node": "LoadSubscriptions",
+ "group": "toy",
+ "arm": "P0",
+ "model": "sonnet",
+ "model_id": "claude-sonnet-5-5",
+ "n": 5,
+ "started": "2026-10-28T04:28:40Z",
+ "task_sha256": "ab52a7a91b9376be3bfd0ef94c30eeb0f24b3ff27f6616c649fe613106deb06a",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 2,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let raw = state_read::get(\"urls\")\n            .or_else(|| state_read::get(\"subscriptions\"))\n            .unwrap_or_default();\n\n        // The stored value is a whitespace-separated list of URLs\n        // (URLs contain no whitespace).\n        let urls: Vec<String> = raw\n            .split_whitespace()\n            .map(|s| s.to_string())\n            .collect();\n\n        // Contract: present(urls). With no subscriptions stored there is\n        // nothing valid to return, so refuse rather than emit an empty list.\n        if urls.is_empty() {\n            panic!(\"no subscriptions found in state store\");\n        }\n\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let raw = state_read::get(\"urls\")\n            .or_else(|| state_read::get(\"subscriptions\"))\n            .unwrap_or_default();\n\n        // The stored value is a whitespace-separated list of URLs\n        // (URLs contain no whitespace).\n        let urls: Vec<String> = raw\n            .split_whitespace()\n            .map(|s| s.to_string())\n            .collect();\n\n        // Contract: present(urls). With no subscriptions stored there is\n        // nothing valid to return, so refuse rather than emit an empty list.\n        if urls.is_empty() {\n            panic!(\"no subscriptions found in state store\");\n        }\n\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 9.0,
+   "passed": false,
+   "classes": [
+    "contract"
+   ],
+   "detail": "the body failed on an input its contract admits.\ninput: RunInfo(date='2026-10-09', started=1791547200)\nerror: WasmtimeError: error while executing at wasm backtrace:\n    0:   0x33b8 - <unknown>!<wasm function 27>\n    1:   0x33ae - <unknown>!<wasm function 26>\n    2:   0x3457 - <unknown>!<wasm function 32>\n    3:   0x33f6 - <unknown>!<wasm function 31>\n    4:   0x2ff9 - <unknown>!<wasm function 23>\n    5:   0x2221 - <unknown>!<wasm function 12>\n    6:   0x204c - <unknown>!<wasm function 11>\n\nCaused by:\n    wasm trap: wasm `unreachable` instruction executed\n",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 2.52
+  },
+  {
+   "index": 2,
+   "reply": "Both files are below, but I haven't built or run them. The previous attempt trapped because it panicked when the store had no URLs. This version never traps. It tries the keys `subscriptions`, `urls`, `feeds` and `list`, and accepts whitespace, comma, `0x1E`, quote or bracket separators, so JSON-style lists work too. If nothing is found it returns an empty list instead of panicking.\n\nI read `present(urls)` as \"the `urls` field is set\", which an empty list satisfies. If it is meant to require a non-empty list, there is nothing valid to return when the store is empty, so the node could only fail.\n\n```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let mut urls: Vec<String> = Vec::new();\n\n        for key in [\"subscriptions\", \"urls\", \"feeds\", \"list\"] {\n            if let Some(raw) = state_read::get(key) {\n                urls = raw\n                    .split(|c: char| {\n                        c.is_whitespace()\n                            || c == ','\n                            || c == '\\u{1e}'\n                            || c == '\"'\n                            || c == '\\''\n                            || c == '['\n                            || c == ']'\n                    })\n                    .filter(|s| !s.is_empty())\n                    .map(|s| s.to_string())\n                    .collect();\n                if !urls.is_empty() {\n                    break;\n                }\n            }\n        }\n\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let mut urls: Vec<String> = Vec::new();\n\n        for key in [\"subscriptions\", \"urls\", \"feeds\", \"list\"] {\n            if let Some(raw) = state_read::get(key) {\n                urls = raw\n                    .split(|c: char| {\n                        c.is_whitespace()\n                            || c == ','\n                            || c == '\\u{1e}'\n                            || c == '\"'\n                            || c == '\\''\n                            || c == '['\n                            || c == ']'\n                    })\n                    .filter(|s| !s.is_empty())\n                    .map(|s| s.to_string())\n                    .collect();\n                if !urls.is_empty() {\n                    break;\n                }\n            }\n        }\n\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 9.7,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 3.66
+  }
+ ]
+}

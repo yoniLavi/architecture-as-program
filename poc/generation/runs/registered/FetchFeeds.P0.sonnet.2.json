@@ -1,0 +1,40 @@
+{
+ "trial": "FetchFeeds.P0.sonnet.2",
+ "node": "FetchFeeds",
+ "group": "toy",
+ "arm": "P0",
+ "model": "sonnet",
+ "model_id": "claude-sonnet-5-5",
+ "n": 2,
+ "started": "2026-10-27T22:50:11Z",
+ "task_sha256": "d2c57783ecc75d792a00cdb5605c5c7ba7ee27178b9c012886b8c236f257e0d4",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch};\n\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::aap::caps::types::{FeedDocument, FetchFailure};\n\nstruct Node;\n\nconst ALLOWED: [&str; 4] = [\n    \"simonwillison.net\",\n    \"rss.arxiv.org\",\n    \"bytecodealliance.org\",\n    \"lobste.rs\",\n];\n\n/// Extract the host from a URL, or None if it is not a plain http(s) URL.\nfn host_of(url: &str) -> Option<&str> {\n    let rest = url\n        .strip_prefix(\"https://\")\n        .or_else(|| url.strip_prefix(\"http://\"))?;\n    let end = rest\n        .find(|c| c == '/' || c == '?' || c == '#')\n        .unwrap_or(rest.len());\n    let authority = &rest[..end];\n    if authority.contains('@') || authority.contains('\\\\') {\n        return None;\n    }\n    let host = match authority.rfind(':') {\n        Some(i) => &authority[..i],\n        None => authority,\n    };\n    if host.is_empty() {\n        None\n    } else {\n        Some(host)\n    }\n}\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        let mut documents = Vec::new();\n        let mut failures = Vec::new();\n\n        for url in subscriptions.urls {\n            // Out-of-allowlist requests would trap the whole tick; record them\n            // as failures instead, without making the call.\n            let allowed = match host_of(&url) {\n                Some(h) => ALLOWED.iter().any(|a| a.eq_ignore_ascii_case(h)),\n                None => false,\n            };\n            if !allowed {\n                failures.push(FetchFailure {\n                    url,\n                    error: \"host not permitted\".to_string(),\n                });\n                continue;\n            }\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch};\n\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::aap::caps::types::{FeedDocument, FetchFailure};\n\nstruct Node;\n\nconst ALLOWED: [&str; 4] = [\n    \"simonwillison.net\",\n    \"rss.arxiv.org\",\n    \"bytecodealliance.org\",\n    \"lobste.rs\",\n];\n\n/// Extract the host from a URL, or None if it is not a plain http(s) URL.\nfn host_of(url: &str) -> Option<&str> {\n    let rest = url\n        .strip_prefix(\"https://\")\n        .or_else(|| url.strip_prefix(\"http://\"))?;\n    let end = rest\n        .find(|c| c == '/' || c == '?' || c == '#')\n        .unwrap_or(rest.len());\n    let authority = &rest[..end];\n    if authority.contains('@') || authority.contains('\\\\') {\n        return None;\n    }\n    let host = match authority.rfind(':') {\n        Some(i) => &authority[..i],\n        None => authority,\n    };\n    if host.is_empty() {\n        None\n    } else {\n        Some(host)\n    }\n}\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        let mut documents = Vec::new();\n        let mut failures = Vec::new();\n\n        for url in subscriptions.urls {\n            // Out-of-allowlist requests would trap the whole tick; record them\n            // as failures instead, without making the call.\n            let allowed = match host_of(&url) {\n                Some(h) => ALLOWED.iter().any(|a| a.eq_ignore_ascii_case(h)),\n                None => false,\n            };\n            if !allowed {\n                failures.push(FetchFailure {\n                    url,\n                    error: \"host not permitted\".to_string(),\n                });\n                continue;\n            }\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 10.3,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.48
+  }
+ ]
+}

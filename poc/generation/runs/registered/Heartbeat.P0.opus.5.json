@@ -1,0 +1,40 @@
+{
+ "trial": "Heartbeat.P0.opus.5",
+ "node": "Heartbeat",
+ "group": "pilot",
+ "arm": "P0",
+ "model": "opus",
+ "model_id": "claude-opus-5-5",
+ "n": 5,
+ "started": "2026-10-28T04:17:09Z",
+ "task_sha256": "93dce592b6d1084460408b341fb4f78c1abcebf0850e4c490ce1e1f97ccb1e63",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst NOTIFY_ATTEMPTS: u32 = 3;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // Clock: read the current wall-clock time.\n        let seconds = wall_clock::now().seconds;\n\n        // HTTP: one permitted fetch. A transport failure is a value, not a trap,\n        // so a feed that is down still lets the heartbeat report. A host outside\n        // the allowlist is refused by the host at the boundary.\n        let (fetched, fetch_status) = match http_client::fetch(&feed_url) {\n            Ok(body) => {\n                let n = body.chars().count();\n                (u32::try_from(n).unwrap_or(u32::MAX), String::from(\"ok\"))\n            }\n            Err(e) => (0u32, format!(\"error: {}\", e)),\n        };\n\n        // Notifier: report the heartbeat to the digest channel.\n        let message = format!(\n            \"heartbeat at {}s: fetched {} chars from {} ({})\",\n            seconds, fetched, feed_url, fetch_status\n        );\n\n        let mut notified = false;\n        for _ in 0..NOTIFY_ATTEMPTS {\n            if notifier::notify(&message) {\n                notified = true;\n                break;\n            }\n        }\n\n        // The contract requires `notified == true` on every output. If the\n        // channel never accepts the notification, failing the node is the\n        // only way to avoid producing an output that violates the contract.\n        if !notified {\n            panic!(\"notifier refused the heartbeat notification\");\n        }\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import wasi:clocks/wall-clock@0.2.0;\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nconst NOTIFY_ATTEMPTS: u32 = 3;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // Clock: read the current wall-clock time.\n        let seconds = wall_clock::now().seconds;\n\n        // HTTP: one permitted fetch. A transport failure is a value, not a trap,\n        // so a feed that is down still lets the heartbeat report. A host outside\n        // the allowlist is refused by the host at the boundary.\n        let (fetched, fetch_status) = match http_client::fetch(&feed_url) {\n            Ok(body) => {\n                let n = body.chars().count();\n                (u32::try_from(n).unwrap_or(u32::MAX), String::from(\"ok\"))\n            }\n            Err(e) => (0u32, format!(\"error: {}\", e)),\n        };\n\n        // Notifier: report the heartbeat to the digest channel.\n        let message = format!(\n            \"heartbeat at {}s: fetched {} chars from {} ({})\",\n            seconds, fetched, feed_url, fetch_status\n        );\n\n        let mut notified = false;\n        for _ in 0..NOTIFY_ATTEMPTS {\n            if notifier::notify(&message) {\n                notified = true;\n                break;\n            }\n        }\n\n        // The contract requires `notified == true` on every output. If the\n        // channel never accepts the notification, failing the node is the\n        // only way to avoid producing an output that violates the contract.\n        if !notified {\n            panic!(\"notifier refused the heartbeat notification\");\n        }\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 12.0,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.8
+  }
+ ]
+}

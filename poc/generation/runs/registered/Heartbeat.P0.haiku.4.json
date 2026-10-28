@@ -1,0 +1,40 @@
+{
+ "trial": "Heartbeat.P0.haiku.4",
+ "node": "Heartbeat",
+ "group": "pilot",
+ "arm": "P0",
+ "model": "haiku",
+ "model_id": "claude-haiku-5-5",
+ "n": 4,
+ "started": "2026-10-28T02:26:09Z",
+ "task_sha256": "93dce592b6d1084460408b341fb4f78c1abcebf0850e4c490ce1e1f97ccb1e63",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // Read the clock once; this is the only time source the node holds.\n        let now = wall_clock::now();\n\n        // The one permitted fetch. A transport failure is a value, so it is\n        // reported as zero characters rather than failing the heartbeat.\n        // A request outside the allowlist traps at the boundary.\n        let fetched = match http_client::fetch(&feed_url) {\n            Ok(body) => u32::try_from(body.chars().count()).unwrap_or(u32::MAX),\n            Err(_) => 0,\n        };\n\n        let message = format!(\n            \"heartbeat at {} fetched {} chars\",\n            now.seconds, fetched\n        );\n        let notified = notifier::notify(&message);\n\n        // The contract requires `notified == true` on every output. If the\n        // notifier refuses, do not return a report that claims otherwise:\n        // trap instead, so no output violating the ensures is ever produced.\n        if !notified {\n            panic!(\"notifier refused the heartbeat; no report produced\");\n        }\n\n        HeartbeatReport {\n            seconds: now.seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        // Read the clock once; this is the only time source the node holds.\n        let now = wall_clock::now();\n\n        // The one permitted fetch. A transport failure is a value, so it is\n        // reported as zero characters rather than failing the heartbeat.\n        // A request outside the allowlist traps at the boundary.\n        let fetched = match http_client::fetch(&feed_url) {\n            Ok(body) => u32::try_from(body.chars().count()).unwrap_or(u32::MAX),\n            Err(_) => 0,\n        };\n\n        let message = format!(\n            \"heartbeat at {} fetched {} chars\",\n            now.seconds, fetched\n        );\n        let notified = notifier::notify(&message);\n\n        // The contract requires `notified == true` on every output. If the\n        // notifier refuses, do not return a report that claims otherwise:\n        // trap instead, so no output violating the ensures is ever produced.\n        if !notified {\n            panic!(\"notifier refused the heartbeat; no report produced\");\n        }\n\n        HeartbeatReport {\n            seconds: now.seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 14.5,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.64
+  }
+ ]
+}

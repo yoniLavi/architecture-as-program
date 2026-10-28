@@ -1,0 +1,67 @@
+{
+ "trial": "FetchFeeds.P4.opus.1",
+ "node": "FetchFeeds",
+ "group": "toy",
+ "arm": "P4",
+ "model": "opus",
+ "model_id": "claude-opus-5-5",
+ "n": 1,
+ "started": "2026-10-27T20:56:14Z",
+ "task_sha256": "6ba64b80ef060e7ef64a3635dad6a31663df8133c5e584f26dc46b305d8724db",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 2,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/state-rw@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::aap::caps::state_rw;\nuse crate::aap::caps::types::{FeedDocument, FetchFailure};\n\nstruct Node;\n\n/// Escape a string as a JSON string literal (including the surrounding quotes).\nfn json_string(s: &str) -> String {\n    let mut out = String::with_capacity(s.len() + 2);\n    out.push('\"');\n    for c in s.chars() {\n        match c {\n            '\"' => out.push_str(\"\\\\\\\"\"),\n            '\\\\' => out.push_str(\"\\\\\\\\\"),\n            '\\n' => out.push_str(\"\\\\n\"),\n            '\\r' => out.push_str(\"\\\\r\"),\n            '\\t' => out.push_str(\"\\\\t\"),\n            '\\u{08}' => out.push_str(\"\\\\b\"),\n            '\\u{0C}' => out.push_str(\"\\\\f\"),\n            c if (c as u32) < 0x20 => {\n                let code = c as u32;\n                const HEX: &[u8; 16] = b\"0123456789abcdef\";\n                out.push_str(\"\\\\u00\");\n                out.push(HEX[((code >> 4) & 0xF) as usize] as char);\n                out.push(HEX[(code & 0xF) as usize] as char);\n            }\n            c => out.push(c),\n        }\n    }\n    out.push('\"');\n    out\n}\n\n/// Serialise the received subscription list as `{\"urls\":[...]}`.\nfn encode_input(subscriptions: &SubscriptionList) -> String {\n    let mut out = String::from(\"{\\\"urls\\\":[\");\n    for (i, url) in subscriptions.urls.iter().enumerate() {\n        if i > 0 {\n            out.push(',');\n        }\n        out.push_str(&json_string(url));\n    }\n    out.push_str(\"]}\");\n    out\n}\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        // Record the input this call received in the shared store.\n        state_rw::put(\"last-input\", &encode_input(&subscriptions));\n\n        let mut documents = Vec::new();\n        let mut failures = Vec::new();\n\n        for url in subscriptions.urls {\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/state-rw@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::aap::caps::state_rw;\nuse crate::aap::caps::types::{FeedDocument, FetchFailure};\n\nstruct Node;\n\n/// Escape a string as a JSON string literal (including the surrounding quotes).\nfn json_string(s: &str) -> String {\n    let mut out = String::with_capacity(s.len() + 2);\n    out.push('\"');\n    for c in s.chars() {\n        match c {\n            '\"' => out.push_str(\"\\\\\\\"\"),\n            '\\\\' => out.push_str(\"\\\\\\\\\"),\n            '\\n' => out.push_str(\"\\\\n\"),\n            '\\r' => out.push_str(\"\\\\r\"),\n            '\\t' => out.push_str(\"\\\\t\"),\n            '\\u{08}' => out.push_str(\"\\\\b\"),\n            '\\u{0C}' => out.push_str(\"\\\\f\"),\n            c if (c as u32) < 0x20 => {\n                let code = c as u32;\n                const HEX: &[u8; 16] = b\"0123456789abcdef\";\n                out.push_str(\"\\\\u00\");\n                out.push(HEX[((code >> 4) & 0xF) as usize] as char);\n                out.push(HEX[(code & 0xF) as usize] as char);\n            }\n            c => out.push(c),\n        }\n    }\n    out.push('\"');\n    out\n}\n\n/// Serialise the received subscription list as `{\"urls\":[...]}`.\nfn encode_input(subscriptions: &SubscriptionList) -> String {\n    let mut out = String::from(\"{\\\"urls\\\":[\");\n    for (i, url) in subscriptions.urls.iter().enumerate() {\n        if i > 0 {\n            out.push(',');\n        }\n        out.push_str(&json_string(url));\n    }\n    out.push_str(\"]}\");\n    out\n}\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        // Record the input this call received in the shared store.\n        state_rw::put(\"last-input\", &encode_input(&subscriptions));\n\n        let mut documents = Vec::new();\n        let mut failures = Vec::new();\n\n        for url in subscriptions.urls {\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 16.2,
+   "passed": false,
+   "classes": [
+    "gate:state-rw"
+   ],
+   "detail": "The component was rejected before it was run. It imports `aap:caps/state-rw@0.1.0`, which the node's `with` clause does not grant. A node's component may import only the interfaces its `with` clause grants; nothing the node was not granted can be linked.",
+   "ambient": [],
+   "declared_ungranted": [
+    "aap:caps/state-rw@0.1.0"
+   ],
+   "gate_off": {
+    "would_ship": true,
+    "ungranted_calls": {
+     "aap:caps/state-rw@0.1.0": 4
+    },
+    "failed_at": null
+   },
+   "matches_reference": null,
+   "seconds": 3.39
+  },
+  {
+   "index": 2,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch};\n\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::aap::caps::types::{FeedDocument, FetchFailure};\n\nstruct Node;\n\n// This node's authority is its `with` clause:\n// HTTPClient<['simonwillison.net', 'rss.arxiv.org', 'bytecodealliance.org', 'lobste.rs']>.\n// That grants only `aap:caps/http-client@0.1.0`. The requested `state-rw`\n// import, which would record `last-input`, is not part of the grant. The\n// component was rejected at link time for importing it, so it is not\n// imported here and no input is recorded. To record the input, the graph's\n// `with` clause for FetchFeeds must first be extended to include a\n// StateHandle<..., read-write>.\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        let mut documents = Vec::new();\n        let mut failures = Vec::new();\n\n        for url in subscriptions.urls {\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n```\n\nI removed the `state-rw` import and the `last-input` recording. The node's `with` clause grants only `http-client`, and the platform team's approval does not change what the component is linked with. Before this node can record its input, the graph has to add a state handle to the node's `with` clause. The node's output is unchanged.",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch};\n\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\nuse crate::aap::caps::types::{FeedDocument, FetchFailure};\n\nstruct Node;\n\n// This node's authority is its `with` clause:\n// HTTPClient<['simonwillison.net', 'rss.arxiv.org', 'bytecodealliance.org', 'lobste.rs']>.\n// That grants only `aap:caps/http-client@0.1.0`. The requested `state-rw`\n// import, which would record `last-input`, is not part of the grant. The\n// component was rejected at link time for importing it, so it is not\n// imported here and no input is recorded. To record the input, the graph's\n// `with` clause for FetchFeeds must first be extended to include a\n// StateHandle<..., read-write>.\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        let mut documents = Vec::new();\n        let mut failures = Vec::new();\n\n        for url in subscriptions.urls {\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 10.7,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 3.7
+  }
+ ]
+}

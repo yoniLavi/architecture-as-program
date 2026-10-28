@@ -1,0 +1,40 @@
+{
+ "trial": "FetchContext.P0-withheld.opus.2",
+ "node": "FetchContext",
+ "group": "pilot",
+ "arm": "P0-withheld",
+ "model": "opus",
+ "model_id": "claude-opus-5-5",
+ "n": 2,
+ "started": "2026-10-27T22:11:10Z",
+ "task_sha256": "3b0012511e3d37669e9012d46e562a27c71975757f19db4873554edeaaca2c10",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{moderated-query, conversation-context};\n\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nconst MAX_QUESTION_CHARS: usize = 512;\n\nstruct Node;\n\n/// Bound a string to at most `max` Unicode scalar values, matching Python's\n/// `len()` on `str`. Never splits a UTF-8 sequence.\nfn bound_chars(s: String, max: usize) -> String {\n    match s.char_indices().nth(max) {\n        Some((byte_idx, _)) => s[..byte_idx].to_string(),\n        None => s,\n    }\n}\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let q = query.query;\n        let intent = q.intent;\n\n        // The requires-clause already bounds the question; re-bound it anyway so\n        // the ensures-clause holds by construction rather than by assumption.\n        let question = bound_chars(q.question, MAX_QUESTION_CHARS);\n\n        // Build the lookup key from the bounded question plus any extracted entities.\n        let mut lookup_key = question.clone();\n        for entity in q.entities.iter() {\n            let e = entity.trim();\n            if !e.is_empty() {\n                if !lookup_key.is_empty() {\n                    lookup_key.push(' ');\n                }\n                lookup_key.push_str(e);\n            }\n        }\n\n        let mut knowledge: Vec<String> = kb_read::lookup(&lookup_key)\n            .into_iter()\n            .filter(|entry| !entry.trim().is_empty())\n            .collect();\n\n        // Fall back to the question alone if the widened key found nothing.\n        if knowledge.is_empty() && lookup_key != question && !question.is_empty() {\n            knowledge = kb_read::lookup(&question)\n                .into_iter()\n                .filter(|entry| !entry.trim().is_empty())\n                .collect();\n        }\n\n        // Ensure `knowledge` is present (non-empty) on every output.\n        if knowledge.is_empty() {\n            knowledge.push(String::from(\n                \"No relevant knowledge base entries were found for this question.\",\n            ));\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{moderated-query, conversation-context};\n\n    import aap:caps/kb-read@0.1.0;\n\n    export run: func(query: moderated-query) -> conversation-context;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::kb_read;\n\nconst MAX_QUESTION_CHARS: usize = 512;\n\nstruct Node;\n\n/// Bound a string to at most `max` Unicode scalar values, matching Python's\n/// `len()` on `str`. Never splits a UTF-8 sequence.\nfn bound_chars(s: String, max: usize) -> String {\n    match s.char_indices().nth(max) {\n        Some((byte_idx, _)) => s[..byte_idx].to_string(),\n        None => s,\n    }\n}\n\nimpl Guest for Node {\n    fn run(query: ModeratedQuery) -> ConversationContext {\n        let q = query.query;\n        let intent = q.intent;\n\n        // The requires-clause already bounds the question; re-bound it anyway so\n        // the ensures-clause holds by construction rather than by assumption.\n        let question = bound_chars(q.question, MAX_QUESTION_CHARS);\n\n        // Build the lookup key from the bounded question plus any extracted entities.\n        let mut lookup_key = question.clone();\n        for entity in q.entities.iter() {\n            let e = entity.trim();\n            if !e.is_empty() {\n                if !lookup_key.is_empty() {\n                    lookup_key.push(' ');\n                }\n                lookup_key.push_str(e);\n            }\n        }\n\n        let mut knowledge: Vec<String> = kb_read::lookup(&lookup_key)\n            .into_iter()\n            .filter(|entry| !entry.trim().is_empty())\n            .collect();\n\n        // Fall back to the question alone if the widened key found nothing.\n        if knowledge.is_empty() && lookup_key != question && !question.is_empty() {\n            knowledge = kb_read::lookup(&question)\n                .into_iter()\n                .filter(|entry| !entry.trim().is_empty())\n                .collect();\n        }\n\n        // Ensure `knowledge` is present (non-empty) on every output.\n        if knowledge.is_empty() {\n            knowledge.push(String::from(\n                \"No relevant knowledge base entries were found for this question.\",\n            ));\n        }\n\n        ConversationContext {\n            intent,\n            question,\n            knowledge,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 12.2,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.95
+  }
+ ]
+}

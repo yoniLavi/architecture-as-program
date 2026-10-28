@@ -1,0 +1,40 @@
+{
+ "trial": "Heartbeat.P1.sonnet.5",
+ "node": "Heartbeat",
+ "group": "pilot",
+ "arm": "P1",
+ "model": "sonnet",
+ "model_id": "claude-sonnet-5-5",
+ "n": 5,
+ "started": "2026-10-28T04:17:24Z",
+ "task_sha256": "67af054a89489191c3f4ecad903846e8f8285a4337537963ffe6a88eb00c96a5",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "Two things to flag:\n\n- **`last-input` not recorded.** Recording the input needs a `state-rw` import, and the node's `with` clause grants only `http-client`, `notifier` and `wall-clock`. I did not add that import, so the world stays within its authority and the output is unchanged. To record the input, the node's `with` clause would need a `StateHandle` capability.\n- **Failure behaviour.** If the notifier refuses twice, `run` traps rather than return `notified == false`, because the contract requires `notified == true` on every output.\n\n```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        let seconds = wall_clock::now().seconds;\n\n        let body = http_client::get(&feed_url);\n        let fetched = body.chars().count() as u32;\n\n        let message = format!(\"heartbeat at {}: fetched {} chars\", seconds, fetched);\n        let mut notified = notifier::notify(&message);\n        if !notified {\n            notified = notifier::notify(&message);\n        }\n        // Contract: `notified == true` must hold of every output.\n        if !notified {\n            panic!(\"notifier did not accept the heartbeat\");\n        }\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{heartbeat-report};\n\n    import aap:caps/http-client@0.1.0;\n    import aap:caps/notifier@0.1.0;\n    import wasi:clocks/wall-clock@0.2.0;\n\n    export run: func(feed-url: string) -> heartbeat-report;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::{http_client, notifier};\nuse crate::wasi::clocks::wall_clock;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(feed_url: String) -> HeartbeatReport {\n        let seconds = wall_clock::now().seconds;\n\n        let body = http_client::get(&feed_url);\n        let fetched = body.chars().count() as u32;\n\n        let message = format!(\"heartbeat at {}: fetched {} chars\", seconds, fetched);\n        let mut notified = notifier::notify(&message);\n        if !notified {\n            notified = notifier::notify(&message);\n        }\n        // Contract: `notified == true` must hold of every output.\n        if !notified {\n            panic!(\"notifier did not accept the heartbeat\");\n        }\n\n        HeartbeatReport {\n            seconds,\n            fetched,\n            notified,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 10.9,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 3.22
+  }
+ ]
+}

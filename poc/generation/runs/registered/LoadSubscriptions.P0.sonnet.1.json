@@ -1,0 +1,59 @@
+{
+ "trial": "LoadSubscriptions.P0.sonnet.1",
+ "node": "LoadSubscriptions",
+ "group": "toy",
+ "arm": "P0",
+ "model": "sonnet",
+ "model_id": "claude-sonnet-5-5",
+ "n": 1,
+ "started": "2026-10-27T20:46:38Z",
+ "task_sha256": "ab52a7a91b9376be3bfd0ef94c30eeb0f24b3ff27f6616c649fe613106deb06a",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 2,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let raw = state_read::get(\"urls\").unwrap_or_default();\n        let urls: Vec<String> = raw\n            .lines()\n            .map(|l| l.trim())\n            .filter(|l| !l.is_empty())\n            .map(|l| l.to_string())\n            .collect();\n        // Contract: present(urls). Refuse to emit an empty list.\n        if urls.is_empty() {\n            panic!(\"no subscriptions found in state store\");\n        }\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        let raw = state_read::get(\"urls\").unwrap_or_default();\n        let urls: Vec<String> = raw\n            .lines()\n            .map(|l| l.trim())\n            .filter(|l| !l.is_empty())\n            .map(|l| l.to_string())\n            .collect();\n        // Contract: present(urls). Refuse to emit an empty list.\n        if urls.is_empty() {\n            panic!(\"no subscriptions found in state store\");\n        }\n        SubscriptionList { urls }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 7.9,
+   "passed": false,
+   "classes": [
+    "contract"
+   ],
+   "detail": "the body failed on an input its contract admits.\ninput: RunInfo(date='2026-10-09', started=1791547200)\nerror: WasmtimeError: error while executing at wasm backtrace:\n    0:   0x3b3b - <unknown>!<wasm function 30>\n    1:   0x3b31 - <unknown>!<wasm function 29>\n    2:   0x3bda - <unknown>!<wasm function 35>\n    3:   0x3b79 - <unknown>!<wasm function 34>\n    4:   0x33d4 - <unknown>!<wasm function 24>\n    5:   0x25fc - <unknown>!<wasm function 13>\n    6:   0x2427 - <unknown>!<wasm function 12>\n\nCaused by:\n    wasm trap: wasm `unreachable` instruction executed\n",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 5.43
+  },
+  {
+   "index": 2,
+   "reply": "Two files below. The earlier build trapped because `panic!` fired when the store returned nothing under `\"urls\"`, and `panic = \"abort\"` turns that into an `unreachable` trap. The body now never panics. It tries a few likely keys and accepts either a JSON array or a plain list of URLs. If nothing is found, it returns an empty list instead of trapping. I could not tell from the contract whether `present(urls)` requires a non-empty list. I chose not to invent URLs, so if the store holds nothing, that case would still fail the contract check.\n\n```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nfn parse_json_strings(s: &str) -> Vec<String> {\n    let mut out = Vec::new();\n    let mut chars = s.chars();\n    while let Some(c) = chars.next() {\n        if c == '\"' {\n            let mut cur = String::new();\n            while let Some(d) = chars.next() {\n                match d {\n                    '\"' => break,\n                    '\\\\' => {\n                        if let Some(e) = chars.next() {\n                            match e {\n                                'n' => cur.push('\\n'),\n                                't' => cur.push('\\t'),\n                                'r' => cur.push('\\r'),\n                                other => cur.push(other),\n                            }\n                        }\n                    }\n                    _ => cur.push(d),\n                }\n            }\n            out.push(cur);\n        }\n    }\n    out\n}\n\nfn parse(raw: &str) -> Vec<String> {\n    let t = raw.trim();\n    let items: Vec<String> = if t.starts_with('[') {\n        parse_json_strings(t)\n    } else {\n        t.split(|c: char| c == '\\n' || c == ',' || c.is_whitespace())\n            .map(|l| l.to_string())\n            .collect()\n    };\n    items\n        .into_iter()\n        .map(|l| l.trim().to_string())\n        .filter(|l| !l.is_empty())\n        .collect()\n}\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        for key in [\"urls\", \"subscriptions\", \"feeds\"] {\n            if let Some(raw) = state_read::get(key) {\n                let urls = parse(&raw);\n                if !urls.is_empty() {\n                    return SubscriptionList { urls };\n                }\n            }\n        }\n        SubscriptionList { urls: Vec::new() }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{run-info, subscription-list};\n\n    import aap:caps/state-read@0.1.0;\n\n    export run: func(info: run-info) -> subscription-list;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_read;\n\nstruct Node;\n\nfn parse_json_strings(s: &str) -> Vec<String> {\n    let mut out = Vec::new();\n    let mut chars = s.chars();\n    while let Some(c) = chars.next() {\n        if c == '\"' {\n            let mut cur = String::new();\n            while let Some(d) = chars.next() {\n                match d {\n                    '\"' => break,\n                    '\\\\' => {\n                        if let Some(e) = chars.next() {\n                            match e {\n                                'n' => cur.push('\\n'),\n                                't' => cur.push('\\t'),\n                                'r' => cur.push('\\r'),\n                                other => cur.push(other),\n                            }\n                        }\n                    }\n                    _ => cur.push(d),\n                }\n            }\n            out.push(cur);\n        }\n    }\n    out\n}\n\nfn parse(raw: &str) -> Vec<String> {\n    let t = raw.trim();\n    let items: Vec<String> = if t.starts_with('[') {\n        parse_json_strings(t)\n    } else {\n        t.split(|c: char| c == '\\n' || c == ',' || c.is_whitespace())\n            .map(|l| l.to_string())\n            .collect()\n    };\n    items\n        .into_iter()\n        .map(|l| l.trim().to_string())\n        .filter(|l| !l.is_empty())\n        .collect()\n}\n\nimpl Guest for Node {\n    fn run(_info: RunInfo) -> SubscriptionList {\n        for key in [\"urls\", \"subscriptions\", \"feeds\"] {\n            if let Some(raw) = state_read::get(key) {\n                let urls = parse(&raw);\n                if !urls.is_empty() {\n                    return SubscriptionList { urls };\n                }\n            }\n        }\n        SubscriptionList { urls: Vec::new() }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 12.6,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.94
+  }
+ ]
+}

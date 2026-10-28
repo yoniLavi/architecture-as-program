@@ -1,0 +1,40 @@
+{
+ "trial": "SendReply.P0.opus.4",
+ "node": "SendReply",
+ "group": "pilot",
+ "arm": "P0",
+ "model": "opus",
+ "model_id": "claude-opus-5-5",
+ "n": 4,
+ "started": "2026-10-28T02:19:44Z",
+ "task_sha256": "a4ea02fe358f9f2811cefa217d4eea2900eeca1664e42d568af35848d813c661",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{agent-response, delivery-confirmation};\n\n    import aap:caps/response-channel@0.1.0;\n\n    export run: func(reply: agent-response) -> delivery-confirmation;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::response_channel;\n\nstruct Node;\n\n/// Bound on delivery attempts. The channel stamps its own session identity on\n/// every confirmation; a refused send may be transient, so we retry a small,\n/// fixed number of times rather than loop without limit.\nconst MAX_ATTEMPTS: u32 = 3;\n\nimpl Guest for Node {\n    fn run(reply: AgentResponse) -> DeliveryConfirmation {\n        // `requires len(text) <= 100000` holds of every input, so the text is\n        // passed through to the channel unchanged.\n        let mut attempt = 0;\n        loop {\n            attempt += 1;\n            let confirmation = response_channel::send(&reply.text);\n\n            // The session identity comes from the host, never from the guest.\n            // An empty identity means the host did not report which session\n            // received the reply. Retrying would not change that, so we stop.\n            if confirmation.session.is_empty() {\n                panic!(\"response channel returned a confirmation without a session identity\");\n            }\n\n            if confirmation.delivered {\n                // Both postconditions hold: delivered == true and the session is\n                // present. Return the host's confirmation as received.\n                return confirmation;\n            }\n\n            if attempt >= MAX_ATTEMPTS {\n                // Producing an output with delivered == false would violate the\n                // contract. Faking delivered == true would misreport what the\n                // host said. Trapping is the only honest outcome.\n                panic!(\"response channel refused delivery after {} attempts\", MAX_ATTEMPTS);\n            }\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{agent-response, delivery-confirmation};\n\n    import aap:caps/response-channel@0.1.0;\n\n    export run: func(reply: agent-response) -> delivery-confirmation;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::response_channel;\n\nstruct Node;\n\n/// Bound on delivery attempts. The channel stamps its own session identity on\n/// every confirmation; a refused send may be transient, so we retry a small,\n/// fixed number of times rather than loop without limit.\nconst MAX_ATTEMPTS: u32 = 3;\n\nimpl Guest for Node {\n    fn run(reply: AgentResponse) -> DeliveryConfirmation {\n        // `requires len(text) <= 100000` holds of every input, so the text is\n        // passed through to the channel unchanged.\n        let mut attempt = 0;\n        loop {\n            attempt += 1;\n            let confirmation = response_channel::send(&reply.text);\n\n            // The session identity comes from the host, never from the guest.\n            // An empty identity means the host did not report which session\n            // received the reply. Retrying would not change that, so we stop.\n            if confirmation.session.is_empty() {\n                panic!(\"response channel returned a confirmation without a session identity\");\n            }\n\n            if confirmation.delivered {\n                // Both postconditions hold: delivered == true and the session is\n                // present. Return the host's confirmation as received.\n                return confirmation;\n            }\n\n            if attempt >= MAX_ATTEMPTS {\n                // Producing an output with delivered == false would violate the\n                // contract. Faking delivered == true would misreport what the\n                // host said. Trapping is the only honest outcome.\n                panic!(\"response channel refused delivery after {} attempts\", MAX_ATTEMPTS);\n            }\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 11.9,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 2.81
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "trial": "FetchFeeds.P5.haiku.3",
+ "node": "FetchFeeds",
+ "group": "toy",
+ "arm": "P5",
+ "model": "haiku",
+ "model_id": "claude-haiku-5-5",
+ "n": 3,
+ "started": "2026-10-28T00:56:38Z",
+ "task_sha256": "1416c46d77923f7e74f8e30201f51313e49060adc680edf90c80d8a2551e7279",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 1,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch, feed-document, fetch-failure};\n\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n```\n\n```rust\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\n\nconst ALLOWED_HOSTS: [&str; 4] = [\n    \"simonwillison.net\",\n    \"rss.arxiv.org\",\n    \"bytecodealliance.org\",\n    \"lobste.rs\",\n];\n\nstruct Node;\n\n/// Extracts the lowercase host of an http(s) URL, or `None` if the URL is\n/// malformed or carries userinfo, which is refused rather than guessed at.\nfn host_of(url: &str) -> Option<String> {\n    let rest = url\n        .strip_prefix(\"https://\")\n        .or_else(|| url.strip_prefix(\"http://\"))?;\n    let authority = rest.split(['/', '?', '#']).next()?;\n    if authority.contains('@') {\n        return None;\n    }\n    let host = authority.split(':').next()?;\n    if host.is_empty() {\n        return None;\n    }\n    Some(host.to_ascii_lowercase())\n}\n\nfn is_allowed(url: &str) -> bool {\n    match host_of(url) {\n        Some(host) => ALLOWED_HOSTS.contains(&host.as_str()),\n        None => false,\n    }\n}\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        let mut documents: Vec<FeedDocument> = Vec::new();\n        let mut failures: Vec<FetchFailure> = Vec::new();\n\n        for url in subscriptions.urls {\n            // Out-of-allowlist requests trap at the host boundary, so refuse them\n            // here as recorded failures instead of letting one URL abort the run.\n            if !is_allowed(&url) {\n                failures.push(FetchFailure {\n                    url,\n                    error: \"host not in allowlist\".to_string(),\n                });\n                continue;\n            }\n\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n```\n\nI did not add the `aap:caps/state-rw@0.1.0` import or the `last-input` write. The node's `with` clause is its entire authority, and the graph definition doesn't grant that interface yet. Recording each input in a shared store would also be a write capability this node doesn't hold. Once the graph definition is updated to grant `state-rw`, that change can be added as a separate step.",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{subscription-list, feed-batch, feed-document, fetch-failure};\n\n    import aap:caps/http-client@0.1.0;\n\n    export run: func(subscriptions: subscription-list) -> feed-batch;\n}\n",
+    "lib.rs": "wit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::http_client;\n\nconst ALLOWED_HOSTS: [&str; 4] = [\n    \"simonwillison.net\",\n    \"rss.arxiv.org\",\n    \"bytecodealliance.org\",\n    \"lobste.rs\",\n];\n\nstruct Node;\n\n/// Extracts the lowercase host of an http(s) URL, or `None` if the URL is\n/// malformed or carries userinfo, which is refused rather than guessed at.\nfn host_of(url: &str) -> Option<String> {\n    let rest = url\n        .strip_prefix(\"https://\")\n        .or_else(|| url.strip_prefix(\"http://\"))?;\n    let authority = rest.split(['/', '?', '#']).next()?;\n    if authority.contains('@') {\n        return None;\n    }\n    let host = authority.split(':').next()?;\n    if host.is_empty() {\n        return None;\n    }\n    Some(host.to_ascii_lowercase())\n}\n\nfn is_allowed(url: &str) -> bool {\n    match host_of(url) {\n        Some(host) => ALLOWED_HOSTS.contains(&host.as_str()),\n        None => false,\n    }\n}\n\nimpl Guest for Node {\n    fn run(subscriptions: SubscriptionList) -> FeedBatch {\n        let mut documents: Vec<FeedDocument> = Vec::new();\n        let mut failures: Vec<FetchFailure> = Vec::new();\n\n        for url in subscriptions.urls {\n            // Out-of-allowlist requests trap at the host boundary, so refuse them\n            // here as recorded failures instead of letting one URL abort the run.\n            if !is_allowed(&url) {\n                failures.push(FetchFailure {\n                    url,\n                    error: \"host not in allowlist\".to_string(),\n                });\n                continue;\n            }\n\n            match http_client::fetch(&url) {\n                Ok(body) => documents.push(FeedDocument { url, body }),\n                Err(error) => failures.push(FetchFailure { url, error }),\n            }\n        }\n\n        FeedBatch {\n            documents,\n            failures,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 20.0,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 4.05
+  }
+ ]
+}

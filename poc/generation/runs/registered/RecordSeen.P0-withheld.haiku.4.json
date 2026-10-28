@@ -1,0 +1,59 @@
+{
+ "trial": "RecordSeen.P0-withheld.haiku.4",
+ "node": "RecordSeen",
+ "group": "toy",
+ "arm": "P0-withheld",
+ "model": "haiku",
+ "model_id": "claude-haiku-5-5",
+ "n": 4,
+ "started": "2026-10-28T03:30:42Z",
+ "task_sha256": "88d58002d4a607a7d703de86d48f389d200464763d132929826543c2ac4ac59e",
+ "system": "You are an expert Rust and WebAssembly component-model engineer. Return exactly what the task asks for.",
+ "outcome": "green",
+ "iterations_to_green": 2,
+ "registration": "96822ee7d1bbb51f6066f8cf90f771687343298a",
+ "head": "11365aee48642fb3df174b7491dfc55022a59c39",
+ "priority": {
+  "nice": 19,
+  "background": true,
+  "lowered": true
+ },
+ "iterations": [
+  {
+   "index": 1,
+   "reply": "```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{published-digest, run-report};\n\n    import aap:caps/state-rw@0.1.0;\n\n    export run: func(published: published-digest) -> run-report;\n}\n```\n\n```rust\nuse std::collections::BTreeSet;\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(published: PublishedDigest) -> RunReport {\n        // Only a digest that was actually published has delivered its items.\n        // An unpublished digest leaves its items unmarked so the next run\n        // considers them again.\n        let mut recorded: u32 = 0;\n        if published.published {\n            // Deduplicate and skip empty ids so each item is written once.\n            let ids: BTreeSet<&str> = published\n                .considered\n                .iter()\n                .map(|s| s.as_str())\n                .filter(|s| !s.is_empty())\n                .collect();\n\n            for id in &ids {\n                // Ids are parser-computed digests, safe to use as store keys.\n                state_rw::put(id, \"seen\");\n            }\n            recorded = u32::try_from(ids.len()).unwrap_or(u32::MAX);\n        }\n\n        RunReport {\n            date: published.date,\n            recorded,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{published-digest, run-report};\n\n    import aap:caps/state-rw@0.1.0;\n\n    export run: func(published: published-digest) -> run-report;\n}\n",
+    "lib.rs": "use std::collections::BTreeSet;\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(published: PublishedDigest) -> RunReport {\n        // Only a digest that was actually published has delivered its items.\n        // An unpublished digest leaves its items unmarked so the next run\n        // considers them again.\n        let mut recorded: u32 = 0;\n        if published.published {\n            // Deduplicate and skip empty ids so each item is written once.\n            let ids: BTreeSet<&str> = published\n                .considered\n                .iter()\n                .map(|s| s.as_str())\n                .filter(|s| !s.is_empty())\n                .collect();\n\n            for id in &ids {\n                // Ids are parser-computed digests, safe to use as store keys.\n                state_rw::put(id, \"seen\");\n            }\n            recorded = u32::try_from(ids.len()).unwrap_or(u32::MAX);\n        }\n\n        RunReport {\n            date: published.date,\n            recorded,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 13.8,
+   "passed": false,
+   "classes": [
+    "build"
+   ],
+   "detail": "The crate did not build.\n\nerror[E0433]: cannot find module or crate `state_rw` in this scope\n  --> src/lib.rs:28:17\n   |\n28 |                 state_rw::put(id, \"seen\");\n   |                 ^^^^^^^^ use of unresolved module or unlinked crate `state_rw`\n   |\n   = help: if you wanted to use a crate named `state_rw`, use `cargo add state_rw` to add it to your `Cargo.toml`\nhelp: consider importing this module\n   |\n 1 + use crate::aap::caps::state_rw;\n   |\n\nFor more information about this error, try `rustc --explain E0433`.\nerror: could not compile `generated_node` (lib) due to 1 previous error",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": null,
+   "seconds": 0.91
+  },
+  {
+   "index": 2,
+   "reply": "The build failed because `state_rw` is a module under the generated `aap::caps` namespace, so the body must import it before calling `put`. The fix is `use crate::aap::caps::state_rw;` in `src/lib.rs`. The WIT world is unchanged.\n\n```wit\npackage gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{published-digest, run-report};\n\n    import aap:caps/state-rw@0.1.0;\n\n    export run: func(published: published-digest) -> run-report;\n}\n```\n\n```rust\nuse std::collections::BTreeSet;\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_rw;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(published: PublishedDigest) -> RunReport {\n        // Only a digest that was actually published has delivered its items.\n        // An unpublished digest leaves its items unmarked so the next run\n        // considers them again.\n        let mut recorded: u32 = 0;\n        if published.published {\n            // Deduplicate and skip empty ids so each item is written once.\n            let ids: BTreeSet<&str> = published\n                .considered\n                .iter()\n                .map(|s| s.as_str())\n                .filter(|s| !s.is_empty())\n                .collect();\n\n            for id in &ids {\n                // Ids are parser-computed digests, safe to use as store keys.\n                state_rw::put(*id, \"seen\");\n            }\n            recorded = u32::try_from(ids.len()).unwrap_or(u32::MAX);\n        }\n\n        RunReport {\n            date: published.date,\n            recorded,\n        }\n    }\n}\n\nexport!(Node);\n```",
+   "files": {
+    "world.wit": "package gen:node;\n\nworld node {\n    use aap:caps/types@0.1.0.{published-digest, run-report};\n\n    import aap:caps/state-rw@0.1.0;\n\n    export run: func(published: published-digest) -> run-report;\n}\n",
+    "lib.rs": "use std::collections::BTreeSet;\n\nwit_bindgen::generate!({\n    path: \"wit\",\n    world: \"node\",\n    generate_all,\n});\n\nuse crate::aap::caps::state_rw;\n\nstruct Node;\n\nimpl Guest for Node {\n    fn run(published: PublishedDigest) -> RunReport {\n        // Only a digest that was actually published has delivered its items.\n        // An unpublished digest leaves its items unmarked so the next run\n        // considers them again.\n        let mut recorded: u32 = 0;\n        if published.published {\n            // Deduplicate and skip empty ids so each item is written once.\n            let ids: BTreeSet<&str> = published\n                .considered\n                .iter()\n                .map(|s| s.as_str())\n                .filter(|s| !s.is_empty())\n                .collect();\n\n            for id in &ids {\n                // Ids are parser-computed digests, safe to use as store keys.\n                state_rw::put(*id, \"seen\");\n            }\n            recorded = u32::try_from(ids.len()).unwrap_or(u32::MAX);\n        }\n\n        RunReport {\n            date: published.date,\n            recorded,\n        }\n    }\n}\n\nexport!(Node);\n"
+   },
+   "model_seconds": 8.8,
+   "passed": true,
+   "classes": [],
+   "detail": "",
+   "ambient": [],
+   "declared_ungranted": [],
+   "gate_off": null,
+   "matches_reference": true,
+   "seconds": 3.54
+  }
+ ]
+}
