@@ -67,9 +67,11 @@ from .sandbox import (
     available,
 )
 from .sandbox.bench import (
+    COMPILATION_TIMING_CLOCK,
     ENVELOPE_CROSSING_MS,
     ENVELOPE_MAX_OVERHEAD,
     ENVELOPE_NODE_WORK_MS,
+    TIMING_CLOCK,
     BenchResult,
     measure,
 )
@@ -1216,8 +1218,8 @@ def check_derivations(derivations: list[Derivation]) -> list[str]:
 
 
 def _environment() -> list[tuple[str, str]]:
-    """Where these numbers came from. The overhead figures are wall-clock timings
-    and therefore machine-dependent; an artifact that reported them without saying
+    """Where these numbers came from. The overhead figures are CPU-time timings
+    and still machine-dependent; an artifact that reported them without saying
     what produced them would invite comparison across machines."""
     try:
         from importlib.metadata import version
@@ -1295,9 +1297,12 @@ def render(
     lines.append("## Environment")
     lines.append("")
     lines.append(
-        "The overhead figures below are wall-clock timings from this machine. They are "
-        "reported to establish an order of magnitude against the proposal's envelope, "
-        "not as portable benchmarks."
+        f"The overhead figures below are CPU-time timings from this machine: the "
+        f"{TIMING_CLOCK}, and for compilation the {COMPILATION_TIMING_CLOCK}. "
+        "CPU time leaves out time spent waiting for a core, which wall-clock time would "
+        "charge to the boundary on a shared machine, but contention still inflates it. "
+        "They are reported to establish an order of magnitude against the proposal's "
+        "envelope, not as portable benchmarks."
     )
     lines.append("")
     lines.append("| | |")

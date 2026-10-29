@@ -68,6 +68,21 @@ The band's ceiling SHALL be a decade boundary, so that no measurement the band a
 above the one the papers state. The band admits the upper half of the decade below as well, so the papers SHALL
 interpolate whichever magnitude a run names rather than state one in their own hand.
 
+The overhead SHALL be measured in CPU time, not wall-clock time: the CPU time of the measuring
+thread for every call into a component, and the CPU time of the whole process for compilation,
+which wasmtime spreads over worker threads. The machine that builds the corpus is shared and never
+idle, and wall-clock time charges the time a measurement spent waiting for a core to whatever it
+measured (decided 29 October 2026, when a build on a loaded machine read 83µs for a crossing that
+reads ~25µs on a quiet one; thread CPU time on the same machine read ~50µs). CPU time does not
+remove the slowdown of running on a contended core, so the band stays, and the artifact and the
+papers SHALL name the clock.
+
+#### Scenario: The benchmark runs on a loaded machine
+- **WHEN** the overhead is measured while other work competes for the cores
+- **THEN** the time the measuring thread spent waiting for a core is not charged to the boundary
+- **AND** the artifact and the paper name the clock, and do not claim that contention has been
+  removed from the figure
+
 #### Scenario: A contaminated measurement does not reach the artifact
 - **WHEN** the per-crossing cost measures outside the band on every attempt
 - **THEN** no evaluation artifact is written, and the failure names the band and says whether the

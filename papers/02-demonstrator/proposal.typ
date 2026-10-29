@@ -359,7 +359,7 @@ The vision asserted an envelope with no measurement behind it: if a node does ab
     [`GenerateResponse` run (warm)], [#d.generate_invocation_ms ms], [#ev.overhead.generate_crossings crossings],
     [*marginal per-crossing*], [*#d.crossing_us µs*], [differenced between two warm paths through one component],
   ),
-  caption: [Capability-boundary overhead on the confined tier. Every crossing lifts and lowers typed WIT values.],
+  caption: [Capability-boundary overhead on the confined tier, in CPU time: the measuring thread's, and for compilation, which wasmtime spreads over threads, the whole process's. Every crossing lifts and lowers typed WIT values.],
 ) <tab:overhead>
 
 A crossing costs #d.crossing_us µs — #if ev.overhead.within_envelope [within] else [*outside*] the #d.envelope_crossing_ms ms envelope, so a single crossing is #d.projected_overhead of a node doing #d.envelope_node_work_ms ms of work — even though crossings lift and lower typed variants, records, and lists rather than the packed `(ptr, len)` bytes of the tier's first implementation. No like-for-like measurement of that flat-ABI tier exists — its earlier, unpublished figures came from a cold-pass timing loop, since corrected to warm and take the best of several rounds, that could distort a differenced cost by an order of magnitude — so the figures say nothing about what typing the boundary cost, only that the typed crossing sits inside the envelope. The figures come from a Python host and a two-node slice; they locate the fixed cost in instantiation and say nothing about complex-type serialisation or graphs of hundreds of nodes.
@@ -490,7 +490,7 @@ The failure mode of a paper like this one is not a false claim but a true claim 
 
 == Internal validity <sec:threat-internal>
 
-*The per-crossing cost is a differenced quantity, and fragile.* Any systematic cost landing in one of two timings is charged to the boundary, and a contended machine moves the figure by a decade, since differencing amplifies any slowdown that lands unevenly on its two terms. The harness therefore pins the measurement to a band, re-measures an excursion, and fails the build on a sustained one; the magnitude quoted is interpolated from that pinned run. The supported claim is the magnitude, #d.crossing_magnitude, not the figure. Instance pooling is unimplemented, and complex-type serialisation is unmeasured.
+*The per-crossing cost is a differenced quantity, and fragile.* Any systematic cost landing in one of two timings is charged to the boundary, and differencing amplifies any slowdown that lands unevenly on its two terms. Measured in wall-clock time, a contended machine once moved the figure by a decade. The timings are therefore taken in CPU time, which leaves out time spent waiting for a core; but running on a contended core still inflates them, by less. The harness also pins the measurement to a band, re-measures an excursion, and fails the build on a sustained one; the magnitude quoted is interpolated from that pinned run. The supported claim is the magnitude, #d.crossing_magnitude, not the figure. Instance pooling is unimplemented, and complex-type serialisation is unmeasured.
 
 == External validity <sec:threat-external>
 

@@ -180,6 +180,14 @@
       hand-types "three partial rows" (correct today); timings are measured at publication,
       not at the dated commit; an optional tag on the dated commit
 
+- [x] 6.32 (29 October 2026, at upload, on the author's instruction: "there is no idle
+      machine here") **Overhead timings are CPU time.** The thread's CPU time is used for
+      calls, and the process's for compilation, which wasmtime spreads over threads. On the
+      loaded machine, a clean wall-clock build read 83.3µs per crossing, where thread CPU time
+      reads ~50µs. CPU time removes queueing, not contention, so the band stays. §4.3's
+      caption and §7.2 name the clock. `tests/test_poc_bench_clock.py` pins it. The
+      evaluation delta records the requirement
+
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 
 - [ ] 7.1 Author's end-to-end read of the merged paper

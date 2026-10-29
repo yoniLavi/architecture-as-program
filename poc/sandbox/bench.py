@@ -31,7 +31,7 @@ Run:  uv run --group poc python -m poc.sandbox.bench
 from __future__ import annotations
 
 from dataclasses import dataclass
-from time import perf_counter
+from time import process_time, thread_time
 
 from ..handles import ReadDBHandle
 from ..values import ConversationContext, Intent, RawMessage, Untrusted
@@ -71,8 +71,26 @@ class BenchResult:
         return self.crossing_ms / ENVELOPE_NODE_WORK_MS
 
 
-def _time(fn, repeats: int) -> float:
-    """Best-of-`_ROUNDS` mean wall-clock milliseconds per call of `fn`.
+# Which clock each figure is measured in. CPU time, not wall-clock time: the
+# machine this runs on is shared and never idle, and wall-clock time charges every
+# moment the measuring thread spent queued for a core to whatever it measured. A
+# build on a loaded machine once read 343µs, and another 83µs, for a crossing that
+# costs ~25µs on a quiet one. CPU time removes the queueing. It does not remove the
+# slowdown of *running* on a contended core (shared caches, frequency), so a
+# loaded machine still inflates it, by less; the band in poc/evaluate.py stays.
+#
+# Thread CPU time for everything that runs in the calling thread, which is every
+# call into a component. Process CPU time for compilation, because wasmtime
+# compiles on worker threads that thread time would not see: that figure is the
+# total CPU spent compiling, which exceeds the wall-clock time on an idle machine.
+TIMING_CLOCK = "CPU time of the measuring thread"
+COMPILATION_TIMING_CLOCK = (
+    "CPU time of the whole process, summed over wasmtime's compilation threads"
+)
+
+
+def _time(fn, repeats: int, clock=thread_time) -> float:
+    """Best-of-`_ROUNDS` mean CPU milliseconds per call of `fn`, on `clock`.
 
     Warmed and best-of, not a single mean pass, and the difference is not
     cosmetic. The crossing cost below is a *difference* of two timings, so any
@@ -80,16 +98,16 @@ def _time(fn, repeats: int) -> float:
     the boundary. Timed cold, the first measurement absorbs wasmtime's JIT warm-up
     and CPython's own, which can distort a differenced figure by an order of
     magnitude. Taking the minimum of several warmed rounds keeps the
-    scheduler and the GC out of the number.
+    GC and the remaining contention out of the number.
     """
     for _ in range(min(repeats, _WARMUP)):
         fn()
     best = float("inf")
     for _ in range(_ROUNDS):
-        start = perf_counter()
+        start = clock()
         for _ in range(repeats):
             fn()
-        best = min(best, (perf_counter() - start) * 1000.0 / repeats)
+        best = min(best, (clock() - start) * 1000.0 / repeats)
     return best
 
 
@@ -154,7 +172,9 @@ def measure(*, repeats: int = 500) -> BenchResult:
     # engine is, or the benchmark would report a tier nobody runs.
     engine = wasmtime.Engine(engine_config())
     path = str(wasm_path("node_parse_message"))
-    compilation_ms = _time(lambda: Component.from_file(engine, path), max(repeats // 20, 5))
+    compilation_ms = _time(
+        lambda: Component.from_file(engine, path), max(repeats // 20, 5), clock=process_time
+    )
 
     # Instantiation: a fresh confined instance from the cached component, with its
     # capability interfaces linked. This is what each node invocation pays up front.
@@ -209,6 +229,7 @@ def main() -> int:
     r = measure()
     us = r.crossing_ms * 1000.0
     print("\n\033[1mComponent tier — overhead measurement\033[0m")
+    print(f"  ({TIMING_CLOCK}; compilation in {COMPILATION_TIMING_CLOCK})")
     print("─" * 74)
     print(f"  component compilation (one-time): {r.compilation_ms:8.3f} ms  (cached, not per call)")
     print(f"  instantiation (per node):         {r.instantiation_ms:8.3f} ms")
