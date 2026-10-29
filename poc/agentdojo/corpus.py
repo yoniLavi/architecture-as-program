@@ -21,10 +21,12 @@ REJECTED = "rejected"
 REASON_CREDENTIALS = "never-granted kind"
 REASON_NARROWING = "capability narrowing"
 REASON_SCOPE = "unreadable scope"
+REASON_MERGE = "merge exclusivity"
 REASON_SIGNATURES: dict[str, tuple[str, ...]] = {
     REASON_CREDENTIALS: ("a capability kind no graph may hold",),
     REASON_NARROWING: ("is not assignable to expected",),
     REASON_SCOPE: ("has a scope this kind cannot read",),
+    REASON_MERGE: ("which are not exclusive branches of one sum",),
 }
 
 PAY = "Payments<['GB29NWBK60161331926819'], '10.00'>"
@@ -68,6 +70,54 @@ def _compose(parent_cap: str, child_cap: str) -> list[dict]:
         "data_edges": [],
     }
     return [parent, child]
+
+
+def lookup_graph(*, exclusive: bool = True) -> dict:
+    """The spike's task-15 shape: a lookup that may fail, rejoining a report.
+
+    `FindRefund` emits `found` or `none`; the refund is sent on `found` and skipped
+    on `none`, and both outcomes reach position 1 of `Report`, a join that also
+    takes an acknowledgement. With `exclusive=False`, `SkipRefund` hangs off the
+    request instead of the `none` branch, so both outcomes could arrive."""
+    return {
+        "name": "RefundIfFound",
+        "parameters": ["TaskRequest", "Payments<[inbound-senders], '10.00'>"],
+        "capabilities": ["Payments<[inbound-senders], '10.00'>"],
+        "nodes": [
+            {"name": "Start", "inputs": ["TaskRequest"], "output": "TaskRequest"},
+            {
+                "name": "FindRefund",
+                "inputs": ["TaskRequest"],
+                "output": "found: PaymentOrder | none: NoRefund",
+            },
+            {
+                "name": "SendRefund",
+                "inputs": ["PaymentOrder", "Payments<[inbound-senders], '10.00'>"],
+                "output": "RefundOutcome",
+            },
+            {
+                "name": "SkipRefund",
+                "inputs": ["NoRefund" if exclusive else "TaskRequest"],
+                "output": "RefundOutcome",
+            },
+            {"name": "Acknowledge", "inputs": ["TaskRequest"], "output": "Ack"},
+            {
+                "name": "Report",
+                "inputs": ["Ack", "RefundOutcome"],
+                "output": "Reply",
+                "merge": True,
+            },
+        ],
+        "data_edges": [
+            {"from": "Start", "to": "FindRefund"},
+            {"from": "Start", "to": "Acknowledge"},
+            {"from": "FindRefund.found", "to": "SendRefund"},
+            {"from": "FindRefund.none" if exclusive else "Start", "to": "SkipRefund"},
+            {"from": "Acknowledge", "to": "Report", "to_input": 0},
+            {"from": "SendRefund", "to": "Report", "to_input": 1},
+            {"from": "SkipRefund", "to": "Report", "to_input": 1},
+        ],
+    }
 
 
 @dataclass(frozen=True)
@@ -123,6 +173,19 @@ CASES: tuple[Case, ...] = (
         REJECTED,
         REASON_NARROWING,
         "the two modes are incomparable",
+    ),
+    Case(
+        "merge_exclusive_branches",
+        lambda: [lookup_graph()],
+        ACCEPTED,
+        note="found and none rejoin one position; at most one arrives",
+    ),
+    Case(
+        "merge_overlapping_branches",
+        lambda: [lookup_graph(exclusive=False)],
+        REJECTED,
+        REASON_MERGE,
+        "the skip branch fires on every run, so two values could arrive",
     ),
 )
 

@@ -27,7 +27,7 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
       first
 - [ ] 2.2 A graph-backed `BasePipelineElement`, modelled on `ground_truth_pipeline.py`, that
       ends with a final assistant message. Scoring stays AgentDojo's own
-- [ ] 2.3 The exclusive-branch merge node (design, Decision 3), with two corpus cases pinned:
+- [x] 2.3 The exclusive-branch merge node (design, Decision 3), with two corpus cases pinned:
       accepted when the branches are exclusive, rejected when they are not
 
 ## 3. The node library

@@ -101,6 +101,14 @@ merge-order rule recorded in `docs/PRIOR-ART.md` §7: exactly one input can arri
 order needs recording. It is pinned by corpus cases: one where the branches are exclusive and
 it is accepted, one where they are not and it is rejected.
 
+**As built (task 2.3).** A node declares `"merge": true`; then one of its input positions
+(of a join, or its only input) may be fed by several edges, provided every pair is
+exclusive. Exclusive means that the two edges' branch conditions name different roles of one
+sum. The validator already computed those conditions to reject joins that could never fire,
+so the proof reuses them. The runtime is unchanged: it already refuses a second arrival.
+Without the marker the join rule is as before, so no existing graph changes meaning. A marker
+on a node with no multiply-fed input is rejected, as a declaration with nothing to mean.
+
 ## Decision 4: the baseline
 
 An undefended tool-calling agent on the same Claude models, over the banking suite, is the

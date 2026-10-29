@@ -171,6 +171,9 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
         if "each" in n and not isinstance(n["each"], bool):
             errors.append(f"{path.name}: node {nname!r} `each` must be boolean")
             continue
+        if "merge" in n and not isinstance(n["merge"], bool):
+            errors.append(f"{path.name}: node {nname!r} `merge` must be boolean")
+            continue
         # Contracts are checked for *parseability* here. Resolvable field paths are
         # not yet checked anywhere before a run (poc/contracts.py
         # `unresolvable_paths` is not called). The split is forced by what each
@@ -622,12 +625,22 @@ def _validate_joins(
 
     What is not checked here: a join one of whose positions is conditional and
     another not. It fires on some runs and is left waiting on others, and the
-    runtime refuses a run that ends that way rather than dropping the value."""
+    runtime refuses a run that ends that way rather than dropping the value.
+
+    One relaxation, opt-in: a node declaring `merge: true` may take several edges at
+    one position, provided every pair of them is *exclusive* — each lies on a
+    different variant of one sum, so at most one can fire in a run. Exactly one
+    value then arrives, and no arrival order needs recording: the order-insensitive
+    case of a merge. The runtime already refuses a second arrival, so a merge the
+    validator could not prove exclusive is rejected here rather than at run time."""
     joins = {name: n for name, n in node_map.items() if len(_data_inputs(n, caps)) > 1}
+    merges = {name for name, n in node_map.items() if n.get("merge", False) is True}
     for name, n in joins.items():
         data = _data_inputs(n, caps)
         for position in range(len(data)):
             sources = fed[name].get(position, [])
+            if name in merges and len(sources) > 1:
+                continue  # checked for exclusivity below
             if len(sources) != 1:
                 errors.append(
                     f"{path.name}: join position {position} of node {name!r} "
@@ -658,6 +671,43 @@ def _validate_joins(
             result |= frozenset.intersection(*alternatives)
         memo[node] = result
         return result
+
+    for name in sorted(merges):
+        n = node_map[name]
+        if "merge" in n and not isinstance(n["merge"], bool):
+            continue
+        by_position: dict[int, list[tuple[str, str | None]]] = {}
+        for src, port, position in in_edges[name]:
+            by_position.setdefault(position, []).append((src, port))
+        if not any(len(edges) > 1 for edges in by_position.values()):
+            errors.append(
+                f"{path.name}: node {name!r} declares `merge: true` but no input of it is "
+                f"fed by more than one edge; a merge with one source merges nothing"
+            )
+            continue
+        for position, edges in sorted(by_position.items()):
+            conds = [
+                (
+                    f"{src}{'.' + port if port else ''}",
+                    conditions(src, frozenset())
+                    | ({(src, port)} if port is not None else frozenset()),
+                )
+                for src, port in edges
+            ]
+            for i, (a_label, a) in enumerate(conds):
+                for b_label, b in conds[i + 1 :]:
+                    a_roles: dict[str, set[str]] = {}
+                    for sum_node, role in a:
+                        a_roles.setdefault(sum_node, set()).add(role)
+                    if not any(
+                        sum_node in a_roles and role not in a_roles[sum_node]
+                        for sum_node, role in b
+                    ):
+                        errors.append(
+                            f"{path.name}: merge {name!r} position {position} is fed by "
+                            f"{a_label} and {b_label}, which are not exclusive branches of "
+                            f"one sum; both could arrive, and a merge takes exactly one value"
+                        )
 
     for name in joins:
         roles_by_sum: dict[str, set[str]] = {}
