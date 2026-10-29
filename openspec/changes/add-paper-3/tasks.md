@@ -21,8 +21,9 @@ the working tree.
       p-value is the first of them. **Done (`e04ff6b`)**: `display.confirmatory_p`, with
       `scientific()` tested. That typst and pandoc render it identically was checked by hand
       in the built PDF and Markdown (both `1.1 × 10⁻⁴⁰`), not by a test: see 1.1a
-- [ ] 1.1a A test that the PDF and Markdown renderings state the same `display` strings. It
-      needs pandoc and typst, so it is skipped without them, like `test_resolve_crossrefs.py`
+- [x] 1.1a A test that the PDF and Markdown renderings state the same `display` strings. It
+      needs pandoc and typst, so it is skipped without them, like `test_resolve_crossrefs.py`.
+      Done: `tests/test_display_renders_identically.py` (it also needs pdftotext)
 - [x] 1.2 Serialise any count Paper 3 states that the JSON only implies, for example caught
       components that would not have shipped. It is computed in `serialise`, never in prose.
       Done: `registered.no_claim` and `registered.gate_off`
