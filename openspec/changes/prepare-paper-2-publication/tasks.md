@@ -190,7 +190,13 @@
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 
-- [ ] 7.1 Author's end-to-end read of the merged paper
+- [x] 7.1 Author's end-to-end read of the merged paper. Done 29 October 2026, with two notes
+      ("Our earlier work"; the "misled" sentence removed, `d5e8a36`)
 - [ ] 7.2 Upload per `publication-checklist.md`, with *Continues* as the only relation to
-      Paper 1
+      Paper 1. **Published 29 October 2026**: https://zenodo.org/records/23057135. The file's
+      MD5 matches the build from `0576a5d`. `RECORD.json` is committed. Open items:
+      - the *Continues* and *Is supplemented by* related identifiers were missing at first
+        publish, and the version field was empty. The author is adding these as a
+        metadata-only edit;
+      - `main` and the tags are not yet pushed.
 - [ ] 7.3 `openspec archive prepare-paper-2-publication --yes` (after ticking 7.1–7.2)
