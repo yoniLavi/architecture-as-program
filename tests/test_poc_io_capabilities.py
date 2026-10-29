@@ -36,6 +36,7 @@ from poc.handles import (
 )
 from poc.llm import StubLLM
 from poc.sandbox.interfaces import (
+    BANKING_INTERFACES,
     CAPABILITY_INTERFACES,
     CAPABILITY_KINDS,
     PAPER2_INTERFACES,
@@ -79,7 +80,7 @@ def test_paper_2s_vocabulary_is_unmoved_by_the_new_kind():
     counted apart, so a figure in a paper that never exercised it cannot move."""
     assert len(PAPER2_KINDS) == 7 and "StateHandle" not in PAPER2_KINDS
     assert len(PAPER2_INTERFACES) == 8
-    assert {STATE_READ, STATE_RW} == CAPABILITY_INTERFACES - PAPER2_INTERFACES
+    assert {STATE_READ, STATE_RW} == CAPABILITY_INTERFACES - PAPER2_INTERFACES - BANKING_INTERFACES
 
 
 def _composition(parent_cap: str, child_cap: str) -> list[str]:

@@ -39,6 +39,7 @@ import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from type_parser import TApp, TList, TName, TString, parse_type
@@ -508,6 +509,9 @@ class World:
     publishers: Mapping[str, Callable[[str], None]] = field(default_factory=dict)
     # Injected time, so a run is reproducible. None reads the real clock.
     clock: Callable[[], WallTime] | None = None
+    # The bank the banking kinds act on (`poc/bank.py`), and that a bank-scoped
+    # `DBHandle<scope, read>` reads. None binds no bank, and a banking kind is refused.
+    bank: Any = None
     _stores: dict[str, StateStore] = field(default_factory=dict, repr=False)
 
     def store(self, name: str) -> StateStore:
@@ -563,6 +567,8 @@ def provision(
 
     if isinstance(ast, TName) and ast.name == "Clock":
         return Clock(_source=world.clock)
+    if isinstance(ast, TName) and ast.name == "Credentials":
+        raise ValueError("Credentials is never granted: no handle exists for it")
 
     if not isinstance(ast, TApp):
         raise ValueError(f"not a capability type: {cap_type!r}")
@@ -579,6 +585,11 @@ def provision(
         scope = ast.args[0].value
         mode = ast.args[1]
         mode_name = mode.name if isinstance(mode, TName) else ""
+        if world.bank is not None and mode_name == "read":
+            from .bank import BankReadHandle, is_bank_scope
+
+            if is_bank_scope(scope):
+                return BankReadHandle(scope, world.bank)
         contents = stores.get(scope, {})
         if mode_name == "read":
             # Read-only: a shallow copy suffices since the handle never mutates.
@@ -629,7 +640,41 @@ def provision(
             f"unrecognised StateHandle mode {mode!r} in {cap_type!r}; modes are read, read-write"
         )
 
+    if ast.head in ("Payments", "ScheduledPayments", "UserProfile"):
+        return _provision_banking(cap_type, ast, world)
+
     raise ValueError(f"unknown capability kind: {cap_type!r}")
+
+
+def _provision_banking(cap_type: str, ast: TApp, world: World) -> object:
+    """A banking handle over the world's bank, its scope parsed by the same
+    function the validator's narrowing rule reads. `Credentials` never reaches
+    here: it is a bare name, refused above as no capability this runtime grants."""
+    from type_parser import payments_scope, profile_fields, scheduled_scope
+
+    from .bank import (
+        PaymentsHandle,
+        RecurringPaymentsHandle,
+        ScheduledPaymentsHandle,
+        UserProfileHandle,
+    )
+
+    if world.bank is None:
+        raise ValueError(f"{cap_type!r} needs a bank, and this world binds none")
+    if ast.head == "Payments":
+        scope = payments_scope(ast)
+        if scope is not None:
+            cls = RecurringPaymentsHandle if scope.recurring else PaymentsHandle
+            return cls(scope, world.bank)
+    elif ast.head == "ScheduledPayments":
+        sched = scheduled_scope(ast)
+        if sched is not None:
+            return ScheduledPaymentsHandle(sched, world.bank)
+    else:
+        fields = profile_fields(ast)
+        if fields is not None:
+            return UserProfileHandle(fields, world.bank)
+    raise ValueError(f"unrecognised {ast.head} shape: {cap_type!r}")
 
 
 def _http_hosts(app: TApp) -> frozenset[str] | None:

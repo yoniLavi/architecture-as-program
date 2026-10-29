@@ -30,6 +30,7 @@ from pathlib import Path
 
 from type_parser import (
     CAPABILITY_HEADS,
+    NEVER_GRANTED,
     ParseError,
     TApp,
     TList,
@@ -42,6 +43,9 @@ from type_parser import (
     is_assignable,
     output_variant_levels,
     parse_type,
+    payments_scope,
+    profile_fields,
+    scheduled_scope,
     strip_trust,
     sum_roles,
     sum_variant_type,
@@ -83,6 +87,28 @@ def _validate_structure(graph: dict, path: Path, errors: list[str]) -> bool:
         errors.append(f"{path.name}: `data_edges` must be a list")
         ok = False
     return ok
+
+
+def _head(ast: Type) -> str | None:
+    """The kind a capability type names: its head, or its bare name (`Clock`)."""
+    if isinstance(ast, TApp):
+        return ast.head
+    if isinstance(ast, TName):
+        return ast.name
+    return None
+
+
+def _readable(ast: Type) -> Type:
+    return ast
+
+
+# The banking kinds narrow on arguments, so their scopes must parse. (The older
+# kinds' shapes are checked where they are provisioned.)
+_BANKING_SCOPES = {
+    "Payments": payments_scope,
+    "ScheduledPayments": scheduled_scope,
+    "UserProfile": profile_fields,
+}
 
 
 def _data_inputs(node: dict, caps: list[str]) -> list[str]:
@@ -173,6 +199,15 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
             or (isinstance(ast, TName) and ast.name in CAPABILITY_HEADS)
         ):
             errors.append(f"{path.name}: {c!r} is listed as a capability but is not one")
+        elif ast is not None and _head(ast) in NEVER_GRANTED:
+            errors.append(
+                f"{path.name}: grants {c!r}, a capability kind no graph may hold; "
+                f"a task that needs it is outside what a graph is granted"
+            )
+        elif ast is not None and _BANKING_SCOPES.get(_head(ast) or "", _readable)(ast) is None:
+            # A scope no narrowing rule can read would be refused at provisioning;
+            # refusing it here says why, before anything runs.
+            errors.append(f"{path.name}: capability {c!r} has a scope this kind cannot read")
     for p in params:
         if p in caps:
             continue

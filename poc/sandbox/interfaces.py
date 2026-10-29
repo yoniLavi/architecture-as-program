@@ -22,7 +22,16 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-from type_parser import TApp, TList, TName, TString, parse_type
+from type_parser import (
+    TApp,
+    TList,
+    TName,
+    TString,
+    parse_type,
+    payments_scope,
+    profile_fields,
+    scheduled_scope,
+)
 
 # The WIT package the node components are built against. Bumping the version is a
 # breaking change for every committed artifact: the host's interface names and the
@@ -74,10 +83,27 @@ PAPER2_KINDS: tuple[str, ...] = (
 # a kind added for a later artifact must not move a figure in a paper that never
 # exercised it. `poc/evaluate.py` reads the `PAPER2_*` sets; everything that
 # *runs* reads the full ones below.
-CAPABILITY_KINDS: tuple[str, ...] = (*PAPER2_KINDS, "StateHandle")
+#
+# The banking kinds came later still, for Paper 4's AgentDojo harness. Each narrows
+# on its arguments (payees and a cap, which orders and fields, which profile
+# fields); the scope lives in the handle and is checked at the crossing, as an HTTP
+# allowlist is. `Credentials` has an interface so that a component importing it is
+# caught by the gate like any other ungranted import; the validator refuses any
+# graph that grants it, so no node is ever entitled to it.
+BANKING_KINDS: tuple[str, ...] = ("Payments", "ScheduledPayments", "UserProfile", "Credentials")
+CAPABILITY_KINDS: tuple[str, ...] = (*PAPER2_KINDS, "StateHandle", *BANKING_KINDS)
 
 STATE_READ = _iface("state-read")  # StateHandle<'name', read>
 STATE_RW = _iface("state-rw")  # StateHandle<'name', read-write>
+
+PAYMENTS = _iface("payments")  # Payments<[payees], cap>
+PAYMENTS_RECURRING = _iface("payments-recurring")  # Payments<[payees], cap, recurring>
+SCHEDULED_PAYMENTS = _iface("scheduled-payments")  # ScheduledPayments<[orders], [fields]>
+USER_PROFILE = _iface("user-profile")  # UserProfile<[fields]>
+CREDENTIALS = _iface("credentials")  # Credentials, never granted
+BANKING_INTERFACES = frozenset(
+    {PAYMENTS, PAYMENTS_RECURRING, SCHEDULED_PAYMENTS, USER_PROFILE, CREDENTIALS}
+)
 
 # The shared domain vocabulary: records, enums and variants, and *no functions*.
 # Every component imports it, and it grants no authority — it is how the two sides
@@ -100,7 +126,7 @@ PAPER2_INTERFACES = frozenset(
         CLOCK,
     }
 )
-CAPABILITY_INTERFACES = PAPER2_INTERFACES | {STATE_READ, STATE_RW}
+CAPABILITY_INTERFACES = PAPER2_INTERFACES | {STATE_READ, STATE_RW} | BANKING_INTERFACES
 
 
 class UnmappedCapability(ValueError):
@@ -125,6 +151,8 @@ def interface_for(cap_type: str) -> str:
     # because the authority it grants (read the wall clock) has no narrower form.
     if isinstance(ast, TName) and ast.name == "Clock":
         return CLOCK
+    if isinstance(ast, TName) and ast.name == "Credentials":
+        return CREDENTIALS
 
     if not isinstance(ast, TApp):
         raise UnmappedCapability(f"not a capability type: {cap_type!r}")
@@ -186,6 +214,25 @@ def interface_for(cap_type: str) -> str:
         if isinstance(mode, TName) and mode.name == "read-write":
             return STATE_RW
         raise UnmappedCapability(f"unrecognised StateHandle shape: {cap_type!r}")
+
+    # The banking kinds: one interface per kind, except `Payments`, whose two modes
+    # (send once, schedule a standing order) are two interfaces, as `StateHandle`'s
+    # are. The scope itself lives in the handle; an unreadable one maps to nothing.
+    if ast.head == "Payments":
+        scope = payments_scope(ast)
+        if scope is None:
+            raise UnmappedCapability(f"unrecognised Payments shape: {cap_type!r}")
+        return PAYMENTS_RECURRING if scope.recurring else PAYMENTS
+
+    if ast.head == "ScheduledPayments":
+        if scheduled_scope(ast) is None:
+            raise UnmappedCapability(f"unrecognised ScheduledPayments shape: {cap_type!r}")
+        return SCHEDULED_PAYMENTS
+
+    if ast.head == "UserProfile":
+        if profile_fields(ast) is None:
+            raise UnmappedCapability(f"unrecognised UserProfile shape: {cap_type!r}")
+        return USER_PROFILE
 
     raise UnmappedCapability(f"unknown capability kind: {cap_type!r}")
 

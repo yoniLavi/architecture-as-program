@@ -65,6 +65,29 @@ the front half does not need it.
 spike's hard case. It is modelled as a handle that consults the environment host-side, and the
 paper states it as a dynamic scope.
 
+**As built (tasks 1.1–1.3).** Each scope is parsed once, in `type_parser`, and the
+validator, the handle and the WIT mapping all read that one parse. Five choices the
+author may want to revisit:
+- **Payees** are string literals (an IBAN, or a name such as `'Spotify'`, which tasks 5
+  and 11 pay), or the dynamic sets `inbound-senders` and `any`. `any` exists because task 0's
+  payee appears only in the bill, so without it task 0 cannot be expressed at all. It is the
+  widest grant, and the reviewers should treat it so.
+- **The cap** is a decimal string, or `uncapped`. Task 0's amount is also known only from
+  the bill.
+- **Standing orders.** `schedule_transaction` (task 6) is `Payments<[payees], cap, recurring>`,
+  a second mode of `Payments` with its own interface. The alternative was a fifth kind. The
+  two modes are incomparable, as `DBHandle`'s `read` and `append` are, so a grant to send
+  once never schedules and the reverse.
+- **Orders are named by subject**, compared case-insensitively. The handle looks the order up
+  by id and checks *its* subject, so a node cannot reach another order by naming its id.
+- **Reads use the existing `DBHandle<scope, read>`**, bound to the bank when the world has
+  one: `'transactions'`, `'scheduled-transactions'`, `'balance'`, `'iban'`, `'user-info'`
+  (which never returns the password), and `'file:<path>'` for one file. No new read kind.
+
+A banking type whose scope does not parse is a validator rejection (`unreadable scope`),
+not a provisioning surprise. The pinned cases live in `poc/agentdojo/corpus.py`, apart
+from Paper 2's corpus, so no Paper 2 figure can move.
+
 ## Decision 3: exclusive-branch merge
 
 The spike's task 2 needs a value from either of two exclusive branches. The positional join

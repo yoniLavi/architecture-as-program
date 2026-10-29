@@ -13,12 +13,12 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
 
 ## 1. Banking kinds (full vocabulary only)
 
-- [ ] 1.1 `Payments<[payees], cap>`, `ScheduledPayments<…>`, `UserProfile<[fields]>` and
+- [x] 1.1 `Payments<[payees], cap>`, `ScheduledPayments<…>`, `UserProfile<[fields]>` and
       `Credentials` in the type parser, `CAPABILITY_HEADS`, `caps.wit` and `interfaces.py`.
       None goes in `PAPER2_*`, and `tests/test_paper2_figures_pinned.py` stays green
-- [ ] 1.2 Narrowing at composition: set inclusion and cap ≤ cap. A grant of `Credentials` is a
+- [x] 1.2 Narrowing at composition: set inclusion and cap ≤ cap. A grant of `Credentials` is a
       validator rejection, pinned as a corpus case
-- [ ] 1.3 Handles check scope at the crossing: an off-list payee or an over-cap amount is
+- [x] 1.3 Handles check scope at the crossing: an off-list payee or an over-cap amount is
       refused like an off-allowlist request. Tests for each refusal
 
 ## 2. Adapter and pipeline element

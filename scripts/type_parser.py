@@ -29,6 +29,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from enum import IntEnum
 from typing import Union
 
@@ -300,8 +301,18 @@ CAPABILITY_HEADS = frozenset(
         "HTTPClient",
         "Notifier",
         "StateHandle",
+        # The banking kinds (Paper 4's AgentDojo harness). A bank tool's authority
+        # is coarser than banking's threats, so each narrows on its arguments.
+        "Payments",
+        "ScheduledPayments",
+        "UserProfile",
+        "Credentials",
     }
 )
+
+# `Credentials` is a kind no graph may be granted: it exists so that changing the
+# password has a capability to name, and a grant of it is a validator rejection.
+NEVER_GRANTED = frozenset({"Credentials"})
 
 
 def contains_capability(t: Type) -> bool:
@@ -499,6 +510,129 @@ def _http_allowlist(app: TApp) -> frozenset[str] | None:
     return frozenset(hosts)
 
 
+# ── The banking kinds' scopes ──────────────────────────────────────
+#
+# Each scope is parsed once, here, so the validator's narrowing rule, the
+# host-side handle's check at the crossing, and the WIT mapping all read the same
+# thing. A shape none of them can read is None, and is refused by all three.
+
+# Payee sets read from the environment rather than written in the type. `any` is
+# the unnarrowed form, there so that a payee known only from a document (a bill)
+# is expressible at all; a reviewer should treat it as the widest grant it is.
+DYNAMIC_PAYEES = frozenset({"any", "inbound-senders"})
+SCHEDULED_FIELDS = frozenset({"recipient", "amount", "subject", "date", "recurring"})
+PROFILE_FIELDS = frozenset({"first_name", "last_name", "street", "city"})
+
+
+@dataclass(frozen=True)
+class PaymentsScope:
+    """`Payments<[payees], cap>`, or `Payments<[payees], cap, recurring>`.
+
+    `literal` holds payees named in the type (an IBAN, or a name such as
+    'Spotify'); `dynamic` holds the environment-read sets of `DYNAMIC_PAYEES`.
+    `cap` is the most one payment may move, None for `uncapped`. `recurring`
+    selects the other mode: scheduling a standing order rather than sending once.
+    The two modes are incomparable, as `DBHandle`'s `read` and `append` are."""
+
+    literal: frozenset[str]
+    dynamic: frozenset[str]
+    cap: Decimal | None
+    recurring: bool
+
+    def covers(self, other: PaymentsScope) -> bool:
+        """True if this scope grants everything `other` does."""
+        if self.recurring != other.recurring:
+            return False
+        if self.cap is not None and (other.cap is None or other.cap > self.cap):
+            return False
+        if "any" in self.dynamic:
+            return True
+        return other.dynamic <= self.dynamic and other.literal <= self.literal
+
+
+@dataclass(frozen=True)
+class ScheduledScope:
+    """`ScheduledPayments<[orders], [fields]>`: which standing orders, by subject
+    (compared case-insensitively), and which of their fields, may change."""
+
+    orders: frozenset[str]
+    fields: frozenset[str]
+
+    def covers(self, other: ScheduledScope) -> bool:
+        return other.orders <= self.orders and other.fields <= self.fields
+
+
+def _string_set(arg: Type) -> frozenset[str] | None:
+    if not isinstance(arg, TList) or not arg.items:
+        return None
+    if not all(isinstance(i, TString) for i in arg.items):
+        return None
+    return frozenset(i.value for i in arg.items)  # type: ignore[union-attr]
+
+
+def _name_set(arg: Type, allowed: frozenset[str]) -> frozenset[str] | None:
+    if not isinstance(arg, TList) or not arg.items:
+        return None
+    names = [i.name for i in arg.items if isinstance(i, TName)]
+    if len(names) != len(arg.items) or not set(names) <= allowed:
+        return None
+    return frozenset(names)
+
+
+def payments_scope(t: Type) -> PaymentsScope | None:
+    """The scope of a `Payments<...>` type, or None if the shape is not one."""
+    if not isinstance(t, TApp) or t.head != "Payments" or len(t.args) not in (2, 3):
+        return None
+    payees, cap_arg = t.args[0], t.args[1]
+    if not isinstance(payees, TList) or not payees.items:
+        return None
+    literal: set[str] = set()
+    dynamic: set[str] = set()
+    for item in payees.items:
+        if isinstance(item, TString) and item.value:
+            literal.add(item.value)
+        elif isinstance(item, TName) and item.name in DYNAMIC_PAYEES:
+            dynamic.add(item.name)
+        else:
+            return None
+    if isinstance(cap_arg, TName) and cap_arg.name == "uncapped":
+        cap = None
+    elif isinstance(cap_arg, TString):
+        try:
+            cap = Decimal(cap_arg.value)
+        except InvalidOperation:
+            return None
+        if not cap.is_finite() or cap <= 0:
+            return None
+    else:
+        return None
+    recurring = False
+    if len(t.args) == 3:
+        mode = t.args[2]
+        if not (isinstance(mode, TName) and mode.name == "recurring"):
+            return None
+        recurring = True
+    return PaymentsScope(frozenset(literal), frozenset(dynamic), cap, recurring)
+
+
+def scheduled_scope(t: Type) -> ScheduledScope | None:
+    """The scope of a `ScheduledPayments<[orders], [fields]>` type, or None."""
+    if not isinstance(t, TApp) or t.head != "ScheduledPayments" or len(t.args) != 2:
+        return None
+    orders = _string_set(t.args[0])
+    fields = _name_set(t.args[1], SCHEDULED_FIELDS)
+    if orders is None or fields is None:
+        return None
+    return ScheduledScope(frozenset(o.lower() for o in orders), fields)
+
+
+def profile_fields(t: Type) -> frozenset[str] | None:
+    """The fields a `UserProfile<[fields]>` type may change, or None."""
+    if not isinstance(t, TApp) or t.head != "UserProfile" or len(t.args) != 1:
+        return None
+    return _name_set(t.args[0], PROFILE_FIELDS)
+
+
 def is_assignable(actual: Type, target: Type) -> bool:
     """True if a value of type `actual` can stand in where `target`
     is expected, under the PoC's capability-narrowing rules.
@@ -562,4 +696,16 @@ def is_assignable(actual: Type, target: Type) -> bool:
         if not isinstance(amode, TName) or not isinstance(tmode, TName):
             return False
         return tmode.name in _STATE_MODE_COVERS.get(amode.name, frozenset())
+    if actual.head == "Payments":
+        # Set inclusion on payees and cap ≤ cap, as for an HTTP allowlist: a parent
+        # may route a wider handle, never a narrower one. Checked, not enforced: the
+        # child receives the parent's handle whole (Paper 2 §7.6).
+        ascope, tscope = payments_scope(actual), payments_scope(target)
+        return ascope is not None and tscope is not None and ascope.covers(tscope)
+    if actual.head == "ScheduledPayments":
+        asched, tsched = scheduled_scope(actual), scheduled_scope(target)
+        return asched is not None and tsched is not None and asched.covers(tsched)
+    if actual.head == "UserProfile":
+        afields, tfields = profile_fields(actual), profile_fields(target)
+        return afields is not None and tfields is not None and tfields <= afields
     return False
