@@ -1,6 +1,51 @@
 # Roadmap: from demonstrator to a useful toy
 
-## Start here: state as of 29 October 2026
+## The north star (the author, 29 October 2026)
+
+The flow the programme is working towards, as the author stated it:
+
+1. A human **Product Owner** (or a customer) writes a free-text prompt.
+2. An **architect AI** authors the signal graph.
+3. A **formal review** checks that the graph makes sense: the validator, and policies.
+4. An **independent AI reviewer** checks that the graph matches the prompt and the owner's
+   needs.
+5. **AI developers** implement the nodes. They may break a node into a sub-graph that further
+   restricts its capabilities, or **escalate to the architect** when a node needs more.
+6. The architect reviews the implementation, and **formal tooling tries to reduce
+   capabilities** further.
+7. The human owner evaluates the solution.
+8. Optionally, a **human architecture reviewer** gives the go-ahead to production.
+
+Paper 3's result shapes step 5. Models took ungranted authority when the task merely
+*claimed* it had been approved. So escalation must be the only route to more authority, and
+it must change the graph, which then goes back through steps 3 and 4. It is never text in a
+developer's context.
+
+**Direction (decided 29 October 2026):**
+- **A, agents author the graph**, is the main line;
+- **C, authority below the level of kinds** (attenuation enforced at routing points,
+  principals bound to handles, drift made unbuildable), is built as A needs it;
+- **B, formal foundations** (a typed lattice and a noninterference argument), runs as a
+  parallel track.
+
+**Sequence (decided 29 October 2026):**
+1. **Paper 4 is the front half, steps 1–4.** Prompt → architect → formal review →
+   independent reviewer, evaluated on AgentDojo: task completion, attack success, and
+   whether a pretext can make the architect widen authority unseen by the reviewers. It
+   starts with a survey of practice, then a design-question document for the author, before
+   any OpenSpec change.
+2. **Then a thin vertical slice of all eight steps, crudely, on one small domain.** It
+   validates or rejects the roadmap cheaply, before more is built on it. It is not
+   necessarily a paper.
+3. **Then Paper 3 is reviewed for publication**, with more distance from Paper 2 and a more
+   complete understanding. The review does not rewrite its assumptions; it asks what to add
+   or improve. Its draft waits in `papers/03-generation/` until then.
+
+The back half (steps 5–6: decomposition, escalation as a graph change, minimisation) is
+likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
+Reviewability by real people (steps 7–8) needs participants, and comes later.
+
+## State as of 29 October 2026
 
 **Paper 2 is published**: https://zenodo.org/records/23057135, 29 October 2026, version
 1.0.0. It is dated to the artifact at `paper-2-artifact` (`41737910cf4c`), and
@@ -11,8 +56,9 @@ here is idle.
 **M5, Paper 3, is started** (`openspec/changes/add-paper-3`, approved 29 October). The author
 decided it follows Paper 2 and cites it, is generation-led, and has a ~8,000-word budget. A
 first draft is in `papers/03-generation/` and builds with the corpus. Now that Paper 2 is
-published, the stamp check allows Paper 3 to be stamped once it is ready. Its critical
-review (task 5.1) is next.
+published, the stamp check allows Paper 3 to be stamped once it is ready. **Its review is
+deferred by the author's decision** until after Paper 4's front half and the vertical slice
+(see "The north star", above).
 
 ## State as of 27 October 2026
 

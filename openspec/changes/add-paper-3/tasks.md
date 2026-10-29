@@ -99,6 +99,12 @@ before the commit. Section-level scrutiny happens in the phase 5 review.
 
 ## 5. Review
 
+**Deferred by the author, 29 October 2026**, until after Paper 4's front half and the
+vertical slice (`docs/ROADMAP.md`, "The north star"). The review then asks what to add or
+improve with more distance. It does not rewrite the paper's assumptions. One candidate
+already noted: state the implication for escalation. Authority must change through the
+graph, never through text in an agent's context. This needs no new experiment.
+
 - [ ] 5.1 A critical review of the whole draft, in the `review-proposal` discipline. Check for
       overstating, understating, pooled trials, causal verbs on descriptive steps, and any
       Paper 2 figure typed by hand. Fix and commit each round.
