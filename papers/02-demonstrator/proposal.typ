@@ -2,7 +2,7 @@
 #set document(
   title: "Confinement by Construction: Capability Surfaces Derived from an Architecture Model",
   author: ("Yoni Lavi"),
-  date: datetime(year: 2026, month: 9, day: 30),
+  date: datetime(year: 2026, month: 10, day: 29),
 )
 #set page(margin: 2.5cm, numbering: "1")
 #set text(font: "New Computer Modern", size: 11pt)
@@ -79,7 +79,7 @@
 ]
 
 #align(center)[
-  #text(size: 11pt)[September 2026]
+  #text(size: 11pt)[October 2026]
 ]
 
 #align(center)[
