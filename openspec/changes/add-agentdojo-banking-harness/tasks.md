@@ -43,7 +43,7 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
 
 ## 4. The baseline (same model, undefended)
 
-- [ ] 4.1 A spike, time-boxed: `claude -p` plus an MCP server exposing the banking tools, or
+- [x] 4.1 A spike, time-boxed: `claude -p` plus an MCP server exposing the banking tools, or
       pi. Choose by the design's three criteria, and record the choice in `design.md`
 - [ ] 4.2 Build the chosen route. It is scrubbed like `ClaudeCLIBackend`, resumes after the
       usage ceiling, and records the model ID each call resolved to

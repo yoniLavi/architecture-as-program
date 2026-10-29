@@ -194,6 +194,38 @@ Choose on three criteria: subscription billing, fidelity to AgentDojo's tool-cal
 pipeline, and the size of the trusted harness. The choice is recorded in this file.
 AgentDojo's pipeline must see the same tool results either way.
 
+**Chosen (task 4.1, 29 October 2026): `claude -p` with an MCP server.** On the three criteria:
+1. **Billing decides it.** pi 0.73.1 (`@mariozechner/pi-coding-agent`, read from its own
+   `docs/providers.md`) supports Claude Pro/Max login. But it states that *"third-party
+   harness usage draws from extra usage and is billed per token, not against Claude plan
+   limits"*. That is a paid spend, which this change rules out. `claude -p` draws on the
+   subscription, as `ClaudeCLIBackend` already does.
+2. **Fidelity.** The MCP server (`poc/agentdojo/mcp_server.py`) offers AgentDojo's own `Function`
+   names, descriptions and argument schemas. Each call runs through
+   `FunctionsRuntime.run_function`, and the model sees `tool_result_to_str` of the result,
+   which is what AgentDojo's tool-calling pipeline shows. The system prompt is AgentDojo's
+   `default` system message, passed with `--system-prompt`. The deviation, measured in the
+   spike: the CLI adds a preamble of its own to the context (the account's email, an
+   environment section with the empty working directory, its guidance on downloaded files,
+   and the model's identity and date). No `CLAUDE.md`, memory or skill reaches the model. The
+   report states the deviation.
+3. **Trusted harness.** The CLI is already trusted by the repository, and the server is about
+   100 lines of stdlib JSON-RPC over AgentDojo. pi would add Node, a new harness, and a
+   TypeScript extension to register the tools; pi has no MCP by design.
+
+**The flags the spike forced.** `--safe-mode`, which `ClaudeCLIBackend` relies on, disables
+even an explicit `--mcp-config`: in the spike the model saw no tools. `--bare` reads only
+`ANTHROPIC_API_KEY`, never the subscription's OAuth, so it is a paid route. The baseline
+therefore runs with:
+- `--setting-sources ""`, `--strict-mcp-config` with only this server, `--tools ""` (no
+  built-in tool), and `--allowedTools mcp__banking`;
+- `--no-session-persistence`;
+- a fresh, empty working directory outside the repository, so no project `CLAUDE.md` is
+  discovered;
+- the environment scrubbed as `ClaudeCLIBackend` scrubs it.
+
+The spike's `init` event listed exactly the eleven banking tools.
+
 ## Decision 5: predictions before measurement
 
 For each task–injection pair, the static prediction from the spike's recipe (vector → node
