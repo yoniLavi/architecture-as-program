@@ -234,6 +234,28 @@ file *before* that graph's measured run. Oracle graphs get predictions too, so t
 exercised before the architect's graphs exist. AgentDojo scores only its nine goals, so a 0%
 attack-success rate is never reported as "no residual".
 
+**As built (tasks 5.1–5.2).** `poc/agentdojo/predict.py` follows the taint of the task's
+vector field by field: the subject of transactions, the text of an injected file, and every
+field of an `Extract` once any of its inputs is tainted. It then holds each writer's
+tainted fields and handle scope against each goal's predicate *as written*, quirk included.
+A goal that needs private data in a payment subject (goal 8) also needs that data upstream of
+the node choosing the subject. The verdicts:
+- `impossible`: no authority, or no tainted value reaches the field the goal needs;
+- `bounded`: the scope refuses it (payees, cap, orders, fields);
+- `residual`: everything admits it.
+
+Each committed file names its graph by hash and records who wrote it (`oracle` here, the
+architect's run and trial later). `contradictions()` lists every measured success the
+prediction ruled out. Selection steering (a `where` reading `subject`) is not modelled: it
+chooses among environment records and never yields a value the environment lacks.
+
+For the oracle graphs the order was not clean: their stand-in runs (task 3.3) were committed
+before these predictions. No model has measured any graph yet, so the rule holds for what it
+governs. But the oracle predictions do not test the method independently; they exercise it.
+They agree with every stand-in run. On task 0 they predict six goals residual (0–3, 5 and 6)
+where the stand-in succeeded on four, which is expected: a non-success under a predicted
+residual is not a contradiction, because the stand-in is not the worst case.
+
 ## Risks
 
 - **AgentDojo's dependencies.** It stays in its own group, and a test checks that no Paper 2

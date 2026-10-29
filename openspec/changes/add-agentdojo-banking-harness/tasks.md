@@ -54,9 +54,9 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
 
 ## 5. Predictions
 
-- [ ] 5.1 A script that derives each task–injection pair's static prediction (impossible,
+- [x] 5.1 A script that derives each task–injection pair's static prediction (impossible,
       bounded or residual) from a graph
-- [ ] 5.2 Predictions for the oracle graphs, committed. The format is the one the architect's
+- [x] 5.2 Predictions for the oracle graphs, committed. The format is the one the architect's
       graphs will use
 
 ## 6. Records
