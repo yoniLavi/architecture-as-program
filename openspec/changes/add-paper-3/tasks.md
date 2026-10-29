@@ -109,8 +109,8 @@ before the commit. Section-level scrutiny happens in the phase 5 review.
 Each step from 6.2 on is outward-facing or follows one, and needs an explicit go.
 
 - [ ] 6.1 The author's end-to-end read
-- [ ] 6.2 Paper 2 published, and its `RECORD.json` committed. The stamp check now allows
-      stamping Paper 3.
+- [x] 6.2 Paper 2 published, and its `RECORD.json` committed. The stamp check now allows
+      stamping Paper 3. Done 29 October 2026: Zenodo 10.5281/zenodo.23057135 (`66fabab`)
 - [ ] 6.3 The author reserves Paper 3's DOI. Stamp it, with the slug's year.
 - [ ] 6.4 Pin the `dist/generation.json` and `dist/evaluation-feed.json` keys Paper 3 typesets,
       as `tests/test_paper2_figures_pinned.py` does for Paper 2

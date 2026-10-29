@@ -192,11 +192,13 @@
 
 - [x] 7.1 Author's end-to-end read of the merged paper. Done 29 October 2026, with two notes
       ("Our earlier work"; the "misled" sentence removed, `d5e8a36`)
-- [ ] 7.2 Upload per `publication-checklist.md`, with *Continues* as the only relation to
+- [x] 7.2 Upload per `publication-checklist.md`, with *Continues* as the only relation to
       Paper 1. **Published 29 October 2026**: https://zenodo.org/records/23057135. The file's
-      MD5 matches the build from `0576a5d`. `RECORD.json` is committed. Open items:
-      - the *Continues* and *Is supplemented by* related identifiers were missing at first
-        publish, and the version field was empty. The author is adding these as a
-        metadata-only edit;
-      - `main` and the tags are not yet pushed.
-- [ ] 7.3 `openspec archive prepare-paper-2-publication --yes` (after ticking 7.1–7.2)
+      MD5 matches the build from `0576a5d`, and `RECORD.json` is committed (`66fabab`).
+      - The related identifiers were missing at first publish, and the version was empty.
+        The author added them as a metadata-only edit, and the API confirms them: *Continues*
+        `10.5281/zenodo.21473361`, *Is supplemented by* the GitHub URL, version 1.0.0.
+      - `main` is pushed (fast-forward to `66fabab`), with the tags `paper-3-before-merge`
+        and `paper-2-artifact` (on `4173791`, the commit §1 names). The commit link
+        resolves.
+- [x] 7.3 `openspec archive prepare-paper-2-publication --yes` (after ticking 7.1–7.2)

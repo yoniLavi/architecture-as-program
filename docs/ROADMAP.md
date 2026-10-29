@@ -2,11 +2,17 @@
 
 ## Start here: state as of 29 October 2026
 
+**Paper 2 is published**: https://zenodo.org/records/23057135, 29 October 2026, version
+1.0.0. It is dated to the artifact at `paper-2-artifact` (`41737910cf4c`), and
+`papers/02-demonstrator/RECORD.json` records the upload. `prepare-paper-2-publication` is
+archived. Before upload, the overhead timings moved to CPU time, because no build machine
+here is idle.
+
 **M5, Paper 3, is started** (`openspec/changes/add-paper-3`, approved 29 October). The author
 decided it follows Paper 2 and cites it, is generation-led, and has a ~8,000-word budget. A
-first draft is in `papers/03-generation/` and builds with the corpus. Its upload waits on
-Paper 2's: `scripts/check-corpus-citations.py` refuses to let it be stamped until Paper 2's
-`RECORD.json` is committed. The author is reviewing and publishing Paper 2 first.
+first draft is in `papers/03-generation/` and builds with the corpus. Now that Paper 2 is
+published, the stamp check allows Paper 3 to be stamped once it is ready. Its critical
+review (task 5.1) is next.
 
 ## State as of 27 October 2026
 
