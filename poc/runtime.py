@@ -456,6 +456,7 @@ def execute(
     graphs: GraphResolver | Mapping[str, dict] | None = None,
     sandbox: Mapping[str, Iterable[str]] | None = None,
     record_timing: bool = False,
+    impls: Mapping[str, Callable[..., object]] | None = None,
     _stack: tuple[str, ...] = (),
     _collector: TraceCollector | None = None,
     _acting_as: tuple[str, ...] = (),
@@ -479,7 +480,12 @@ def execute(
     assembled with its own tiers already fixed; this only reaches the children the
     runtime assembles, and it carries no backend, so a confined child node is still
     confined to the handles the parent routed. `_stack` carries the chain of
-    sub-graphs currently being executed, which is what the recursion guard checks."""
+    sub-graphs currently being executed, which is what the recursion guard checks.
+
+    `impls` supplies a leaf node's body by node name ahead of the registries: a
+    graph composed from a node library (`poc/agentdojo/library.py`) binds each
+    node's body from its parameters, so its bodies are per graph, not global. It
+    applies to this graph only; a sub-graph resolves its own nodes as before."""
     resolve = _resolver(graphs)
     # One collector is shared across a whole nested execution; a top-level run mints
     # it, a sub-graph run inherits the parent's so crossings land in the right node.
@@ -605,7 +611,7 @@ def execute(
             entry.subgraph = sub.trace
         else:
             registry = _CONFINED if node.tier == TIER_SANDBOX else REGISTRY
-            impl = registry.get(node_name)
+            impl = (impls or {}).get(node_name) or registry.get(node_name)
             if impl is None:
                 raise ExecutionError(
                     f"no {node.tier}-tier implementation registered for node {node_name!r}"

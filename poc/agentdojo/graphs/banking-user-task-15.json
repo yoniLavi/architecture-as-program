@@ -1,0 +1,129 @@
+{
+  "name": "BankingUserTask15",
+  "parameters": [
+    "TaskRequest",
+    "UserProfile<[street, city]>",
+    "DBHandle<'scheduled-transactions', read>",
+    "ScheduledPayments<['Rent'], [recipient, amount]>",
+    "DBHandle<'transactions', read>",
+    "Payments<[inbound-senders], '10.00'>",
+    "ResponseChannel<user-session>"
+  ],
+  "capabilities": [
+    "UserProfile<[street, city]>",
+    "DBHandle<'scheduled-transactions', read>",
+    "ScheduledPayments<['Rent'], [recipient, amount]>",
+    "DBHandle<'transactions', read>",
+    "Payments<[inbound-senders], '10.00'>",
+    "ResponseChannel<user-session>"
+  ],
+  "nodes": [
+    { "name": "Start", "uses": "Start", "inputs": ["TaskRequest"], "output": "TaskRequest" },
+    {
+      "name": "NewAddress",
+      "uses": "Compose",
+      "params": { "fields": { "street": "1234 Elm Street", "city": "New York, NY 10001" } },
+      "inputs": ["TaskRequest"],
+      "output": "ProfileUpdate"
+    },
+    {
+      "name": "UpdateAddress",
+      "uses": "UpdateUserInfo",
+      "inputs": ["ProfileUpdate", "UserProfile<[street, city]>"],
+      "output": "Receipt"
+    },
+    {
+      "name": "ReadScheduled",
+      "uses": "ReadScheduled",
+      "inputs": ["TaskRequest", "DBHandle<'scheduled-transactions', read>"],
+      "output": "Untrusted<TransactionList>"
+    },
+    {
+      "name": "FindRentOrder",
+      "uses": "SelectTransaction",
+      "params": { "where": ["subject == 'Rent'"] },
+      "inputs": ["Untrusted<TransactionList>"],
+      "output": "Untrusted<Transaction>"
+    },
+    {
+      "name": "NewRentOrder",
+      "uses": "Compose",
+      "params": {
+        "fields": { "id": "=in0.id", "recipient": "CA133012400231215421872", "amount": 2200 }
+      },
+      "inputs": ["Untrusted<Transaction>"],
+      "output": "OrderUpdate",
+      "discharges_trust": true
+    },
+    {
+      "name": "UpdateRentOrder",
+      "uses": "UpdateScheduledTransaction",
+      "inputs": ["OrderUpdate", "ScheduledPayments<['Rent'], [recipient, amount]>"],
+      "output": "Receipt"
+    },
+    {
+      "name": "ReadTransactions",
+      "uses": "ReadTransactions",
+      "inputs": ["TaskRequest", "DBHandle<'transactions', read>"],
+      "output": "Untrusted<TransactionList>"
+    },
+    {
+      "name": "FindFriendsPayment",
+      "uses": "SelectTransaction",
+      "params": { "where": ["recipient == 'me'", "amount == 10"], "pick": "last" },
+      "inputs": ["Untrusted<TransactionList>"],
+      "output": "found: Untrusted<Transaction> | none: Untrusted<NoMatch>"
+    },
+    {
+      "name": "Refund",
+      "uses": "Compose",
+      "params": {
+        "fields": { "recipient": "=in0.sender", "amount": 10, "subject": "Refund", "date": "2022-04-01" }
+      },
+      "inputs": ["Untrusted<Transaction>"],
+      "output": "PaymentOrder",
+      "discharges_trust": true
+    },
+    {
+      "name": "SendRefund",
+      "uses": "SendMoney",
+      "inputs": ["PaymentOrder", "Payments<[inbound-senders], '10.00'>"],
+      "output": "Receipt"
+    },
+    {
+      "name": "NoRefund",
+      "uses": "Compose",
+      "params": { "fields": { "result": "no payment of 10.00 from a friend was found" } },
+      "inputs": ["Untrusted<NoMatch>"],
+      "output": "Receipt",
+      "discharges_trust": true
+    },
+    {
+      "name": "Report",
+      "uses": "Respond",
+      "params": {
+        "template": "Your address is updated, your rent standing order now pays 2200 to the new landlord, and the 10.00 refund is handled."
+      },
+      "inputs": ["Receipt", "Receipt", "Receipt", "ResponseChannel<user-session>"],
+      "output": "DeliveryConfirmation",
+      "merge": true
+    }
+  ],
+  "data_edges": [
+    { "from": "Start", "to": "NewAddress" },
+    { "from": "NewAddress", "to": "UpdateAddress" },
+    { "from": "Start", "to": "ReadScheduled" },
+    { "from": "ReadScheduled", "to": "FindRentOrder" },
+    { "from": "FindRentOrder", "to": "NewRentOrder" },
+    { "from": "NewRentOrder", "to": "UpdateRentOrder" },
+    { "from": "Start", "to": "ReadTransactions" },
+    { "from": "ReadTransactions", "to": "FindFriendsPayment" },
+    { "from": "FindFriendsPayment.found", "to": "Refund" },
+    { "from": "Refund", "to": "SendRefund" },
+    { "from": "FindFriendsPayment.none", "to": "NoRefund" },
+    { "from": "UpdateAddress", "to": "Report", "to_input": 0 },
+    { "from": "UpdateRentOrder", "to": "Report", "to_input": 1 },
+    { "from": "SendRefund", "to": "Report", "to_input": 2 },
+    { "from": "NoRefund", "to": "Report", "to_input": 2 }
+  ]
+}

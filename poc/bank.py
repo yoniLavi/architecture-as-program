@@ -56,6 +56,10 @@ class Bank(Protocol):
     the bank itself."""
 
     def read(self, scope: str) -> Any: ...
+
+    # What a scope check reads. Not a node's operation, so a bank that records the
+    # agent's tool calls (AgentDojo's) must not record it as one.
+    def inspect(self, scope: str) -> Any: ...
     def send_money(self, recipient: str, amount: float, subject: str, date: str) -> Any: ...
     def schedule_transaction(
         self, recipient: str, amount: float, subject: str, date: str, recurring: bool
@@ -75,10 +79,10 @@ def _within_cap(amount: float, cap: Decimal | None) -> bool:
 def inbound_senders(bank: Bank) -> frozenset[str]:
     """Senders of payments *into* this account: the environment-read payee set.
     A payment in names the account by IBAN, or as 'me' in AgentDojo's data."""
-    own = bank.read("iban")
+    own = bank.inspect("iban")
     return frozenset(
         t["sender"]
-        for t in bank.read("transactions")
+        for t in bank.inspect("transactions")
         if t["recipient"] in (own, "me") and t["sender"] not in (own, "me")
     )
 
@@ -143,7 +147,8 @@ class ScheduledPaymentsHandle:
             raise CapabilityError(
                 f"fields {outside} are outside the handle's fields {sorted(self.scope.fields)}"
             )
-        order = next((t for t in self._bank.read("scheduled-transactions") if t["id"] == id), None)
+        scheduled = self._bank.inspect("scheduled-transactions")
+        order = next((t for t in scheduled if t["id"] == id), None)
         if order is None:
             raise BankError(f"no scheduled transaction with id {id}")
         if order["subject"].lower() not in self.scope.orders:
@@ -217,6 +222,8 @@ class MemoryBank:
             "iban": lambda: self.iban,
             "user-info": lambda: {k: v for k, v in self.user.items() if k != "password"},
         }[scope]()
+
+    inspect = read
 
     def _next_id(self) -> int:
         return max((t["id"] for t in [*self.transactions, *self.scheduled]), default=0) + 1

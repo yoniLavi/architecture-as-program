@@ -23,19 +23,19 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
 
 ## 2. Adapter and pipeline element
 
-- [ ] 2.1 Handles backed by AgentDojo's `FunctionsRuntime.run_function`, with scope checked
+- [x] 2.1 Handles backed by AgentDojo's `FunctionsRuntime.run_function`, with scope checked
       first
-- [ ] 2.2 A graph-backed `BasePipelineElement`, modelled on `ground_truth_pipeline.py`, that
+- [x] 2.2 A graph-backed `BasePipelineElement`, modelled on `ground_truth_pipeline.py`, that
       ends with a final assistant message. Scoring stays AgentDojo's own
 - [x] 2.3 The exclusive-branch merge node (design, Decision 3), with two corpus cases pinned:
       accepted when the branches are exclusive, rejected when they are not
 
 ## 3. The node library
 
-- [ ] 3.1 The library's catalogue as data: one generic node per banking tool operation,
+- [x] 3.1 The library's catalogue as data: one generic node per banking tool operation,
       deterministic selectors, and inference-only extraction nodes with closed output schemas
-- [ ] 3.2 Host-side implementations, with tests
-- [ ] 3.3 The spike's three graphs rewritten over the library. They run through the harness,
+- [x] 3.2 Host-side implementations, with tests
+- [x] 3.3 The spike's three graphs rewritten over the library. They run through the harness,
       and AgentDojo scores them. Reported as **oracle plans** only
 - [ ] 3.4 Confined components for the library, time-boxed to one session. Each is held to its
       clause by the derivation gate. If the timebox fails, record the fallback (host tier,
