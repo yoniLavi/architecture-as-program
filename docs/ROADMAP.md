@@ -48,7 +48,7 @@ Reviewability by real people (steps 7–8) needs participants, and comes later.
 ## State as of 29 October 2026, evening: Paper 4's harness
 
 `openspec/changes/add-agentdojo-banking-harness`, the first of Paper 4's two changes, is
-built. Signal graphs run inside AgentDojo's own scorer (banking `v1.2.2`, pinned) through a
+built, and archived (`openspec/changes/archive/2026-10-29-add-agentdojo-banking-harness`). Signal graphs run inside AgentDojo's own scorer (banking `v1.2.2`, pinned) through a
 fixed node library: an architect writes wiring and parameters, never code. What it has:
 - four banking capability kinds, with `Credentials` never grantable;
 - an exclusive-branch merge;

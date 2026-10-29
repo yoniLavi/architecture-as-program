@@ -136,7 +136,7 @@ Built 27 October 2026, up to the registered run. **Every session working on it s
 - **Everything long-running lowers its own priority** (`poc/polite.py`: nice 19 plus macOS background QoS, inherited by children; checked, and tested). Use `--no-nice` only on an idle machine.
 - **AgentDojo:** banking expresses as graphs, but a benchmark built from hand-written graphs would measure oracle plans (`docs/agentdojo-spike.md`). A comparable number needs a prompt-to-graph planner first.
 
-### Paper 4's AgentDojo banking harness (`openspec/changes/add-agentdojo-banking-harness`)
+### Paper 4's AgentDojo banking harness (`openspec/changes/archive/2026-10-29-add-agentdojo-banking-harness`)
 
 Built 29 October 2026; the decisions and their reasons are in that change's `design.md`. None of it moves a Paper 2 figure.
 
