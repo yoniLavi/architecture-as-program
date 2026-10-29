@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -261,7 +261,7 @@ def _fill(template: str, inputs: tuple[Any, ...]) -> str:
         v = resolve(inputs, m.group(1))
         if isinstance(v, float) and v.is_integer():
             v = int(v)
-        return v if isinstance(v, str) else json.dumps(v)
+        return v if isinstance(v, str) else compact(v)
 
     return re.sub(r"\{(in\d+(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\}", value, template)
 
@@ -443,10 +443,11 @@ def _parse_json_object(text: str) -> Any:
         raise LibraryError(f"the model's answer is not JSON: {e}") from e
 
 
-def _decode(value: Any) -> Any:
-    """A bank read arrives as a list of JSON strings (the `DBHandle` surface)."""
-    items = [json.loads(v) if isinstance(v, str) and v[:1] in "[{" else v for v in value]
-    return items
+def compact(value: Any) -> str:
+    """JSON as both tiers spell it: compact and key-sorted, as serde_json writes it
+    (`poc/sandbox/rust/lib_common`). The confined `Extract` must send the model
+    exactly what the host-tier one does."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def body(node: dict, capabilities: list[str]) -> Callable[..., Any]:
@@ -459,18 +460,20 @@ def body(node: dict, capabilities: list[str]) -> Callable[..., Any]:
         return lambda request: request
 
     if entry.family == READER:
-
+        # A bank read arrives as a list of strings (the `DBHandle` surface): a JSON
+        # record each, or for a file and the IBAN, the raw text.
         def read(_request: Any, handle: Any) -> Any:
-            items = _decode(handle.read(""))
+            items = handle.read("")
+            first = items[0] if items else ""
             if entry.name in ("ReadTransactions", "ReadScheduled"):
-                return items
+                return [json.loads(i) for i in items]
             if entry.name == "ReadFile":
-                return {"text": items[0] if items else ""}
-            if entry.name == "ReadBalance":
-                return {"amount": items[0]}
+                return {"text": first}
             if entry.name == "ReadIban":
-                return {"iban": items[0]}
-            return items[0]
+                return {"iban": first}
+            if entry.name == "ReadBalance":
+                return {"amount": json.loads(first)}
+            return json.loads(first)
 
         return read
 
@@ -518,11 +521,11 @@ def body(node: dict, capabilities: list[str]) -> Callable[..., Any]:
 
     if entry.family == EXTRACT:
         schema = {k: str(v) for k, v in params["fields"].items()}
-        system = EXTRACT_SYSTEM.format(fields=json.dumps(schema))
+        system = EXTRACT_SYSTEM.format(fields=compact(schema))
 
         def extract(*args: Any) -> Any:
             *inputs, llm = args
-            material = json.dumps(inputs if len(inputs) > 1 else inputs[0], indent=1)
+            material = compact(inputs if len(inputs) > 1 else inputs[0])
             answer = llm.infer(
                 system=system,
                 prompt=f"{params['instruction']}\n\nMaterial:\n{material}",
@@ -561,10 +564,26 @@ def body(node: dict, capabilities: list[str]) -> Callable[..., Any]:
     raise LibraryError(f"no body for {entry.name}")  # pragma: no cover
 
 
-def bodies(graph: dict) -> dict[str, Callable[..., Any]]:
-    """Node name → body, for every node of a library graph."""
+def bodies(graph: dict, confined: Iterable[str] = ()) -> dict[str, Callable[..., Any]]:
+    """Node name → body, for every node of a library graph. Nodes named in
+    `confined` get their component (`confined.py`, which needs wasmtime)."""
     caps = list(graph.get("capabilities", []))
-    return {n["name"]: body(n, caps) for n in graph["nodes"]}
+    confined = set(confined)
+    out: dict[str, Callable[..., Any]] = {}
+    for n in graph["nodes"]:
+        if n["name"] in confined:
+            from .confined import body as confined_body
+
+            out[n["name"]] = confined_body(n)
+        else:
+            out[n["name"]] = body(n, caps)
+    return out
+
+
+def confinable(graph: dict) -> list[str]:
+    """The nodes of a graph whose entry has a component: exactly those whose entry
+    holds a capability. The pure entries have none, and run on the host tier."""
+    return [n["name"] for n in graph["nodes"] if CATALOGUE[n["uses"]].capability is not None]
 
 
 __all__ = [

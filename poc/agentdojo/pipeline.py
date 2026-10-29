@@ -75,7 +75,7 @@ class GraphPipeline(BasePipelineElement):
         if problems:
             raise LibraryGraphError("; ".join(problems))
         try:
-            result = execute(assembled, {"prompt": query}, impls=bodies(self.graph))
+            result = execute(assembled, {"prompt": query}, impls=bodies(self.graph, self.sandbox))
             record.order = list(result.order)
         finally:
             channels = [

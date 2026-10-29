@@ -318,7 +318,9 @@ WASM_MODULES := node_parse_message node_moderate_content node_fetch_context \
                 node_start_run node_load_subscriptions node_fetch_feeds \
                 node_drop_seen node_classify_item node_summarise_item \
                 node_compose_digest node_publish_digest node_record_seen \
-                hostile_exfiltrating_classifier hostile_seen_writer
+                hostile_exfiltrating_classifier hostile_seen_writer \
+                lib_read lib_send_money lib_schedule_transaction \
+                lib_update_scheduled lib_update_user_info lib_respond lib_extract
 
 # Build the component-tier WASM node artifacts and copy them into
 # poc/sandbox/wasm/ (which is committed).

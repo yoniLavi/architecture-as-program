@@ -37,7 +37,7 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
 - [x] 3.2 Host-side implementations, with tests
 - [x] 3.3 The spike's three graphs rewritten over the library. They run through the harness,
       and AgentDojo scores them. Reported as **oracle plans** only
-- [ ] 3.4 Confined components for the library, time-boxed to one session. Each is held to its
+- [x] 3.4 Confined components for the library, time-boxed to one session. Each is held to its
       clause by the derivation gate. If the timebox fails, record the fallback (host tier,
       host-side scope) in `design.md`, and the narrower claim it implies
 

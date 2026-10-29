@@ -90,6 +90,32 @@ and the report says so. On the oracle graph for task 0, the fooled extractor sen
 an empty secret, and goals 0, 1 and 3 still score as successes. The spike had predicted them
 impossible by information flow.
 
+**The timebox (task 3.4, 29 October 2026): met, with one narrowing.** Each library entry
+that holds a capability is a confined component, one per family:
+- `lib_read`, which serves all six readers;
+- `lib_send_money`, `lib_schedule_transaction`, `lib_update_scheduled` and
+  `lib_update_user_info`;
+- `lib_respond` and `lib_extract`.
+
+Each world imports exactly the interface its entry's kind maps to. Values and parameters
+cross as JSON, because the library is generic over its records. The worlds are in
+`banking.wit`; the Rust is in `poc/sandbox/rust/lib_*`, with a shared rlib, `lib_common`, that
+imports nothing. The tests check three things:
+- the derivation gate, on every confinable node of every oracle graph and on one example
+  clause per entry, with a negative control that it fires;
+- a refused payment traps through the component before the bank is touched;
+- every committed oracle run gives the same record on both tiers. Amounts compare as floats,
+  since a component sends a WIT `f64`.
+
+**The narrowing.** The pure entries (`Start`, the selectors and `Compose`) hold no capability
+and have no component. They run on the host tier, which is the feed-triage service's
+precedent. So the claim Paper 4 may make is: *every node that holds authority runs confined,
+with an import surface derived from its clause*. It may not claim that every node runs
+confined. A pure host-tier node is library code, written once and not by the architect, but
+it is not confined. Porting the selectors and `Compose` would also mean a second
+implementation of the contract vocabulary and of the expression language, which is the cost
+the timebox declined.
+
 ## Decision 2: the banking kinds narrow on arguments
 
 From the spike: a handle's kind is coarser than banking's threats, so the scope lives in the
