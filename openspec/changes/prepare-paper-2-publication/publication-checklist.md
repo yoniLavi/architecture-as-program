@@ -114,6 +114,12 @@ the PDF reports. Pushing a tag is outward-facing too, so it is the author's call
       `openspec archive prepare-paper-2-publication --yes`, then
       `openspec validate --specs --strict`, and commit.
 - ~~Paper 3 can now publish.~~ Moot since the merge: there is no Paper 3.
+- [ ] **Commit `papers/02-demonstrator/RECORD.json`** (added 29 October 2026, by
+      `add-paper-3`): `{"status": "published", "doi": "10.5281/zenodo.23057135",
+      "record": "https://zenodo.org/records/23057135", "published": "<the upload date>"}`.
+      It is what `scripts/check-corpus-citations.py` reads: until it exists, the new
+      Paper 3 (`papers/03-generation/`, which cites Paper 2) cannot be stamped. Commit it
+      only once the record is live; the check trusts the marker.
 
 ## A note on Paper 1 that this surfaced
 

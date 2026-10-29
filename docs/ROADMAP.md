@@ -1,6 +1,14 @@
 # Roadmap: from demonstrator to a useful toy
 
-## Start here: state as of 27 October 2026
+## Start here: state as of 29 October 2026
+
+**M5, Paper 3, is started** (`openspec/changes/add-paper-3`, approved 29 October). The author
+decided it follows Paper 2 and cites it, is generation-led, and has a ~8,000-word budget. A
+first draft is in `papers/03-generation/` and builds with the corpus. Its upload waits on
+Paper 2's: `scripts/check-corpus-citations.py` refuses to let it be stamped until Paper 2's
+`RECORD.json` is committed. The author is reviewing and publishing Paper 2 first.
+
+## State as of 27 October 2026
 
 The generation result was judged too early for Paper 3, and
 `openspec/changes/strengthen-generation-evidence` is the work that strengthens it. Its code is

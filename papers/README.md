@@ -14,6 +14,7 @@ one bibliography.
 |---|---|---|---|
 | 1. The founding vision | `01-vision/` | **Frozen** (errata-only), published | Served from its published files (`published/`), never rebuilt |
 | 2. *Confinement by Construction* | `02-demonstrator/` | Living | The shared root artifact |
+| 3. *Granted by Claim* (working title) | `03-generation/` | Living, **draft**; may not be stamped before Paper 2 publishes | `dist/generation.json`, `dist/evaluation-feed.json` |
 
 Paper 2 reports **what the artifact establishes** and owns the
 predictions-and-outcomes accounting of Paper 1 against it. From August to

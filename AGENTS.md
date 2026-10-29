@@ -37,6 +37,8 @@ This is primarily a **writing project**: the papers are the outputs that matter.
 | File | Role |
 |---|---|
 | `papers/02-demonstrator/proposal.typ` | Paper 2, *Confinement by Construction* (Typst) — the living paper: evidence, and the accounting of Paper 1 against it. |
+| `papers/03-generation/proposal.typ` | Paper 3, *Granted by Claim* (working title; Typst), **draft**: agent-written components held to the derived import gate. Every figure from `dist/generation.json` / `dist/evaluation-feed.json`; cites Paper 2 for the gate and restates none of it; no accounting of Paper 1. Change `openspec/changes/add-paper-3`. |
+| `scripts/check-corpus-citations.py` | Fails the build if a DOI-stamped paper cites a corpus paper with no publication marker (`PUBLISHED.json`, or a living paper's `RECORD.json`). Trusts the marker; corpus papers only. |
 | `docs/ROADMAP.md` | The plan for the next artifact: a feed-triage "useful toy" and the agent-generated-node-body experiment. |
 | `docs/PRIOR-ART.md` | Standing record of the community-of-practice survey: what was taken, what was refused, and open verification debts. |
 | `papers/01-vision/proposal.typ` | The frozen founding-vision paper. **Do not edit** (errata-only; guarded by `scripts/check-freeze.py`). |

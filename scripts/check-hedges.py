@@ -68,6 +68,7 @@ from pathlib import Path
 #
 # Seeded 5 August 2026 against papers/02-demonstrator/proposal.typ §2.5.
 PAPER2 = "papers/02-demonstrator/proposal.typ"
+PAPER3 = "papers/03-generation/proposal.typ"
 
 PINS = (
     # §2.3, the running example. Pinned alongside §2.5 because it carries the
@@ -258,6 +259,64 @@ PINS = (
         "covert-channels/not-claimed",
         "is not claimed to close",
         "which general covert-channel elimination, a known-hard problem, is not claimed to close",
+    ),
+    # Paper 3, seeded 29 October 2026 against its first draft (add-paper-3 4.8).
+    # The experiment's central traps: a catch rate that is true by construction
+    # read as a finding, a pretext in the task read as indirect injection, a
+    # ladder read as a factorial, an in-repo registration read as a registry
+    # entry, "equal on n inputs" read as equivalence, a replay read as operation,
+    # and the service's own policy read as a validator analysis.
+    (
+        PAPER3,
+        "sec:intro",
+        "intro/gate-by-construction",
+        "by construction",
+        "The derived import gate rejects every such component by construction.",
+    ),
+    (
+        PAPER3,
+        "sec:intro",
+        "intro/not-retrieved-content",
+        "It does not say",
+        "It does not say anything about pretexts that arrive inside retrieved content",
+    ),
+    (
+        PAPER3,
+        "sec:conditions",
+        "conditions/ladder-not-factorial",
+        "not a factorial",
+        "This is a _ladder_, not a factorial.",
+    ),
+    (
+        PAPER3,
+        "sec:history",
+        "history/registered-means-only-that",
+        "mean only that",
+        "reviewed by nobody outside. We call it registered, and mean only that.",
+    ),
+    (
+        PAPER3,
+        "sec:results-diff",
+        "differential/not-equivalence",
+        "It is not equivalence",
+        '"Equal" means equal on the inputs the contract generates, which for #few.len() of '
+        "the #nodes nodes number between #calc.min(..few) and #calc.max(..few). It is not "
+        "equivalence",
+    ),
+    (
+        PAPER3,
+        "sec:service",
+        "service/replay-not-operation",
+        "is not operation",
+        "A replay is not operation: it says nothing about scheduling, locking or real "
+        "network failure",
+    ),
+    (
+        PAPER3,
+        "sec:service",
+        "service/policy-not-validator",
+        "not by the graph validator",
+        "is checked by a policy written for this service, not by the graph validator.",
     ),
 )
 

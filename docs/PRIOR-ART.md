@@ -380,6 +380,55 @@ same family and was not checked or cited.
 
 ---
 
+## Survey, October 2026 — before Paper 3 (`add-paper-3`, task 3.1)
+
+Asked "what should change in the design or the claim?", not only "who to cite". Run by a
+subagent against primary sources; the three entries that position the paper (Leong,
+Progent, Yang et al.) were re-read against their arXiv abstracts by the drafting session.
+
+### 16. Compliance with claimed authority is not ours to claim
+
+Persuasion by appeal to authority jailbreaks aligned models (Zeng et al., ACL 2024), and
+sycophancy is a plausible mechanism (Sharma et al. 2023), which our design does not test.
+**Leong (arXiv 2608.28502v2, 17 Oct 2026) is the closest competitor**: fabricated authority
+on tool-calling agents, the same conclusion (enforce outside the model), at tool-call time
+rather than on a build's imports. Two of its results set our scope: a reason without an
+authority claim was executed by all ten endpoints (our P1: none), and a valid scoped token
+still induced in-scope deletions (our free-text residual). **Taken:** Paper 3 claims no
+novelty for compliance; its contribution is the setting (code that *requests* authority) and
+the derived gate.
+
+### 17. Least privilege for agents: where policy comes from
+
+Progent (Shi et al., arXiv 2504.11703) enforces deterministic per-call policies that an LLM
+drafts; a narrowing applies automatically and an expansion needs approval — the channel our
+pretexts imitate. In the signal graph authority comes from the graph alone. Yang et al.
+(arXiv 2606.20023) find over-privileged tool selection common, with prompt-level controls of
+limited help "under transient failures" (the qualifier matters; the survey's first summary
+dropped it). **Taken:** Paper 3 does not generalise its zero baseline beyond tasks that hand
+the model an explicit grant. The instruction hierarchy (Wallace et al. 2024) is the
+training-side alternative; it has nothing to separate when the notice sits in the task.
+
+### 18. The gate's blind spots, named
+
+Generated code is insecure without an adversary (Pearce et al., S&P 2022; Perry et al.,
+CCS 2023); the gate does not address that. Package hallucination (Spracklen et al., USENIX
+Security 2025) is a second route to authority: the experiment's crates could add no
+dependency (`poc/generation/pipeline.py`, fixed `Cargo.toml`, `--offline`), and outside it a
+dependency's imports would meet the same gate but its behaviour would not.
+
+### 19. Pre-registration wording
+
+Nosek et al. (PNAS 2018) for confirmatory versus exploratory; Ernst and Baldassarre (EMSE
+2023) for registered reports in software engineering. Ours is self-registration with no
+outside review, and Paper 3 says so.
+
+**Surveyed and not cited:** TAMAS (impersonation as an attack class: seen only in a search
+snippet), Bhardwaj 2026 (capability safety for agent skills; weak sourcing), Rauba et al. 2026
+("least privilege" for a model's internal computation — same term, nothing else).
+**Unverified, so left out of the bib:** the ICLR venue of Sharma et al.; the volume and
+article number of Ernst and Baldassarre.
+
 ## Open verification debts
 
 - ~~**Wassette's permission mechanism**~~ — **resolved, confirmed and sharpened**

@@ -175,9 +175,14 @@ def test_fragments_match_across_line_breaks():
 
 def test_the_seeded_pins_cover_the_design_section_of_paper_2():
     """The guard is seeded where AGENTS.md says the hedging discipline fails."""
-    sections = {pin[1] for pin in check_hedges.PINS}
-    assert "sec:security" in sections
-    assert all(pin[0] == "papers/02-demonstrator/proposal.typ" for pin in check_hedges.PINS)
+    paper2 = {pin[1] for pin in check_hedges.PINS if pin[0] == check_hedges.PAPER2}
+    assert "sec:security" in paper2
+
+
+def test_pins_live_only_in_living_papers():
+    """The frozen paper is guarded by the freeze, never by a pin; Paper 3 has its own."""
+    papers = {pin[0] for pin in check_hedges.PINS}
+    assert papers == {check_hedges.PAPER2, check_hedges.PAPER3}
 
 
 def test_tier_restricted_properties_are_pinned_on_both_paragraphs(sources):
