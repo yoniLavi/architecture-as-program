@@ -157,9 +157,28 @@
       on evidence the paper does not present. §6.1 also gains Leong (arXiv 2608.28502):
       model arbitration between instructions is not a trust boundary, and a validly scoped
       token still permits in-scope misuse
-- [ ] 6.31 A full review pass after 6.30, run by a subagent. It reads the paper knowing that
+- [x] 6.31 A full review pass after 6.30, run by a subagent. It reads the paper knowing that
       a Paper 3 draft exists and is not ready, and that Paper 3 may add experiments.
-      Findings are triaged; fixes are committed and judgement calls left for the author
+      Findings are triaged; fixes are committed and judgement calls left for the author.
+      **Done.** Two majors, both in 6.30's new sentence, and both fixed:
+      - the dating covered only "unbuilt or not attempted", while seven other statements of
+        absence (for example "every canonical graph describes a customer-support pipeline",
+        "no network I/O") and the §5 verdicts went undated. It now covers what the artifact
+        has and lacks, and the verdicts;
+      - a short hash in an unnamed repository could not be resolved. The repository is now
+        named, with the full hash in the link (step 2 of the checklist confirms it resolves
+        after the push).
+
+      Also fixed:
+      - the paper's two dates are reconciled ("its code last changed on 30 September");
+      - §4.2's hand-typed "Two cases predate the review" was wrong (four do) and is now
+        count-free;
+      - "the shared premise";
+      - "at scale" is dropped, as it described unpublished work.
+
+      No finding concerned Paper 3: nothing cites or foreshadows it. Left for the author: §5.5
+      hand-types "three partial rows" (correct today); timings are measured at publication,
+      not at the dated commit; an optional tag on the dated commit
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 

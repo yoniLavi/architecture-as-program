@@ -62,7 +62,14 @@ before the final build.
    create a new upload.
 2. ~~Stamp it.~~ **Done** in `58211c8`: the title block carries the DOI line, and the
    `lavi_confinement_2026` bib step is moot (that entry was deleted, because only Paper
-   3 cited it).
+   3 cited it). *(29 October 2026: the entry is back, cited now by the new Paper 3, which
+   is a draft and is not uploaded with this paper.)*
+   **Since 29 October, the paper names the commit it reports**: §1 shows `41737910cf4c`
+   and the repository, with the full hash in the link target. After the push in step 3, open
+   `https://github.com/yoniLavi/architecture-as-program/commit/41737910cf4c1b108429bc6cd6c256de65a0aec4`
+   and confirm it resolves. An optional tag on that commit, `paper-2-artifact`, would be
+   a sturdier anchor than a hash, given that §7.5 admits the history was once rewritten.
+   Pushing the tag is the author's call.
 3. `make clean && make build` again, on an idle machine. Confirm `git status` is clean, so
    the PDF was built from a committed tree, then **push `main` and the tag
    `paper-3-before-merge`** (`git push origin main paper-3-before-merge`; the tag is not yet
