@@ -78,15 +78,16 @@ UI_FIGS := $(addprefix $(DIST)/ui/,$(UI_FIGS_USED))
 # dist/papers/02-demonstrator/ (see README).
 ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 
-.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation paper1 paper2 paper3 aliases api ui ui-check ui-e2e
+.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking paper1 paper2 paper3 aliases api ui ui-check ui-e2e
 
-build: validate-graphs check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation paper1 paper2 paper3 aliases
+build: validate-graphs check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking paper1 paper2 paper3 aliases
 	@echo "Build complete."
 
 grammar: $(DIST)/grammar.md
 evaluation: $(DIST)/evaluation.md $(DIST)/evaluation.json
 evaluation-feed: $(DIST)/evaluation-feed.md
 generation: $(DIST)/generation.md
+agentdojo-banking: $(DIST)/agentdojo-banking.md
 paper1: $(P1_SERVED) $(P1_DOCS)
 paper2: $(P2_DOCS) $(P2_PUB_PDF)
 paper3: $(P3_DOCS) $(P3_PUB_PDF)
@@ -142,6 +143,14 @@ $(DIST)/evaluation-feed.md: $(POC_SRC) $(POC_WASM) $(FEED_SRC) $(GRAPHS_SRC) scr
 # report is refused.
 $(DIST)/generation.md: poc/generation/report.py poc/generation/results.json poc/generation/registration.json | $(DIST)
 	$(PY) -m poc.generation.report
+
+# Paper 4's AgentDojo banking harness, rendered from committed records: the banking
+# corpus, the oracle plans and their predictions, and the undefended baseline.
+# Stdlib-only and calls no model; the runs themselves are `poc.agentdojo.harness`
+# and `poc.agentdojo.baseline`, never a build step.
+AGENTDOJO_RECORDS := $(wildcard poc/agentdojo/records/*.json poc/agentdojo/records/baseline/*/*.jsonl poc/agentdojo/predictions/*.json)
+$(DIST)/agentdojo-banking.md: poc/agentdojo/report.py poc/agentdojo/corpus.py $(AGENTDOJO_RECORDS) | $(DIST)
+	$(PY) -m poc.agentdojo.report $(DIST)
 
 # Each of the two artifacts above writes its .json in the same recipe as its .md;
 # these rules establish the ordering for Paper 3, which typesets from both.
