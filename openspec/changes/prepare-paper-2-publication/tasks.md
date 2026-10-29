@@ -148,6 +148,18 @@
       layout entries, and an error no reason class claims now fails the evaluation; §4.2 marks
       where the review-found cases end; §6.2 says capDL's proof is refinement; §1.1 says which
       half of "by construction" is constructed; §4.4 names the misleading reply
+- [x] 6.30 (29 October 2026, author-approved) **Paper 2 is dated to its commit.** By then the
+      repository had gained node-local state, fan-in, a generative contract mode and generated
+      bodies at scale, so five passages and two accounting rows that called them absent had
+      become understatements. One sentence at the end of §1 dates the paper to `4173791`
+      (1 October 2026) and names what it does not report. The `paper-corpus` delta allows a
+      living paper to name its commit. The sweep was rejected: it would have moved verdicts
+      on evidence the paper does not present. §6.1 also gains Leong (arXiv 2608.28502):
+      model arbitration between instructions is not a trust boundary, and a validly scoped
+      token still permits in-scope misuse
+- [ ] 6.31 A full review pass after 6.30, run by a subagent. It reads the paper knowing that
+      a Paper 3 draft exists and is not ready, and that Paper 3 may add experiments.
+      Findings are triaged; fixes are committed and judgement calls left for the author
 
 ## 7. Publication (handed over from `merge-and-condense-papers`, 30 September 2026)
 
