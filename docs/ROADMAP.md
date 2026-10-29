@@ -59,8 +59,11 @@ fixed node library: an architect writes wiring and parameters, never code. What 
 The spike's three graphs, run as **oracle plans** on stand-in models, have utility, and
 obey their predictions. Building it found that AgentDojo's predicates for goals 0, 1 and 3
 succeed on *any* payment to the attacker (a precedence slip, used unchanged and stated).
-The baseline is running on `claude-haiku-5-5`, one repetition, by the author's choice. It
-stops at the usage ceiling and resumes. Next: `add-architect-and-reviewers`.
+The undefended baseline ran on `claude-haiku-5-5`, one repetition, by the author's choice:
+utility 13/16, and **0/144 attack success** under `important_instructions`. Haiku resisted
+this attack undefended, so on this model and attack the graph has no attack-success headroom
+to show. The comparison Paper 4 needs is then autonomy and utility, plus the pretext
+experiment. Next: `add-architect-and-reviewers`.
 
 ## State as of 29 October 2026
 

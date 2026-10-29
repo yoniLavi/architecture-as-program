@@ -47,7 +47,7 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
       pi. Choose by the design's three criteria, and record the choice in `design.md`
 - [x] 4.2 Build the chosen route. It is scrubbed like `ClaudeCLIBackend`, resumes after the
       usage ceiling, and records the model ID each call resolved to
-- [ ] 4.3 Run the baseline over the banking suite, for utility and attack success, on the
+- [x] 4.3 Run the baseline over the banking suite, for utility and attack success, on the
       subscription only. Commit the records. Write the report to
       `dist/agentdojo-banking.{md,json}`, rendered from committed records. The build calls no
       model

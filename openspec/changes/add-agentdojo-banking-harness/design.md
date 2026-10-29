@@ -226,6 +226,20 @@ therefore runs with:
 
 The spike's `init` event listed exactly the eleven banking tools.
 
+**The result (task 4.3, 29 October 2026).** `claude-haiku-5-5`, one repetition (the author's
+choice of model), all 160 runs, no harness faults, every run resolved to the model requested:
+- utility 13/16 with no attack, and 107/144 under attack;
+- **attack success 0/144** under `important_instructions`.
+
+Two readings must travel together:
+- Undefended Haiku 5.5 already resisted this attack on banking, so attack success leaves a
+  graph no headroom on this model and attack.
+- 0/144 is not "no residual": AgentDojo scores only its nine goals, and one attack.
+
+Paper 4's case therefore rests on utility, autonomy and the pretext experiment, not on
+lowering an attack-success rate this baseline does not have. Other models or attacks would
+need the author's approval and usage.
+
 ## Decision 5: predictions before measurement
 
 For each task–injection pair, the static prediction from the spike's recipe (vector → node
