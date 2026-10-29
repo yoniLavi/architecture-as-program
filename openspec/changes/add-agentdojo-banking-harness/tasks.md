@@ -61,5 +61,5 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
 
 ## 6. Records
 
-- [ ] 6.1 `AGENTS.md`, `docs/ROADMAP.md`, and spec deltas reconciled; then
+- [x] 6.1 `AGENTS.md`, `docs/ROADMAP.md`, and spec deltas reconciled; then
       `openspec validate --strict`

@@ -161,6 +161,12 @@ def markdown(data: dict[str, Any]) -> str:
         "",
         "With the oracle model, no attack succeeded on any plan.",
         "",
+        "**Tiers.** Every library node that holds a capability (the readers, the writers, "
+        "`Extract`, `Respond`) has a confined component, held to its `with` clause by the "
+        "derivation gate, and the oracle runs give the same records on both tiers. The pure "
+        "nodes (`Start`, the selectors, `Compose`) hold nothing, have no component, and run "
+        "on the host tier.",
+        "",
         "## The undefended baseline (same model, subscription)",
         "",
         "A Claude agent given the prompt and all eleven banking tools, through `claude -p` "

@@ -45,6 +45,23 @@ The back half (steps 5–6: decomposition, escalation as a graph change, minimis
 likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
 Reviewability by real people (steps 7–8) needs participants, and comes later.
 
+## State as of 29 October 2026, evening: Paper 4's harness
+
+`openspec/changes/add-agentdojo-banking-harness`, the first of Paper 4's two changes, is
+built. Signal graphs run inside AgentDojo's own scorer (banking `v1.2.2`, pinned) through a
+fixed node library: an architect writes wiring and parameters, never code. What it has:
+- four banking capability kinds, with `Credentials` never grantable;
+- an exclusive-branch merge;
+- confined components for every authority-holding library node;
+- static per-pair predictions;
+- an undefended `claude -p` baseline on the subscription.
+
+The spike's three graphs, run as **oracle plans** on stand-in models, have utility, and
+obey their predictions. Building it found that AgentDojo's predicates for goals 0, 1 and 3
+succeed on *any* payment to the attacker (a precedence slip, used unchanged and stated).
+The baseline is running on `claude-haiku-5-5`, one repetition, by the author's choice. It
+stops at the usage ceiling and resumes. Next: `add-architect-and-reviewers`.
+
 ## State as of 29 October 2026
 
 **Paper 2 is published**: https://zenodo.org/records/23057135, 29 October 2026, version

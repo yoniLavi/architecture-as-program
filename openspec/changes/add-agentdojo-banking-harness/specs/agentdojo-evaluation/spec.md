@@ -39,7 +39,25 @@ derivation gate; if it runs on the host tier instead, the report SHALL say so.
 
 #### Scenario: A library node over-imports
 - **WHEN** a library component imports an interface its clause does not grant
-- **THEN** the build fails, as for any derived component
+- **THEN** the test suite fails, and with it the pre-commit gate
+
+#### Scenario: A pure library node
+- **WHEN** a library node holds no capability
+- **THEN** it runs on the host tier, and the report says so
+
+### Requirement: Exclusive branches may merge
+The validator SHALL accept several edges into one input position of a node declaring
+`merge: true` only if every pair of them lies on different variants of one sum, so that at
+most one value arrives. Without the marker, the one-edge-per-position rule of a join SHALL hold
+unchanged.
+
+#### Scenario: A lookup that may fail rejoins a report
+- **WHEN** the `found` and `none` branches of one lookup both feed a merge position
+- **THEN** the validator accepts the graph, and the runtime runs the merge once
+
+#### Scenario: Branches that can both fire
+- **WHEN** two edges into a merge position are not on exclusive variants
+- **THEN** the validator rejects the graph, by a pinned reason class
 
 ### Requirement: The comparison runs on the same model
 The repository SHALL provide an undefended tool-calling agent on the same Claude models, run on
