@@ -27,7 +27,14 @@ It holds the reserved DOI, and discarding it loses the metadata entered so far.
 >   stating that no canonical graph attaches a contract; and the ordinal 3 is retired.
 > - The pre-flight spot-checks still hold after renumbering: §4.1 names
 >   `hostile_ungranted`, §4.3 is the overhead table, and §6.2 carries CAmkES. The PDF
->   also shows the outcomes table in §5, with 19 rows.
+>   also shows the outcomes table in §5, with ~~19~~ 24 rows (review rounds of 30
+>   September), and ~~three~~ two corrections (`ServiceOutcome` was reclassified as
+>   not counted).
+>
+> **Amended 29 October 2026, at upload:** the date line reads *October 2026*
+> (`b04c38f`). §1 now dates the paper to commit `41737910cf4c`, which resolves only once
+> `main` is pushed. And `lavi_confinement_2026` is back in the bib, cited by the Paper 3
+> draft, which is not part of this upload.
 
 ## 1. Pre-flight (local)
 
