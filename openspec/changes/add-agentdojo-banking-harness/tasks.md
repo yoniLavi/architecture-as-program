@@ -5,9 +5,9 @@ Each session first checks the feed recorder (`strengthen-generation-evidence` 0.
 
 ## 0. Setup
 
-- [ ] 0.1 Add the `agentdojo` dependency group, pinned at commit `089ed468…`. Add a test that
+- [x] 0.1 Add the `agentdojo` dependency group, pinned at commit `089ed468…`. Add a test that
       no module under `scripts/`, and nothing `poc/evaluate.py` imports, can import it
-- [ ] 0.2 Read `docs/agentdojo-spike.md` and its three graphs, and re-check the pin's banking
+- [x] 0.2 Read `docs/agentdojo-spike.md` and its three graphs, and re-check the pin's banking
       paths (`task_suite.py`, `user_tasks.py`, `injection_tasks.py`,
       `ground_truth_pipeline.py`)
 

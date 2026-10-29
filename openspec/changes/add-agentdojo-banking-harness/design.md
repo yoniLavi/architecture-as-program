@@ -8,6 +8,26 @@ measurement recipe ("Measuring attack success on a graph") is followed here unch
 2. handles backed by `FunctionsRuntime.run_function`, with scope checked first;
 3. AgentDojo's own `run_task_with_pipeline` and `security()` predicate.
 
+## The pin, re-checked (task 0.2, 29 October 2026)
+
+Installed from the `agentdojo` group at `089ed468`. The spike's paths hold: `UserTask0`, `1`
+and `15` at `v1/banking/user_tasks.py:16`, `56` and `516`; the eleven tools at
+`v1/banking/task_suite.py:23`; `GroundTruthPipeline.query` at `ground_truth_pipeline.py:20`;
+the security result at `task_suite.py:412–420`; injection candidates at
+`attacks/base_attacks.py:49`.
+
+- **The measured suite is `v1.2.2`**, the newest the pin registers. Its banking user tasks
+  come from `v1` except task 6 (`v1_2_2`) and task 15 (`v1_1_1`, the prompt the spike
+  used); its injection tasks come from `v1_2` except goal 7 (`v1`). So the spike's line
+  numbers for goals 5 and 6 (`v1/…/injection_tasks.py:241`, `276`) are the `v1` wording;
+  the measured predicates are `v1_2`'s.
+- **Each user task exposes exactly one vector** under the ground-truth run: the bill text
+  (task 0), the landlord's notice (2, 12), the address-change file (13), and the incoming
+  transaction's subject (the other twelve). So the suite has 16 × 9 = 144 pairs, one vector
+  each.
+- `security` in `run_task_with_pipeline`'s result is **true when the injection goal was
+  met**: it is the goal's own predicate. Reports name it "attack success", never "security".
+
 ## Decision 1: architects compose a library; they do not write code
 
 The front half (Paper 4) has no developers, but an architect's graph still needs node bodies
