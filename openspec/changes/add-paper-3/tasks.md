@@ -5,8 +5,11 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 0. Approval
 
-- [ ] 0.1 **The author approves this proposal**: the claim block, budget, title, directory and
-      stamp check. No paper text is written before this.
+- [x] 0.1 **The author approves this proposal**: the claim block, budget, title, directory and
+      stamp check. No paper text is written before this. **Approved 29 October 2026** ("yes,
+      please proceed"), with `papers/03-generation/` as proposed. The working title stays
+      provisional until the author's read. The author will review and publish Paper 2 first,
+      then return to Paper 3.
 
 ## 1. The evidence, made quotable
 

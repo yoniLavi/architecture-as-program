@@ -362,8 +362,12 @@ def test_registered_trials_move_no_earlier_figure():
     before = report.summarise(results, design)
     with_run = {**results, "trials": [*results["trials"], *_complete(_small_design(), 2)]}
     after = report.summarise(with_run, design)
-    assert {k: v for k, v in after.items() if k != "registered"} == {
-        k: v for k, v in before.items() if k != "registered"
+    # `display` holds the registered run's figures pre-formatted, so it belongs to
+    # the registered section; every key in it must say so.
+    registered_only = {"registered", "display"}
+    assert all(k.startswith("confirmatory_") for k in after["display"])
+    assert {k: v for k, v in after.items() if k not in registered_only} == {
+        k: v for k, v in before.items() if k not in registered_only
     }
     assert after["registered"]["earlier"] == before["registered"]["earlier"]
 
@@ -410,3 +414,63 @@ def test_cargo_builds_with_bounded_parallelism(tmp_path, monkeypatch):
     pipeline.build({"lib.rs": "", "world.wit": ""}, tmp_path / "c", tmp_path / "t")
     command = seen["command"]
     assert command[command.index("-j") + 1] == "2"
+
+
+# ── What a paper interpolates (add-paper-3, 1.1 to 1.3) ──────────────
+
+
+@pytest.mark.parametrize(
+    "x, expected",
+    [
+        (1.0886790573745067e-40, f"1.1 {report.TIMES} 10⁻⁴⁰"),
+        (0.01, f"1.0 {report.TIMES} 10⁻²"),
+        (2.5e3, f"2.5 {report.TIMES} 10³"),
+    ],
+)
+def test_a_float_is_displayed_as_one_string_for_typst_and_pandoc(x, expected):
+    assert report.scientific(x) == expected
+
+
+def test_the_display_block_carries_the_confirmatory_p_and_alpha():
+    design = _small_design()
+    summary = report.summarise_registered(_complete(design, 2), design, [])
+    display = report.display(summary)
+    assert display["confirmatory_p"] == report.scientific(summary["confirmatory_test"]["p"])
+    assert display["confirmatory_alpha"] == "0.01"
+    assert report.display({"registered": False}) == {
+        "confirmatory_p": None,
+        "confirmatory_alpha": None,
+    }
+
+
+def test_the_no_claim_sum_covers_only_conditions_without_a_claimed_approval():
+    design = _small_design()
+    summary = report.summarise_registered(
+        _complete(design, 2, reach_in=("P3", "P5", "P5-withheld")), design, []
+    )
+    no_claim = summary["no_claim"]
+    assert no_claim["conditions"] == ["P0", "P1", "P2", "P0-withheld", "P2-withheld"]
+    assert no_claim["reached"] == 0
+    assert no_claim["of"] == 5 * 12
+
+
+def test_the_gate_off_totals_are_the_sum_of_the_conditions():
+    design = _small_design()
+    summary = report.summarise_registered(_complete(design, 2), design, [])
+    secondary = summary["secondary"].values()
+    total = summary["gate_off"]
+    assert total["components"] == sum(s["gate_off_components"] for s in secondary)
+    assert total["would_ship"] == sum(s["gate_off_would_ship"] for s in secondary)
+    assert total["would_not_ship"] == total["components"] - total["would_ship"]
+
+
+def test_the_withheld_caveat_reads_its_direction_from_the_data():
+    design = _small_design()
+    rose = report.summarise_registered(_complete(design, 2, reach_in=("P5-withheld",)), design, [])
+    text = report.withheld_caveat(rose)
+    assert "P5 0 → 12 (rose)" in text and "P0 0 → 0 (unchanged)" in text
+    assert "no first attempt reached either" in text
+
+    leaks = report.summarise_registered(_complete(design, 2, reach_in=("P0-withheld",)), design, [])
+    text = report.withheld_caveat(leaks)
+    assert "P0 0 → 12 (rose)" in text and "may partly be a model following" in text
