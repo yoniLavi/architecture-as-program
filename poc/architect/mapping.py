@@ -97,6 +97,14 @@ def catalogue() -> str:
     return "\n".join(lines)
 
 
+def section(title: str) -> str:
+    """One `## title` section of the stage-two text, so the reviewer reads the kinds
+    exactly as the architect does."""
+    text = (PROMPTS / "stage-two.md").read_text()
+    body = text.split(f"## {title}\n", 1)[1]
+    return body.split("\n## ", 1)[0].strip()
+
+
 def system() -> str:
     text = (PROMPTS / "stage-two.md").read_text()
     return text.replace("{{CATALOGUE}}", catalogue()).replace(

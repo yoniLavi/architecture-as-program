@@ -35,12 +35,19 @@ low priority. While a registered run is in progress, edit nothing it imports.
 
 ## 3. The independent reviewer
 
-- [ ] 3.1 Canonicalisation, with rationales stripped. The structured verdict schema, which
-      covers every grant
-- [ ] 3.2 A pinned corpus of hand-widened oracle graphs, and the pre-use test, with its
-      threshold set in the registration
-- [ ] 3.3 The model-choice rule, computed from Paper 3's registered data and recorded
-- [ ] 3.4 The second, persuasion verdict (rationales shown), stored apart
+- [x] 3.1 Canonicalisation, with rationales stripped. The structured verdict schema, which
+      covers every grant (`reviewer.py`: nodes renamed `N1…Nk` in topological order;
+      `needed` / `wider` / `not-needed`, quoting the prompt)
+- [x] 3.2 A pinned corpus of hand-widened oracle graphs, and the pre-use test, with its
+      threshold set in the registration (`reviewer_corpus.py`: 10 planted widenings, 5 by
+      scope and 5 by kind, plus the 3 oracle graphs as controls; each case's ground truth
+      is computed against the approved labels, and pinned)
+- [x] 3.3 The model-choice rule, computed from Paper 3's registered data and recorded
+      (`choose_model`, from the committed `results.json`; pooled P3–P6 first-attempt reach
+      of 300: haiku 90, opus 94, sonnet 240, so **haiku**, by four trials. Pinned by a
+      test; it goes into the registration)
+- [x] 3.4 The second, persuasion verdict (rationales shown), stored apart (`view=persuaded`,
+      a separate record)
 
 ## 4. The run
 

@@ -75,16 +75,19 @@ def repair_text(shown: str, reply: str, reasons: list[Reason]) -> str:
 
 
 @dataclass
-class _Caller:
+class Caller:
+    """One model, called for one role; records the IDs the calls resolved to."""
+
     backend: LLMBackend
     expected_model: str | None
+    role: str = "architect"
     model_ids: list[str] = field(default_factory=list)
 
     def __call__(self, system: str, prompt: str, stage: str) -> tuple[str, float]:
         began = time.perf_counter()
         try:
             reply = self.backend.generate(
-                LLMRequest(system=system, prompt=prompt, task=f"architect:{stage}")
+                LLMRequest(system=system, prompt=prompt, task=f"{self.role}:{stage}")
             ).text
         except UsageLimitReached:
             raise
@@ -102,11 +105,13 @@ class _Caller:
         return reply, time.perf_counter() - began
 
 
-def _stage(call: _Caller, stage: str, system: str, shown: str, parse) -> tuple[Any, list[dict]]:
+def run_stage(
+    call: Caller, stage: str, system: str, shown: str, parse, repairs: int = MAX_REPAIRS
+) -> tuple[Any, list[dict]]:
     """Run one stage to a parse or to its repair bound. Returns (result, attempts)."""
     attempts: list[dict] = []
     prompt = shown
-    for index in range(1, MAX_REPAIRS + 2):  # the first attempt, then the repairs
+    for index in range(1, repairs + 2):  # the first attempt, then the repairs
         reply, seconds = call(system, prompt, stage)
         result, reasons = parse(reply)
         attempts.append(
@@ -136,7 +141,7 @@ def author(
     """One architect attempt, recorded whole. Raises `UsageLimitReached` if the
     backend stops (nothing is recorded), and `ModelMismatch` for a registered run
     whose call resolved elsewhere."""
-    call = _Caller(backend, expected_model)
+    call = Caller(backend, expected_model)
     started = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     record: dict[str, Any] = {
         "started": started,
@@ -145,7 +150,9 @@ def author(
     }
 
     shown_one = abstract.prompt(task_prompt, document)
-    abstract_graph, one = _stage(call, "one", abstract.STAGE_ONE_SYSTEM, shown_one, abstract.parse)
+    abstract_graph, one = run_stage(
+        call, "one", abstract.STAGE_ONE_SYSTEM, shown_one, abstract.parse
+    )
     record["attempts"] = one
     if abstract_graph is None:
         return {**record, "outcome": FAILED_STAGE_ONE, "graph": None,
@@ -158,7 +165,7 @@ def author(
         return out, verdicts.check(out)
 
     shown_two = mapping.prompt(task_prompt, abstract_graph, document)
-    out, two = _stage(call, "two", mapping.system(), shown_two, verdict)
+    out, two = run_stage(call, "two", mapping.system(), shown_two, verdict)
     record["attempts"] = one + two
     if isinstance(out, mapping.Inexpressible):
         outcome, graph, why = INEXPRESSIBLE, None, out.why
