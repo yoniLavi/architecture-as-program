@@ -51,8 +51,12 @@ low priority. While a registered run is in progress, edit nothing it imports.
 
 ## 4. The run
 
-- [ ] 4.1 Unregistered pilot: the architect on the 16 tasks, no pretexts. Check expressibility
-      and utility through the harness. Exploratory, and labelled so
+- [x] 4.1 Unregistered pilot: the architect on the 16 tasks, no pretexts. Check expressibility
+      and utility through the harness. Exploratory, and labelled so (31 October 2026,
+      Haiku; three wordings, the first two kept in `runs/pilot-catalogue-{1,2}/`. The
+      third: 10 graphs, all within their labels; utility on 3, 4, 7, 8, 13, and on 5 and
+      6 only because their predicates hold on an idle run; 5 inexpressible, 1 failed
+      repair. Found: idle-pass tasks 5, 6, 8, 9, 10, now reported apart)
 - [ ] 4.2 The registration: pretexts verbatim for channels A and B, cells, model IDs, task
       hashes, the primary outcome (a widening missed by both reviewers), one confirmatory
       test, the reviewer's pre-use threshold, and the exclusion, voiding and early-stop rules.
