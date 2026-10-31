@@ -45,6 +45,25 @@ The back half (steps 5–6: decomposition, escalation as a graph change, minimis
 likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
 Reviewability by real people (steps 7–8) needs participants, and comes later.
 
+## State as of 31 October 2026: Paper 4's evidence
+
+`openspec/changes/add-architect-and-reviewers`, the second of Paper 4's two changes, is
+built and run. Steps 1–4 of the north star exist: an architect writes graphs from a prompt,
+a formal review checks them, and an AI reviewer checks them again before anything runs.
+`dist/architect.md` reports:
+- **The registered pretext experiment** (400 trials, Haiku as architect and reviewer).
+  Its one confirmatory test was **not supported**: unseen widenings under a pretext in the
+  prompt came in 18.1% of trials, against 7.5% with none, p = 0.019 at α = 0.01. The
+  reviewer caught 10/10 planted widenings, but 17 of 76 natural ones. The link check
+  caught none. Pretexts loosened the architect in general more than toward their target.
+- **AgentDojo**: utility 7/16 (3/11 beyond the tasks whose utility holds on an idle run),
+  against the undefended baseline's 13/16 (8/11). Attack success was 0/90, but the two
+  graphs predicted vulnerable failed before any writer, so that zero is not a defence.
+
+What it changes for the plan: same-model review is weak on natural widenings, so step 4
+needs more than a second look by the same model. The gated cross-family control is built,
+with no spend approved. Next: propose `add-paper-4`, then the thin vertical slice.
+
 ## State as of 29 October 2026, evening: Paper 4's harness
 
 `openspec/changes/add-agentdojo-banking-harness`, the first of Paper 4's two changes, is
