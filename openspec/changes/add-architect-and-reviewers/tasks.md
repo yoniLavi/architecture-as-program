@@ -11,10 +11,12 @@ low priority. While a registered run is in progress, edit nothing it imports.
 - [x] 1.2 Stage two: abstract graph plus catalogue → graph JSON over the library, with every
       grant's `because` quoting the prompt (`mapping.py`; the catalogue is rendered from the
       library and shows shapes, never bank values; `{"inexpressible": …}` is an answer)
-- [ ] 1.3 The validator in the loop: structured reason classes, at most four repairs, and a
-      recorded failure after them
-- [ ] 1.4 Tests that the architect sees no tool output, injection or reviewer verdict. Inputs
-      are hashed and recorded, as Paper 3's tasks are
+- [x] 1.3 The validator in the loop: structured reason classes, at most four repairs, and a
+      recorded failure after them (`architect.py`, `verdicts.py`). The link and
+      least-authority checks are deliberately *not* in the loop: they are the formal review
+- [x] 1.4 Tests that the architect sees no tool output, injection or reviewer verdict. Inputs
+      are hashed and recorded, as Paper 3's tasks are (every request is rebuilt in the test
+      from the allowed pieces only)
 
 ## 2. The formal review
 
