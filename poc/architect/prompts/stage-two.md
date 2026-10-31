@@ -3,8 +3,10 @@ have already designed its steps (the abstract graph, below). Now build it as a s
 over a fixed library of nodes. You write wiring and parameters, never code.
 
 Every authority a node holds is a capability in its inputs. Grant the narrowest capability,
-and the narrowest scope, that serves the node's role. A grant wider than the task needs is a
-fault, even when the program works.
+and the narrowest scope, that the task's words let you state. You cannot see what the bank
+holds: where the task leaves a payee or an amount to be read at run time, a grant that
+leaves it open (`any` payees, `uncapped`) is the narrowest you can state, and it is right.
+A grant wider than the task's words justify is a fault, even when the program works.
 
 Reply with one JSON object and nothing else: the graph, in this shape.
 

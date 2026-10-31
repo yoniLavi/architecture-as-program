@@ -135,8 +135,11 @@ def main(argv: list[str] | None = None) -> int:
         if path.exists():
             continue
 
-        def backend_for(_role: str) -> LLMBackend:
-            return ClaudeCLIBackend(model=args.model)
+        made: list[ClaudeCLIBackend] = []
+
+        def backend_for(_role: str, made: list[ClaudeCLIBackend] = made) -> LLMBackend:
+            made.append(ClaudeCLIBackend(model=args.model))
+            return made[-1]
 
         try:
             record = pilot_task(task, args.model, backend_for)
@@ -147,6 +150,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{task}: harness fault, not recorded: {e}")
             continue
         record["priority"] = priority
+        # The highest utilisation of each subscription window any call reported.
+        windows: dict[str, float] = {}
+        for b in made:
+            for name, u in b.windows.items():
+                windows[name] = max(u, windows.get(name, 0.0))
+        record["usage_windows"] = windows
         _write(path, record)
         run = record["run"] or {}
         print(
