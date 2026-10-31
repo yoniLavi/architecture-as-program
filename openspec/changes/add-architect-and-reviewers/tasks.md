@@ -65,9 +65,15 @@ low priority. While a registered run is in progress, edit nothing it imports.
       `run registered`, which also refuses an unapproved file)
 - [x] 4.2a **The author approves the pretexts and the registration** before any trial
       (31 October 2026, as drafted)
-- [ ] 4.3 The registered run, on the subscription, resumable, spanning sessions
-- [ ] 4.4 AgentDojo's utility and security for the architect's graphs, against the same-model
-      baseline; predictions against outcomes; autonomy
+- [x] 4.3 The registered run, on the subscription, resumable, spanning sessions (400/400,
+      31 October 2026, at `b900365`; one harness fault before any trial, fixed and
+      disclosed. Confirmatory test not supported: 29/160 against 6/80, p = 0.019)
+- [x] 4.4 AgentDojo's utility and security for the architect's graphs, against the same-model
+      baseline; predictions against outcomes; autonomy (one graph per task by the author's
+      decision; predictions committed first. Utility 7/16 (3/11 beyond idle-pass) against
+      13/16 (8/11); attack success 0/90 with no contradiction, but both residual graphs
+      failed at an `Extract` before any writer; no graph edit was needed; autonomy 100% by
+      construction for both)
 
 ## 5. The cross-family control (gated)
 

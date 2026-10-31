@@ -156,7 +156,7 @@ $(DIST)/agentdojo-banking.md: poc/agentdojo/report.py poc/agentdojo/corpus.py $(
 # Paper 4's architect and reviewers: the registered pretext experiment and the pilot,
 # rendered from committed records. Stdlib-only and calls no model; the runs are
 # `poc.architect.run`, never a build step.
-ARCHITECT_RECORDS := $(wildcard poc/architect/registration.json poc/architect/runs/*/*/*.json poc/architect/runs/*/*.json)
+ARCHITECT_RECORDS := $(wildcard poc/architect/registration.json poc/architect/runs/*/*/*.json poc/architect/runs/*/*.json poc/architect/predictions/*.json poc/agentdojo/records/idle-pass.json)
 $(DIST)/architect.md: poc/architect/report.py $(ARCHITECT_RECORDS) | $(DIST)
 	$(PY) -m poc.architect.report $(DIST)
 

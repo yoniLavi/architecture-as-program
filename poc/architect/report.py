@@ -168,8 +168,88 @@ def pilot_summary() -> list[dict[str, Any]]:
     return out
 
 
+MEASURE = RUNS / "measure"
+PREDICTIONS = HERE / "predictions"
+WRITER_ENTRIES = ("SendMoney", "ScheduleTransaction", "UpdateScheduledTransaction",
+                  "UpdateUserInfo")  # fmt: skip
+WRITES = ("send_money", "schedule_transaction", "update_scheduled_transaction",
+          "update_user_info", "update_password")  # fmt: skip
+
+
+def measured_summary() -> dict[str, Any]:
+    """Task 4.4: one graph per task through AgentDojo, beside the same-model baseline."""
+    from ..agentdojo import report as banking
+
+    idle = set(banking.idle_pass())
+    tasks, clean, attacked = [], [], []
+    for task in registration.TASKS:
+        d = MEASURE / task
+        if not d.exists():
+            tasks.append({"task": task, "graph": False})
+            continue
+        c = json.loads((d / "clean.json").read_text())
+        runs = [json.loads(p.read_text())["run"] for p in sorted(d.glob("injection_task_*.json"))]
+        pred = json.loads((PREDICTIONS / f"{task}.json").read_text())["predictions"]
+        final = c["rerun"] or c["run"]
+        clean.append({"user_task": task, "utility": final["utility"]})
+        attacked += [{"user_task": task, "utility": r["utility"]} for r in runs]
+        residual = sorted(g for g, p in pred.items() if p["verdict"] == "residual")
+        succeeded = [r["injection_task"] for r in runs if r["attack_success"]]
+        graph = json.loads((REGISTERED / "Q0" / f"{task}.0.json").read_text())["architect"]["graph"]
+        tasks.append(
+            {
+                "task": task,
+                "graph": True,
+                "utility": final["utility"],
+                "failure": final["failure"],
+                "edited": c["edit"] is not None,
+                "holds_writer": any(n.get("uses") in WRITER_ENTRIES for n in graph["nodes"]),
+                "predicted_residual": residual,
+                "attack_success": sorted(succeeded),
+                "contradictions": sorted(g for g in succeeded if g not in residual),
+                "writer_reached_under_attack": sum(
+                    any(x["function"] in WRITES for x in r["calls"]) for r in runs
+                ),
+                "attacked_runs": len(runs),
+            }
+        )
+    no_graph = [t["task"] for t in tasks if not t["graph"]]
+
+    def rate(rows: list[dict], extra_n: int, beyond: bool) -> dict[str, int]:
+        rows = [r for r in rows if not beyond or r["user_task"] not in idle]
+        missing = [t for t in no_graph if not beyond or t not in idle]
+        return {"hits": sum(r["utility"] for r in rows), "n": len(rows) + extra_n * len(missing)}
+
+    return {
+        "model": MODEL_NOTE,
+        "tasks": tasks,
+        "no_graph": no_graph,
+        "utility": rate(clean, 1, False),
+        "utility_beyond_idle": rate(clean, 1, True),
+        "utility_under_attack": rate(attacked, 9, False),
+        "utility_under_attack_beyond_idle": rate(attacked, 9, True),
+        "attack_success": {
+            "hits": sum(len(t.get("attack_success", [])) for t in tasks),
+            "n": len(attacked),
+        },
+        "edits": sum(t.get("edited", False) for t in tasks),
+        "baseline": banking.baseline_summary(),
+    }
+
+
+MODEL_NOTE = (
+    "claude-haiku-5-5 as architect and behind Extract; one graph per task, the registered "
+    "Q0 graph of repetition 0; capability-holding nodes confined, the pure ones on the host "
+    "tier"
+)
+
+
 def build() -> dict[str, Any]:
-    return {"registered": registered_summary(), "pilot": pilot_summary()}
+    return {
+        "registered": registered_summary(),
+        "measured": measured_summary(),
+        "pilot": pilot_summary(),
+    }
 
 
 COLUMNS = (
@@ -245,6 +325,7 @@ def markdown(data: dict[str, Any]) -> str:
         f"- Read-class widenings (not counted): {r['read_widenings'] or 'none'}.",
         f"- Reviewer flags on grants within their label: {r['false_alarms_primary']}.",
         "",
+        *measured_markdown(data["measured"]),
         "## The pilot (exploratory, unregistered, never pooled)",
         "",
         "| Run | Tasks | Outcomes | Utility | Utility with a failed run |",
@@ -256,6 +337,65 @@ def markdown(data: dict[str, Any]) -> str:
             f"{', '.join(p['utility_with_a_failed_run']) or '—'} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def measured_markdown(m: dict[str, Any]) -> list[str]:
+    def r(x: dict) -> str:
+        return _of(x["hits"], x["n"])
+
+    lines = [
+        "## AgentDojo: the architect's graphs beside the undefended baseline",
+        "",
+        f"{m['model']}. Scored by AgentDojo's unchanged scorer, banking v1.2.2, "
+        "`important_instructions`. A task with no graph scores no utility.",
+        "",
+        "| | Graphs (architect) | Undefended baseline |",
+        "|---|---|---|",
+    ]
+    b = m["baseline"][0] if m["baseline"] else None
+    for label, key in (
+        ("Utility, no attack", "utility"),
+        ("…beyond the idle-pass tasks", "utility_beyond_idle"),
+        ("Utility under attack", "utility_under_attack"),
+        ("…beyond the idle-pass tasks", "utility_under_attack_beyond_idle"),
+        ("Attack success", "attack_success"),
+    ):
+        lines.append(f"| {label} | {r(m[key])} | {r(b[key]) if b else '—'} |")
+    lines += [
+        "",
+        f"No graph (inexpressible or failed at Q0, repetition 0), so not attacked: "
+        f"{', '.join(t.rsplit('_', 1)[1] for t in m['no_graph'])}. Graph edits after a "
+        f"refusal at a crossing: {m['edits']}. Autonomy is 100% for both pipelines by "
+        "construction: no human is prompted in either.",
+        "",
+        "| Task | Utility | Failure | Predicted residual | Attack success | Writer reached under "
+        "attack | Contradictions |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for t in m["tasks"]:
+        if not t["graph"]:
+            continue
+        writer = (
+            f"{t['writer_reached_under_attack']}/{t['attacked_runs']}"
+            if t["holds_writer"]
+            else "no writer held"
+        )
+        lines.append(
+            f"| {t['task'].rsplit('_', 1)[1]} | {t['utility']} | {t['failure'] or '—'} | "
+            f"{', '.join(g.rsplit('_', 1)[1] for g in t['predicted_residual']) or '—'} | "
+            f"{len(t['attack_success'])}/{t['attacked_runs']} | {writer} | "
+            f"{', '.join(t['contradictions']) or 'none'} |"
+        )
+    lines += [
+        "",
+        "Read the attack column with the writer column. A graph that holds no writer cannot "
+        "be made to write, by construction. Where a graph holds one and reached it in no "
+        "attacked run, the run failed first, and its zero is not a defence. 0% attack success "
+        "is not the absence of a residual: AgentDojo scores only its nine goals, under one "
+        "attack, and the undefended baseline had no attack success to lower on this model.",
+        "",
+    ]
+    return lines
 
 
 def main(argv: list[str] | None = None) -> int:
