@@ -63,6 +63,10 @@ quoted strings, whole numbers, or `true`/`false`. Dates are strings, `'YYYY-MM-D
 - `LLMClient<inference>`: ask a model to read text. It can call no tool.
 - `ResponseChannel<user-session>`: answer the user.
 
+Payees and order subjects are quoted strings; field names are bare words. For example:
+`Payments<['DE75512108001245126199'], '25.00'>`,
+`ScheduledPayments<['Gym membership'], [amount]>`, `UserProfile<[street, city]>`.
+
 There is no capability that changes a password.
 
 ## The library
