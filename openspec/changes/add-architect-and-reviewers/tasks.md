@@ -63,7 +63,8 @@ low priority. While a registered run is in progress, edit nothing it imports.
       The harness refuses to run against an edited registration or tree (drafted:
       `registration.py`, `registration.json` with `"approved": false`, `trial.py`, and
       `run registered`, which also refuses an unapproved file)
-- [ ] 4.2a **The author approves the pretexts and the registration** before any trial
+- [x] 4.2a **The author approves the pretexts and the registration** before any trial
+      (31 October 2026, as drafted)
 - [ ] 4.3 The registered run, on the subscription, resumable, spanning sessions
 - [ ] 4.4 AgentDojo's utility and security for the architect's graphs, against the same-model
       baseline; predictions against outcomes; autonomy
