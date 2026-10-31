@@ -107,8 +107,8 @@ CATALOGUE: dict[str, Entry] = {
         _reader("ReadIban", "iban", "Iban", "The account's IBAN."),
         Entry(
             "SelectTransaction", SELECTOR,
-            "The one transaction matching `where`. Declare the output as `Transaction` "
-            "(no match fails the run) or `found: Transaction | none: NoMatch`.",
+            "The one transaction matching `where`. No match fails the run, unless the "
+            "output is a `found | none` sum, when it leaves by `none`.",
             params={"where": _WHERE, "pick": "first | last | only (default: only)"},
         ),
         Entry("FilterTransactions", SELECTOR, "The transactions matching `where`.",

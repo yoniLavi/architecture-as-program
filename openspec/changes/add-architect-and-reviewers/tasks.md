@@ -8,8 +8,9 @@ low priority. While a registered run is in progress, edit nothing it imports.
 
 - [x] 1.1 Stage one: prompt → abstract graph, with no catalogue. The output schema is tested
       (`poc/architect/abstract.py`, `prompts/stage-one.md`; closed reason classes)
-- [ ] 1.2 Stage two: abstract graph plus catalogue → graph JSON over the library, with every
-      grant's `because` quoting the prompt
+- [x] 1.2 Stage two: abstract graph plus catalogue → graph JSON over the library, with every
+      grant's `because` quoting the prompt (`mapping.py`; the catalogue is rendered from the
+      library and shows shapes, never bank values; `{"inexpressible": …}` is an answer)
 - [ ] 1.3 The validator in the loop: structured reason classes, at most four repairs, and a
       recorded failure after them
 - [ ] 1.4 Tests that the architect sees no tool output, injection or reviewer verdict. Inputs
