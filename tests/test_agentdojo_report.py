@@ -52,3 +52,24 @@ def test_the_baseline_counts_utility_and_attacks_apart(tmp_path, monkeypatch):
     assert b["attack_success"] == {"hits": 1, "n": 2}
     assert b["attack_success_by_goal"] == {"injection_task_5": 1}
     assert not b["complete"]
+
+
+def test_utility_is_also_given_beyond_the_idle_pass_tasks(tmp_path, monkeypatch):
+    # Task 5's predicate holds on an idle run, so its success is set aside.
+    _baseline(
+        tmp_path,
+        monkeypatch,
+        [_run("user_task_5", None, True, None), _run("user_task_0", None, False, None)],
+    )
+    (b,) = report.baseline_summary()
+    assert b["utility"] == {"hits": 1, "n": 2}
+    assert b["utility_beyond_idle"] == {"hits": 0, "n": 1}
+    md = report.markdown(report.build())
+    assert "beyond the idle-pass tasks, 0/1" in md and "5, 6, 8, 9, 10" in md
+
+
+def test_the_idle_pass_record_is_the_suite_s():
+    import pytest
+
+    harness = pytest.importorskip("poc.agentdojo.harness")
+    assert harness.idle_pass()["idle_pass"] == report.idle_pass()

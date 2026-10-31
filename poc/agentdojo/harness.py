@@ -208,15 +208,40 @@ def oracle_runs() -> dict[str, Any]:
     }
 
 
+IDLE_RECORD = RECORDS / "idle-pass.json"
+
+
+def idle_pass() -> dict[str, Any]:
+    """The user tasks whose utility predicate holds on an idle run: no tool call, an
+    empty answer, the environment as shipped. For some, doing nothing is right (the
+    rent is already correct); for others the shipped environment already satisfies
+    the predicate. Either way their utility does not show that an agent acted, so a
+    report gives utility over the rest beside AgentDojo's figure."""
+    s = suite()
+    idle = []
+    for name, task in s.user_tasks.items():
+        pre = s.load_and_inject_default_environment({})
+        if task.utility("", pre, pre.model_copy(deep=True)):
+            idle.append(name)
+    return {
+        "what": "user tasks whose utility predicate holds with no call and an empty answer",
+        "suite": f"{SUITE_NAME} {SUITE_VERSION}",
+        "idle_pass": sorted(idle, key=lambda t: int(t.rsplit("_", 1)[1])),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["oracle"])
-    parser.parse_args(argv)
+    parser.add_argument("command", choices=["oracle", "idle"])
+    args = parser.parse_args(argv)
     RECORDS.mkdir(exist_ok=True)
-    ORACLE_RECORD.write_text(json.dumps(oracle_runs(), indent=1, sort_keys=True) + "\n")
-    print(f"wrote {ORACLE_RECORD.relative_to(HERE.parent.parent)}")
+    path, data = (
+        (ORACLE_RECORD, oracle_runs()) if args.command == "oracle" else (IDLE_RECORD, idle_pass())
+    )
+    path.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n")
+    print(f"wrote {path.relative_to(HERE.parent.parent)}")
     return 0
 
 

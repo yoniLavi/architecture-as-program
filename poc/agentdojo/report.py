@@ -33,6 +33,19 @@ def _rate(hits: int, n: int) -> str:
     return f"{hits}/{n} ({100 * hits / n:.0f}%)" if n else "0/0"
 
 
+def idle_pass() -> list[str]:
+    """The tasks whose utility holds on an idle run (`records/idle-pass.json`, written
+    by `harness idle` and held to the computation by a test)."""
+    return json.loads((RECORDS / "idle-pass.json").read_text())["idle_pass"]
+
+
+def beyond_idle(runs: list[dict[str, Any]]) -> dict[str, int]:
+    """Utility over the runs whose task's predicate fails on an idle run."""
+    idle = set(idle_pass())
+    active = [r for r in runs if r["user_task"] not in idle]
+    return {"hits": sum(r["utility"] for r in active), "n": len(active)}
+
+
 def baseline_summary() -> list[dict[str, Any]]:
     out = []
     for path in sorted(BASELINE.glob("*/rep-*.jsonl")):
@@ -48,10 +61,12 @@ def baseline_summary() -> list[dict[str, Any]]:
                 "complete": len(runs) == PAIRS_PER_REP,
                 "models_resolved": sorted({m for r in runs for m in r["model_resolved"]}),
                 "utility": {"hits": sum(r["utility"] for r in clean), "n": len(clean)},
+                "utility_beyond_idle": beyond_idle(clean),
                 "utility_under_attack": {
                     "hits": sum(r["utility"] for r in attacked),
                     "n": len(attacked),
                 },
+                "utility_under_attack_beyond_idle": beyond_idle(attacked),
                 "attack_success": {
                     "hits": sum(bool(r["attack_success"]) for r in attacked),
                     "n": len(attacked),
@@ -173,6 +188,11 @@ def markdown(data: dict[str, Any]) -> str:
         "and an MCP server over AgentDojo's own runtime. Beyond AgentDojo's pipeline, the "
         "model also sees the CLI's own context preamble (design, task 4.1).",
         "",
+        f"AgentDojo's utility predicate holds on an idle run (no call, an empty answer) for "
+        f"{', '.join(t.rsplit('_', 1)[1] for t in idle_pass())}: for some doing nothing is "
+        f"right, for the others the shipped environment already meets it. So each utility "
+        f"figure is also given over the remaining tasks, where only acting can earn it.",
+        "",
     ]
     if not data["baseline"]:
         lines.append("No baseline run is recorded yet.")
@@ -183,9 +203,11 @@ def markdown(data: dict[str, Any]) -> str:
             "",
             f"- Resolved to: {', '.join(b['models_resolved']) or '—'}",
             f"- Utility, no attack: {_rate(b['utility']['hits'], b['utility']['n'])} "
-            f"of {USER_TASKS} tasks",
+            f"of {USER_TASKS} tasks; beyond the idle-pass tasks, "
+            f"{_rate(b['utility_beyond_idle']['hits'], b['utility_beyond_idle']['n'])}",
             f"- Utility under attack: "
-            f"{_rate(b['utility_under_attack']['hits'], b['utility_under_attack']['n'])}",
+            f"{_rate(b['utility_under_attack']['hits'], b['utility_under_attack']['n'])}; "
+            f"beyond the idle-pass tasks, {_rate(**b['utility_under_attack_beyond_idle'])}",
             f"- Attack success: {_rate(b['attack_success']['hits'], b['attack_success']['n'])} "
             f"of {INJECTION_PAIRS} pairs",
             f"- By goal: {b['attack_success_by_goal'] or 'none'}",
