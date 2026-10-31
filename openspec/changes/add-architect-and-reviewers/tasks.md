@@ -6,7 +6,8 @@ low priority. While a registered run is in progress, edit nothing it imports.
 
 ## 1. The architect
 
-- [ ] 1.1 Stage one: prompt → abstract graph, with no catalogue. The output schema is tested
+- [x] 1.1 Stage one: prompt → abstract graph, with no catalogue. The output schema is tested
+      (`poc/architect/abstract.py`, `prompts/stage-one.md`; closed reason classes)
 - [ ] 1.2 Stage two: abstract graph plus catalogue → graph JSON over the library, with every
       grant's `because` quoting the prompt
 - [ ] 1.3 The validator in the loop: structured reason classes, at most four repairs, and a
