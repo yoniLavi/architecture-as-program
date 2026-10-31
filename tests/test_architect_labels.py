@@ -36,9 +36,10 @@ def test_no_label_grants_credentials():
     assert not any(formal.kind(g) == "Credentials" for g in every)
 
 
-def test_the_draft_is_not_approved():
-    # Flips only by the author's approval (task 2.2a), recorded in the file.
-    assert not labels.approved(DATA)
+def test_the_author_s_approval_is_recorded_with_the_decisions():
+    # Task 2.2a, 31 October 2026. The open questions were answered there.
+    assert labels.approved(DATA)
+    assert {"user_task_5", "user_task_10", "caps", "the_rest"} <= set(DATA["decisions"])
 
 
 @pytest.mark.parametrize(

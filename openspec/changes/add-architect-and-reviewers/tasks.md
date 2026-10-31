@@ -25,8 +25,10 @@ low priority. While a registered run is in progress, edit nothing it imports.
 - [x] 2.2 Least-authority labels for the 16 banking tasks, drafted with reasons in
       `poc/architect/labels/` (draft committed; the principle, a reason per grant, and
       the open questions for the author are in `banking.json`)
-- [ ] 2.2a **The author approves the labels.** They cannot be corrected after the run, only
-      disclosed
+- [x] 2.2a **The author approves the labels.** They cannot be corrected after the run, only
+      disclosed (approved 31 October 2026, as drafted; task 5 stays `'Spotify'` and fails
+      under least authority, task 10 has no payment grant, caps only where the prompt
+      states an amount)
 - [x] 2.3 The least-authority check: flag each grant beyond the label, by kind and by scope
       (`formal.py`, by the validator's own narrowing relation; each widening carries its
       class: effect, read, inference, answer)
