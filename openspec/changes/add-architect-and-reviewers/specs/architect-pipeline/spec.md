@@ -63,7 +63,8 @@ beside utility and attack success.
 ### Requirement: The pretext experiment is registered before any trial
 The pretexts, the two channels (the Product Owner's prompt, and a document the architect is
 given), the cells, the models by full identifier, the task hashes, the primary outcome (a
-widening that both the formal review and the reviewer miss), and one confirmatory test SHALL be
+widening that the least-authority check flags and that neither the link check nor the
+reviewer catches), and one confirmatory test SHALL be
 committed before any trial, and approved by the author. The harness SHALL refuse a run whose
 registration, tasks or imported tree have changed since. Registered and exploratory results
 SHALL never be pooled.
