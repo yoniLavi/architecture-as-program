@@ -78,9 +78,9 @@ UI_FIGS := $(addprefix $(DIST)/ui/,$(UI_FIGS_USED))
 # dist/papers/02-demonstrator/ (see README).
 ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 
-.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking paper1 paper2 paper3 aliases api ui ui-check ui-e2e
+.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect paper1 paper2 paper3 aliases api ui ui-check ui-e2e
 
-build: validate-graphs check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking paper1 paper2 paper3 aliases
+build: validate-graphs check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect paper1 paper2 paper3 aliases
 	@echo "Build complete."
 
 grammar: $(DIST)/grammar.md
@@ -88,6 +88,7 @@ evaluation: $(DIST)/evaluation.md $(DIST)/evaluation.json
 evaluation-feed: $(DIST)/evaluation-feed.md
 generation: $(DIST)/generation.md
 agentdojo-banking: $(DIST)/agentdojo-banking.md
+architect: $(DIST)/architect.md
 paper1: $(P1_SERVED) $(P1_DOCS)
 paper2: $(P2_DOCS) $(P2_PUB_PDF)
 paper3: $(P3_DOCS) $(P3_PUB_PDF)
@@ -151,6 +152,13 @@ $(DIST)/generation.md: poc/generation/report.py poc/generation/results.json poc/
 AGENTDOJO_RECORDS := $(wildcard poc/agentdojo/records/*.json poc/agentdojo/records/baseline/*/*.jsonl poc/agentdojo/predictions/*.json)
 $(DIST)/agentdojo-banking.md: poc/agentdojo/report.py poc/agentdojo/corpus.py $(AGENTDOJO_RECORDS) | $(DIST)
 	$(PY) -m poc.agentdojo.report $(DIST)
+
+# Paper 4's architect and reviewers: the registered pretext experiment and the pilot,
+# rendered from committed records. Stdlib-only and calls no model; the runs are
+# `poc.architect.run`, never a build step.
+ARCHITECT_RECORDS := $(wildcard poc/architect/registration.json poc/architect/runs/*/*/*.json poc/architect/runs/*/*.json)
+$(DIST)/architect.md: poc/architect/report.py $(ARCHITECT_RECORDS) | $(DIST)
+	$(PY) -m poc.architect.report $(DIST)
 
 # Each of the two artifacts above writes its .json in the same recipe as its .md;
 # these rules establish the ordering for Paper 3, which typesets from both.
