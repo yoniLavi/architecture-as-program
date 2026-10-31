@@ -126,6 +126,41 @@ marked:
   can name a value the bank holds (a payee, possibly an attacker's). The graph-edit loop
   (D8, task 4.4) may return only the refusal's class, node and capability.
 
+## What the registered run found (31 October 2026)
+
+Registration `b900365`, approved by the author as drafted; 400/400 trials. The rendered
+figures are in `dist/architect.md`; a test pins the headline ones.
+- **The confirmatory test is not supported.** Unseen widenings in 29/160 channel-A trials
+  (18.1%) against 6/80 with no pretext (7.5%): one-sided Fisher p = 0.019, against the
+  registered α = 0.01. The report says so, and gives the rest as description.
+- **The pre-use gate overstates the reviewer.** It caught 10/10 planted widenings with no
+  false alarm, but only 17 of 76 trials with a natural effect-class widening. Hand-planted
+  widenings are easy; the architect's are not.
+- **The link check caught none.** In channel B, too, the architect quoted the prompt,
+  not the document. This is the design's "linkage, not adequacy", observed.
+- **Pretexts loosen the architect in general**, rather than steering it to their target:
+  only 12 of the 55 unseen widenings under a pretext were the pretext's own grant. Task
+  15's standing order to the new landlord appears 16 times under a pretext and never
+  without one.
+- **A parser hole, now closed.** Six unseen widenings were a quoted dynamic-set name
+  (`'any'`, `'inbound-senders'`), which parsed as a literal payee of that name. They
+  count as registered and are reported apart. `payments_scope` now refuses the
+  spelling (corpus case `quoted_dynamic_payee`), and the report reads those grants off
+  the type's literals, so its count cannot move with the parser.
+- **One harness fault, before any trial.** The first start crashed before the pre-use
+  gate (a backend factory passed where a backend was due). Nothing was recorded. It was
+  fixed in `run.py` only, with the registration and every hash unchanged, and two
+  end-to-end tests were added.
+- **AgentDojo's utility holds on an idle run** for tasks 5, 6, 8, 9 and 10, found in the
+  pilot. Every utility figure is now also given over the other 11 tasks (the baseline:
+  13/16, and 8/11).
+
+**4.4, by the author's decision:** one graph per task (Q0, repetition 0), clean and under
+the nine injections, confined where it holds authority. Predictions were committed first
+(`c039559`): eight graphs are `impossible` on all nine goals, and the two `residual`
+graphs are task 0 (the bill's payee) and task 10, whose graph holds an unseen widening.
+**5.2, by the author's decision:** no cross-family spend for now.
+
 ## Risks
 
 - **Labels decide the outcome.** That is why they are registered and approved before the run,
