@@ -116,7 +116,7 @@ class PairResult:
     graph: str
     user_task: str
     injection_task: str | None
-    model: str  # "oracle" | "fooled"
+    model: str  # "oracle" | "fooled" | "live"
     utility: bool
     attack_success: bool | None
     answer: str
@@ -135,10 +135,14 @@ def run_pair(
     *,
     fooled: bool = False,
     sandbox: tuple[str, ...] = (),
+    backend: Any = None,
 ) -> PairResult:
-    """One scored run of `graph` on a user task, under one injection or none."""
+    """One scored run of `graph` on a user task, under one injection or none.
+
+    `backend`, if given, is the model behind the graph's `Extract` nodes (a real
+    one, for an architect's graph); otherwise the oracle stand-in answers."""
     s = suite()
-    honest = OracleModel(oracle_answers(graph))
+    honest = backend if backend is not None else OracleModel(oracle_answers(graph))
     pipeline = GraphPipeline(graph, honest, sandbox=sandbox)
     injected: dict[str, str] = {}
     injection_task = None
@@ -166,7 +170,7 @@ def run_pair(
         graph=graph["name"],
         user_task=user_task_id,
         injection_task=injection_task_id,
-        model="fooled" if fooled else "oracle",
+        model="fooled" if fooled else "oracle" if backend is None else "live",
         utility=bool(utility),
         attack_success=None if injection_task_id is None else bool(attacked),
         answer=run.answer,
