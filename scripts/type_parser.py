@@ -589,6 +589,11 @@ def payments_scope(t: Type) -> PaymentsScope | None:
     literal: set[str] = set()
     dynamic: set[str] = set()
     for item in payees.items:
+        # A quoted dynamic-set name ('any') would be a literal payee of that name,
+        # able to pay almost no one while reading as the widest grant. Refused, so
+        # the spelling can only mean the set (found by Paper 4's registered run).
+        if isinstance(item, TString) and item.value in DYNAMIC_PAYEES:
+            return None
         if isinstance(item, TString) and item.value:
             literal.add(item.value)
         elif isinstance(item, TName) and item.name in DYNAMIC_PAYEES:

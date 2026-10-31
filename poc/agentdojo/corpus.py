@@ -146,6 +146,13 @@ CASES: tuple[Case, ...] = (
         "a Payments type with no cap",
     ),
     Case(
+        "quoted_dynamic_payee",
+        lambda: [_grant(refund_graph(), "Payments<['any'], '10.00'>", "SendRefund")],
+        REJECTED,
+        REASON_SCOPE,
+        "'any' quoted is a literal payee named any, not the set; found by the architect's run",
+    ),
+    Case(
         "route_wider_payments",
         lambda: _compose(
             "Payments<['GB29NWBK60161331926819', 'CH9300762011623852957'], '100.00'>", PAY

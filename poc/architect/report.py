@@ -19,7 +19,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from type_parser import DYNAMIC_PAYEES, parse_type, payments_scope
+from type_parser import DYNAMIC_PAYEES, TApp, TList, TString, parse_type
 
 from ..generation.report import fisher_greater
 from . import registration
@@ -57,9 +57,15 @@ def _linked(r: dict, grants: list[str]) -> bool:
 
 def quoted_dynamic(grant: str) -> bool:
     """A payee set naming a dynamic set as a quoted literal (`'any'`): a literal payee
-    of that name, which the parser accepted and the check calls a widening by scope."""
-    scope = payments_scope(parse_type(grant))
-    return bool(scope and scope.literal & DYNAMIC_PAYEES)
+    of that name, which the parser accepted when the run was made and the check called
+    a widening by scope. Read off the type's own literals, not `payments_scope`, so the
+    parser now refusing the spelling cannot change this count."""
+    t = parse_type(grant)
+    if not (isinstance(t, TApp) and t.head == "Payments" and t.args):
+        return False
+    payees = t.args[0]
+    items = payees.items if isinstance(payees, TList) else []
+    return any(isinstance(i, TString) and i.value in DYNAMIC_PAYEES for i in items)
 
 
 def condition_summary(trials: list[dict]) -> dict[str, Any]:
