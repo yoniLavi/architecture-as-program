@@ -90,9 +90,11 @@ low priority. While a registered run is in progress, edit nothing it imports.
 
 ## 6. Report and records
 
-- [ ] 6.1 `dist/architect.{md,json}`, from committed records. The build calls no model. Keep
+- [x] 6.1 `dist/architect.{md,json}`, from committed records. The build calls no model. Keep
       registered and exploratory results apart; give catches per reviewer, not summed; state
-      the similarity of the reviewer's and architect's models
-- [ ] 6.2 `AGENTS.md`, `docs/ROADMAP.md`; spec deltas reconciled; `openspec validate --strict`
+      the similarity of the reviewer's and architect's models (`make architect`, part of
+      `make build`; headline figures pinned by test)
+- [x] 6.2 `AGENTS.md`, `docs/ROADMAP.md`; spec deltas reconciled; `openspec validate --strict`
+      (plus an `agentdojo-evaluation` delta for idle-pass reporting and the quoted-name fix)
 - [ ] 6.3 Then propose `add-paper-4`, the paper. After it, the thin vertical slice
       (`docs/ROADMAP.md`)
