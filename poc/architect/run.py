@@ -163,7 +163,7 @@ def registered_main(priority: dict) -> int:
     try:
         if not gate_path.exists():
             backends = _Backends(reg["reviewer_model"])
-            gate = preuse(backends, expected_model=reg["reviewer_model"])
+            gate = preuse(backends("reviewer-preuse"), expected_model=reg["reviewer_model"])
             _write(gate_path, {**gate, "registration_commit": commit, "head": head(),
                                "usage_windows": backends.windows()})  # fmt: skip
         gate = json.loads(gate_path.read_text())

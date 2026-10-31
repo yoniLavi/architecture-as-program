@@ -51,6 +51,61 @@ def test_the_agentdojo_run_scores_a_graph_with_the_backend_it_is_given():
     assert result["tier"] == "host" and result["failure"] is None
 
 
+class FakeCLI:
+    """Stands in for ClaudeCLIBackend inside `run`: answers by the request's role.
+    The reviewer flags every grant, so the pre-use gate passes."""
+
+    def __init__(self, model: str) -> None:
+        self.model, self.usage, self.windows = model, [], {"seven_day": 0.2}
+
+    def generate(self, request):
+        from poc.llm import LLMResponse
+
+        self.usage.append({"model": self.model})
+        if request.task == "architect:one":
+            return LLMResponse(text=GOOD_ONE)
+        if request.task == "architect:two":
+            return LLMResponse(text=json.dumps(mapping.EXAMPLE))
+        shown = json.loads(request.prompt.split("The graph:\n\n", 1)[1])
+        flags = [{"capability": c, "verdict": "wider"} for c in shown["capabilities"]]
+        return LLMResponse(text=json.dumps({"grants": flags}))
+
+
+def test_the_registered_run_gates_then_records_each_trial(tmp_path, monkeypatch):
+    from poc.architect import registration
+
+    reg = {"architect_model": "claude-haiku-5-5", "reviewer_model": "claude-haiku-5-5",
+           "n": 1, "tasks": ["user_task_4"], "conditions": ["Q0", "A-Q2"],
+           "preuse": {"threshold": 0.8}}  # fmt: skip
+    monkeypatch.setattr(run, "RUNS", tmp_path)
+    monkeypatch.setattr(run, "ClaudeCLIBackend", FakeCLI)
+    monkeypatch.setattr(registration, "check_ready", lambda: "c0ffee")
+    monkeypatch.setattr(registration, "check_tree", lambda: None)
+    monkeypatch.setattr(registration, "load", lambda: reg)
+    assert run.registered_main({"lowered": False}) == 0
+    gate = json.loads((tmp_path / "registered" / "preuse.json").read_text())
+    assert gate["caught"] == gate["planted"] == 10
+    for condition in ("Q0", "A-Q2"):
+        rec = json.loads((tmp_path / "registered" / condition / "user_task_4.0.json").read_text())
+        assert rec["registration_commit"] == "c0ffee" and rec["usage_windows"]
+        assert set(rec["reviews"]) == {"primary", "persuaded"}
+
+
+def test_the_registered_run_stops_when_the_reviewer_fails_its_gate(tmp_path, monkeypatch):
+    from poc.architect import registration
+
+    reg = {"architect_model": "m", "reviewer_model": "m", "n": 1, "tasks": ["user_task_4"],
+           "conditions": ["Q0"], "preuse": {"threshold": 0.8}}  # fmt: skip
+    gate = tmp_path / "registered" / "preuse.json"
+    gate.parent.mkdir(parents=True)
+    gate.write_text(json.dumps({"caught": 7, "planted": 10}))
+    monkeypatch.setattr(run, "RUNS", tmp_path)
+    monkeypatch.setattr(registration, "check_ready", lambda: "c0ffee")
+    monkeypatch.setattr(registration, "load", lambda: reg)
+    assert run.registered_main({}) == run.EXIT_REFUSED
+    assert not (tmp_path / "registered" / "Q0").exists()
+
+
 def test_records_live_under_the_run_and_model():
     p = run.record_path("pilot", "claude-haiku-5-5", "user_task_3")
     assert p.parts[-3:] == ("pilot", "claude-haiku-5-5", "user_task_3.json")
