@@ -96,5 +96,6 @@ low priority. While a registered run is in progress, edit nothing it imports.
       `make build`; headline figures pinned by test)
 - [x] 6.2 `AGENTS.md`, `docs/ROADMAP.md`; spec deltas reconciled; `openspec validate --strict`
       (plus an `agentdojo-evaluation` delta for idle-pass reporting and the quoted-name fix)
-- [ ] 6.3 Then propose `add-paper-4`, the paper. After it, the thin vertical slice
-      (`docs/ROADMAP.md`)
+- [x] 6.3 Then propose `add-paper-4`, the paper. After it, the thin vertical slice
+      (`docs/ROADMAP.md`) (proposed 31 October 2026, `openspec/changes/add-paper-4`; awaiting
+      the author's approval and three answers)
