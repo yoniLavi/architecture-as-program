@@ -129,8 +129,10 @@ CATALOGUE: dict[str, Entry] = {
         ),
         Entry(
             "Extract", EXTRACT,
-            "Asks a model (inference only) to read its inputs and return exactly the "
-            "named fields, with their types. Any other answer fails the run.",
+            "Asks a model (inference only) to read its inputs and answer with exactly "
+            "the named fields, with their types. The model can find, compare and compute "
+            "over the material, such as a total or the one record that matches a "
+            "description. Any other answer fails the run.",
             capability="LLMClient",
             params={"instruction": "what to extract", "fields": "field name → type"},
             may_discharge=True,
