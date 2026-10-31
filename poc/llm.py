@@ -411,3 +411,123 @@ class AnthropicBackend:
                 tool_calls.append(ToolCall(name=block.name, arguments=dict(block.input)))
 
         return LLMResponse(text="".join(text_parts).strip(), tool_calls=tuple(tool_calls))
+
+
+# ── A paid, cross-family backend, gated (Paper 4's control; never used by the build) ──
+
+
+class SpendRefused(ModelCallError):
+    """A paid call refused before any network request: no committed approval, no key,
+    or the recorded spend at its ceiling."""
+
+
+PAID_APPROVALS = _REPO_ROOT / "poc" / "approvals"
+PAID_LEDGER = PAID_APPROVALS / "spend"
+
+
+def _committed(path: Path) -> bool:
+    """True if `path` is tracked by git and equal to its committed version."""
+    rel = path.relative_to(_REPO_ROOT).as_posix()
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", rel], cwd=_REPO_ROOT, capture_output=True
+    )
+    if tracked.returncode != 0:
+        return False
+    diff = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", rel], cwd=_REPO_ROOT)
+    return diff.returncode == 0
+
+
+@dataclass
+class DeepSeekBackend:
+    """DeepSeek's chat API, a non-Claude family, for the gated cross-family control
+    (design D4, task 5). It costs money beyond the subscription, so it refuses to run
+    unless the author has approved a spend (the paid-API policy, 29 October 2026):
+
+    * an approval file, `poc/approvals/<name>.json`, **committed and unmodified**, holding
+      who approved it, when, the model, the ceiling in USD, and the prices per million
+      input and output tokens the ceiling is computed from (the code states no price);
+    * the key in the environment (`DEEPSEEK_API_KEY`), never in the repository;
+    * the spend so far, read from the ledger `poc/approvals/spend/<name>.jsonl`, below the
+      ceiling. Every completed call appends its tokens and cost there; once the total
+      reaches the ceiling, a call is refused before any request is made.
+
+    Every refusal is raised before the network is touched. Inference only, like
+    `ClaudeCLIBackend`. No test or build step uses it with a real transport: tests
+    pass `transport`, a fake."""
+
+    approval: str
+    transport: object | None = None  # (url, headers, body) -> parsed JSON; tests only
+    url: str = "https://api.deepseek.com/chat/completions"
+    timeout: float = 120.0
+    usage: list[dict] = field(default_factory=list)
+
+    def _approval(self) -> dict:
+        path = PAID_APPROVALS / f"{self.approval}.json"
+        if not path.exists() or not _committed(path):
+            raise SpendRefused(f"no committed approval at {path.relative_to(_REPO_ROOT)}")
+        data = json.loads(path.read_text())
+        for key in ("approved_by", "date", "model", "ceiling_usd", "usd_per_mtok"):
+            if key not in data:
+                raise SpendRefused(f"the approval lacks {key!r}")
+        return data
+
+    def ledger(self) -> Path:
+        return PAID_LEDGER / f"{self.approval}.jsonl"
+
+    def spent(self) -> float:
+        path = self.ledger()
+        if not path.exists():
+            return 0.0
+        return sum(json.loads(line)["usd"] for line in path.read_text().splitlines() if line)
+
+    def generate(self, request: LLMRequest) -> LLMResponse:
+        if request.offered_tools:
+            raise ModelCallError("the DeepSeek backend serves inference only")
+        approval = self._approval()
+        spent, ceiling = self.spent(), float(approval["ceiling_usd"])
+        if spent >= ceiling:
+            raise SpendRefused(f"spent {spent:.4f} USD of the approved {ceiling}")
+        key = os.environ.get("DEEPSEEK_API_KEY")
+        if not key:
+            raise SpendRefused("DEEPSEEK_API_KEY is not set")
+        body = {
+            "model": approval["model"],
+            "messages": [
+                {"role": "system", "content": request.system},
+                {"role": "user", "content": request.prompt},
+            ],
+        }
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        post = self.transport or self._post
+        parsed = post(self.url, headers, body)  # type: ignore[operator]
+        tokens = parsed.get("usage") or {}
+        price = approval["usd_per_mtok"]
+        prompt_tokens = tokens.get("prompt_tokens", 0)
+        completion_tokens = tokens.get("completion_tokens", 0)
+        usd = (
+            prompt_tokens * float(price["input"]) + completion_tokens * float(price["output"])
+        ) / 1e6
+        entry = {
+            "model": parsed.get("model", approval["model"]),
+            "usd": round(usd, 6),
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+        }
+        self.ledger().parent.mkdir(parents=True, exist_ok=True)
+        with self.ledger().open("a") as f:
+            f.write(json.dumps(entry, sort_keys=True) + "\n")
+        self.usage.append(entry)
+        try:
+            return LLMResponse(text=parsed["choices"][0]["message"]["content"].strip())
+        except (KeyError, IndexError, TypeError) as e:
+            raise ModelCallError(f"DeepSeek returned no message: {str(parsed)[:300]}") from e
+
+    def _post(self, url: str, headers: dict, body: dict) -> dict:
+        import urllib.request
+
+        req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                return json.loads(resp.read())
+        except OSError as e:
+            raise ModelCallError(f"DeepSeek call failed: {e}") from e

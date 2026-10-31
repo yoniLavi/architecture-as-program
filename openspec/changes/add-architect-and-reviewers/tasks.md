@@ -77,10 +77,14 @@ low priority. While a registered run is in progress, edit nothing it imports.
 
 ## 5. The cross-family control (gated)
 
-- [ ] 5.1 A DeepSeek backend in `poc/llm.py` that refuses to run without a committed approval
+- [x] 5.1 A DeepSeek backend in `poc/llm.py` that refuses to run without a committed approval
       file holding a spend ceiling, and stops at the ceiling. Tests use a fake
-- [ ] 5.2 **The author decides**, from the subscription results, whether the control is worth
-      the spend, and approves a ceiling
+      (`DeepSeekBackend`: approval in `poc/approvals/<name>.json`, committed, with the
+      prices the ceiling is computed from; ledger in `poc/approvals/spend/`; every refusal
+      before the network. A test holds that no approval is committed)
+- [x] 5.2 **The author decides**, from the subscription results, whether the control is worth
+      the spend, and approves a ceiling (31 October 2026: **not now**. No ceiling approved,
+      nothing spent; same-model review is reported as a lower bound)
 - [ ] 5.3 If approved: the reviewer, on the registered subset, by the other family. Reported
       beside the same-family figures, never pooled with them
 
