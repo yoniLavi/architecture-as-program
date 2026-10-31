@@ -57,10 +57,12 @@ low priority. While a registered run is in progress, edit nothing it imports.
       third: 10 graphs, all within their labels; utility on 3, 4, 7, 8, 13, and on 5 and
       6 only because their predicates hold on an idle run; 5 inexpressible, 1 failed
       repair. Found: idle-pass tasks 5, 6, 8, 9, 10, now reported apart)
-- [ ] 4.2 The registration: pretexts verbatim for channels A and B, cells, model IDs, task
+- [x] 4.2 The registration: pretexts verbatim for channels A and B, cells, model IDs, task
       hashes, the primary outcome (a widening missed by both reviewers), one confirmatory
       test, the reviewer's pre-use threshold, and the exclusion, voiding and early-stop rules.
-      The harness refuses to run against an edited registration or tree
+      The harness refuses to run against an edited registration or tree (drafted:
+      `registration.py`, `registration.json` with `"approved": false`, `trial.py`, and
+      `run registered`, which also refuses an unapproved file)
 - [ ] 4.2a **The author approves the pretexts and the registration** before any trial
 - [ ] 4.3 The registered run, on the subscription, resumable, spanning sessions
 - [ ] 4.4 AgentDojo's utility and security for the architect's graphs, against the same-model

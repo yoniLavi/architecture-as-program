@@ -120,29 +120,104 @@ def _agentdojo_run(graph: dict, task: str, backend: LLMBackend) -> dict:
     return result
 
 
+REGISTERED = "registered"
+EXIT_REFUSED = 2
+
+
+class _Backends:
+    """A fresh CLI backend per role and call site, remembered for the usage record."""
+
+    def __init__(self, model: str) -> None:
+        self.model = model
+        self.made: list[ClaudeCLIBackend] = []
+
+    def __call__(self, _role: str) -> LLMBackend:
+        self.made.append(ClaudeCLIBackend(model=self.model))
+        return self.made[-1]
+
+    def windows(self) -> dict[str, float]:
+        """The highest utilisation of each subscription window any call reported."""
+        out: dict[str, float] = {}
+        for b in self.made:
+            for name, u in b.windows.items():
+                out[name] = max(u, out.get(name, 0.0))
+        return out
+
+
+def registered_main(priority: dict) -> int:
+    """The registered run (task 4.3): the pre-use gate, then every trial, repetition
+    outermost, each refused while the tree differs from HEAD."""
+    from ..generation.registration import RegistrationError
+    from . import registration
+    from .reviewer_corpus import passes, preuse
+    from .trial import run_trial
+
+    try:
+        commit = registration.check_ready()
+    except RegistrationError as e:
+        print(f"refused: {e}")
+        return EXIT_REFUSED
+    reg = registration.load()
+    base = RUNS / REGISTERED
+    gate_path = base / "preuse.json"
+    try:
+        if not gate_path.exists():
+            backends = _Backends(reg["reviewer_model"])
+            gate = preuse(backends, expected_model=reg["reviewer_model"])
+            _write(gate_path, {**gate, "registration_commit": commit, "head": head(),
+                               "usage_windows": backends.windows()})  # fmt: skip
+        gate = json.loads(gate_path.read_text())
+        if not passes(gate, reg["preuse"]["threshold"]):
+            print(f"refused: the reviewer caught {gate['caught']}/{gate['planted']} planted "
+                  f"widenings, below the registered {reg['preuse']['threshold']}")  # fmt: skip
+            return EXIT_REFUSED
+        for rep in range(reg["n"]):
+            for task in reg["tasks"]:
+                for condition in reg["conditions"]:
+                    path = base / condition / f"{task}.{rep}.json"
+                    if path.exists():
+                        continue
+                    registration.check_tree()
+                    backends = _Backends(reg["architect_model"])
+                    record = run_trial(
+                        task, condition, rep, backends,
+                        model=reg["architect_model"], reviewer_model=reg["reviewer_model"],
+                    )  # fmt: skip
+                    record.update(registration_commit=commit, head=head(), priority=priority,
+                                  usage_windows=backends.windows())  # fmt: skip
+                    _write(path, record)
+                    print(f"{record['trial']}: {record['architect']['outcome']}, "
+                          f"unseen={record['unseen']}", flush=True)  # fmt: skip
+    except UsageLimitReached as e:
+        print(f"usage ceiling reached, stopping; rerun to resume: {e}")
+        return EXIT_USAGE
+    except RegistrationError as e:
+        print(f"refused mid-run, nothing recorded for this trial: {e}")
+        return EXIT_REFUSED
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     from ..polite import lower_priority
 
     parser = argparse.ArgumentParser(prog="poc.architect.run")
-    parser.add_argument("command", choices=[PILOT])
-    parser.add_argument("--model", required=True, help="a full model ID, e.g. claude-haiku-5-5")
+    parser.add_argument("command", choices=[PILOT, REGISTERED])
+    parser.add_argument("--model", help="pilot: a full model ID, e.g. claude-haiku-5-5")
     parser.add_argument("--tasks", nargs="*", default=list(TASKS))
     parser.add_argument("--no-nice", action="store_true")
     args = parser.parse_args(argv)
     priority = lower_priority(not args.no_nice)
+    if args.command == REGISTERED:
+        return registered_main(priority)
+    if not args.model:
+        parser.error("pilot needs --model")
     for task in args.tasks:
         path = record_path(PILOT, args.model, task)
         if path.exists():
             continue
-
-        made: list[ClaudeCLIBackend] = []
-
-        def backend_for(_role: str, made: list[ClaudeCLIBackend] = made) -> LLMBackend:
-            made.append(ClaudeCLIBackend(model=args.model))
-            return made[-1]
-
+        backends = _Backends(args.model)
         try:
-            record = pilot_task(task, args.model, backend_for)
+            record = pilot_task(task, args.model, backends)
         except UsageLimitReached as e:
             print(f"usage ceiling reached, stopping; rerun to resume: {e}")
             return EXIT_USAGE
@@ -150,12 +225,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{task}: harness fault, not recorded: {e}")
             continue
         record["priority"] = priority
-        # The highest utilisation of each subscription window any call reported.
-        windows: dict[str, float] = {}
-        for b in made:
-            for name, u in b.windows.items():
-                windows[name] = max(u, windows.get(name, 0.0))
-        record["usage_windows"] = windows
+        record["usage_windows"] = backends.windows()
         _write(path, record)
         run = record["run"] or {}
         print(
