@@ -20,13 +20,15 @@ low priority. While a registered run is in progress, edit nothing it imports.
 
 ## 2. The formal review
 
-- [ ] 2.1 The link check: `because` must be a verbatim span of the prompt. Pinned cases for a
-      missing link and a fabricated one
+- [x] 2.1 The link check: `because` must be a verbatim span of the prompt. Pinned cases for a
+      missing link and a fabricated one (`formal.py`; it measures linkage, not adequacy)
 - [ ] 2.2 Least-authority labels for the 16 banking tasks, drafted with reasons in
       `poc/architect/labels/`
 - [ ] 2.2a **The author approves the labels.** They cannot be corrected after the run, only
       disclosed
-- [ ] 2.3 The least-authority check: flag each grant beyond the label, by kind and by scope
+- [x] 2.3 The least-authority check: flag each grant beyond the label, by kind and by scope
+      (`formal.py`, by the validator's own narrowing relation; each widening carries its
+      class: effect, read, inference, answer)
 
 ## 3. The independent reviewer
 
