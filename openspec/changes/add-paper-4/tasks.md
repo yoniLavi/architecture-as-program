@@ -5,8 +5,10 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 0. Approval
 
-- [ ] 0.1 **The author approves this proposal**: the claim block, the budget, and the three
+- [x] 0.1 **The author approves this proposal**: the claim block, the budget, and the three
       open questions (Paper 3, title, directory). No paper text is written before this
+      (proposal approved 1 November 2026. The three open questions are still to be
+      answered; the first decides the corpus's order, see `docs/ROADMAP.md`)
 
 ## 1. The evidence, made quotable
 
