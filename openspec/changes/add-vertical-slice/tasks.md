@@ -17,8 +17,13 @@ nothing a run imports while it runs.
       takes a `custom` flag, not a catalogue, so no content can arrive by it. Holds a reader's
       `DBHandle`, `LLMClient<inference>`, or a banking writer kind; may not discharge trust;
       its output is `Untrusted` if it reads the bank or any untrusted input
-- [ ] 1.2 The scope-binding link check, in shadow mode, replayed over the registered
-      records. Reported, never enforced
+- [x] 1.2 The scope-binding link check, in shadow mode, replayed over the registered
+      records. Reported, never enforced. `formal.scope_binding`, `poc/slice/replay.py`.
+      Found (pinned by test): bound to the quote, it flags 1 of the 61 unseen widenings at
+      59 false alarms in 60 flags (the quotes are a few words; the IBAN stands elsewhere);
+      bound to the prompt, it flags none. The 61 are 17 by kind (open scope), 2 open
+      `UserProfile`, and 42 whose literal elements all stand in the prompt: field and mode
+      widenings, which no text-binding check can see
 
 ## 2. Step 4: the chosen reviewer candidate(s)
 
