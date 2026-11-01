@@ -85,6 +85,10 @@ What it does not say, stated in the introduction:
    - (b) Paper 4 cites the committed artifact, the registered data in the repository at a
      tagged commit, rather than the paper, and restates only the one figure it uses;
    - (c) Paper 4 drops the dependence, and states the reviewer rule's inputs as data.
+
+   **Settled by the author's sequence (1 November 2026, `docs/ROADMAP.md`): (a).** The
+   vertical slice comes next, then Paper 3 and this proposal are updated, then Paper 3
+   publishes, and Paper 4 is drafted after. The proposal is revisited after the slice.
 2. **Title.** Working: *Reviewed Before It Runs: Measuring Whether Automated Review Catches
    an Architect's Widened Authority*. The slug follows the title.
 3. **Directory.** `papers/04-architect/`.
