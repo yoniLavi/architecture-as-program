@@ -155,6 +155,33 @@ CATALOGUE: dict[str, Entry] = {
 
 # `update_password` has no library node: its kind, `Credentials`, is never granted.
 
+# ── The custom node (the vertical slice only) ───────────────────────
+#
+# `Custom` is the one entry with no body: the architect declares a role, a signature
+# and a `with` clause, and a developer writes the body (`openspec/changes/
+# add-vertical-slice`). It is a new route to authority, so it is not in `CATALOGUE`:
+# the registered architect run hashed the catalogue it was shown, and that text must
+# stay reproducible. Only the slice composes from `SLICE_CATALOGUE`.
+
+CUSTOM = "custom"
+# The kinds a custom node may hold, each under the same rule its library entry
+# obeys: a reader's scope and `read` mode, inference only. `ResponseChannel` is
+# `Respond`'s alone, and `Credentials` is never granted.
+CUSTOM_KINDS = ("DBHandle", "LLMClient", "Payments", "ScheduledPayments", "UserProfile")
+
+CUSTOM_ENTRY = Entry(
+    "Custom", CUSTOM,
+    "A node a developer writes, for a step that no other entry can do. Use it only "
+    "then. You give its `role`, its inputs, its output and the capabilities it holds; "
+    "the developer's code can use those capabilities and no others. Its output is a "
+    "record: a writer's record, or the fields you name. If it holds a `DBHandle`, or "
+    "any input is `Untrusted`, its output is `Untrusted` too.",
+    params={"role": "what the node does, for the developer, in a sentence or two",
+            "fields": "field name → type (omit when the output is a writer's record)"},
+)  # fmt: skip
+SLICE_CATALOGUE: dict[str, Entry] = {**CATALOGUE, CUSTOM_ENTRY.name: CUSTOM_ENTRY}
+_READER_SCOPES = frozenset(e.scope for e in CATALOGUE.values() if e.family == READER)
+
 # ── Paths and the expression language ───────────────────────────────
 
 _PATH = re.compile(r"in(\d+)((?:\.[A-Za-z_][A-Za-z0-9_]*)*)")
@@ -317,14 +344,15 @@ def _untrusted(t: str) -> bool:
     return unparse(strip_trust(parse_type(t))) != unparse(parse_type(t))
 
 
-def check_graph(graph: dict) -> list[str]:
+def check_graph(graph: dict, catalogue: Mapping[str, Entry] = CATALOGUE) -> list[str]:
     """Every way `graph` misuses the library; empty if it composes correctly. The
-    validator's own checks (edges, the lattice, narrowing) run separately."""
+    validator's own checks (edges, the lattice, narrowing) run separately. Only the
+    slice passes `SLICE_CATALOGUE`."""
     errors: list[str] = []
     caps = set(graph.get("capabilities", []))
     for n in graph.get("nodes", []):
         name = n.get("name")
-        entry = CATALOGUE.get(n.get("uses", ""))
+        entry = catalogue.get(n.get("uses", ""))
         if entry is None:
             errors.append(f"node {name!r} uses {n.get('uses')!r}, which is not in the library")
             continue
@@ -342,7 +370,9 @@ def check_graph(graph: dict) -> list[str]:
         if not data:
             errors.append(f"{where} takes no data input")
         wanted = [entry.capability] if entry.capability else []
-        if [_kind(c) for c in held] != wanted:
+        if entry.family == CUSTOM:
+            errors.extend(f"{where}: {e}" for e in _check_custom(n, data, held))
+        elif [_kind(c) for c in held] != wanted:
             errors.append(f"{where} must hold exactly {wanted or 'no capability'}, not {held}")
         elif entry.family == READER:
             scope = _db_scope(held[0]) or ""
@@ -414,6 +444,49 @@ def _check_params(entry: Entry, node: dict, arity: int) -> list[str]:
     if entry.family == RESPOND and not isinstance(params.get("template"), str):
         errors.append("Respond needs a `template`")
     return errors
+
+
+def _check_custom(node: dict, data: list[str], held: list[str]) -> list[str]:
+    """A custom node's clause, parameters and labels. Each grant obeys the rule its
+    library entry does; everything it reads from the bank, like a reader's output,
+    leaves labelled `Untrusted`."""
+    errors: list[str] = []
+    for cap in held:
+        kind = _kind(cap)
+        if kind not in CUSTOM_KINDS:
+            errors.append(f"may hold only {list(CUSTOM_KINDS)}, not {cap}")
+        elif kind == "DBHandle":
+            scope = _db_scope(cap) or ""
+            known = scope in _READER_SCOPES or (scope.startswith("file:") and len(scope) > 5)
+            if not known or not cap.endswith(", read>"):
+                errors.append(f"must hold a reader's DBHandle<'<scope>', read>, not {cap}")
+        elif kind == "LLMClient" and cap != "LLMClient<inference>":
+            errors.append(f"must hold LLMClient<inference> only, not {cap}")
+    params = node.get("params", {})
+    if not isinstance(params.get("role"), str) or not params["role"].strip():
+        errors.append("Custom needs a `role`")
+    out = strip_trust(parse_type(node["output"]))
+    if not isinstance(out, TName):
+        errors.append(f"must emit one named record, not {node['output']!r}")
+        return errors
+    fields = params.get("fields")
+    if out.name in RECORDS:
+        if fields is not None and fields != RECORDS[out.name]:
+            errors.append(f"its fields are {out.name}'s; omit `fields` or give them exactly")
+    elif not isinstance(fields, dict) or not fields:
+        errors.append(f"Custom needs a non-empty `fields` object for {out.name}")
+    elif not all(isinstance(t, str) and t.rstrip("?") in FIELD_TYPES for t in fields.values()):
+        errors.append(f"Custom field types must be among {sorted(FIELD_TYPES)}")
+    reads = any(_kind(c) == "DBHandle" for c in held)
+    if (reads or any(_untrusted(d) for d in data)) and not _untrusted(node["output"]):
+        errors.append("its output must be Untrusted: it reads the bank or untrusted input")
+    return errors
+
+
+def custom_schema(node: dict) -> dict[str, str]:
+    """The record a custom node emits: a writer's record, or its `fields`."""
+    name = strip_output(node["output"])
+    return dict(RECORDS.get(name) or node.get("params", {}).get("fields") or {})
 
 
 def strip_output(t: str) -> str:
@@ -590,7 +663,9 @@ def confinable(graph: dict) -> list[str]:
 
 __all__ = [
     "CATALOGUE",
+    "CUSTOM_ENTRY",
     "RECORDS",
+    "SLICE_CATALOGUE",
     "Entry",
     "LibraryError",
     "bodies",

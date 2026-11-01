@@ -11,8 +11,12 @@ nothing a run imports while it runs.
 
 ## 1. Steps 2 and 3: the custom node and the shadow link check
 
-- [ ] 1.1 The `Custom` library entry: role, signature and clause, no body; the library check;
-      the catalogue's wording, which says when to use it
+- [x] 1.1 The `Custom` library entry: role, signature and clause, no body; the library check;
+      the catalogue's wording, which says when to use it. In `SLICE_CATALOGUE` only, so the
+      registered run's hashed text is unchanged (a test now holds it reproducible); `author`
+      takes a `custom` flag, not a catalogue, so no content can arrive by it. Holds a reader's
+      `DBHandle`, `LLMClient<inference>`, or a banking writer kind; may not discharge trust;
+      its output is `Untrusted` if it reads the bank or any untrusted input
 - [ ] 1.2 The scope-binding link check, in shadow mode, replayed over the registered
       records. Reported, never enforced
 

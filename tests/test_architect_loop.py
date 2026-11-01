@@ -116,7 +116,9 @@ def test_a_registered_run_refuses_a_call_that_resolved_elsewhere():
 
 def test_author_has_no_parameter_through_which_tool_output_could_arrive():
     params = set(inspect.signature(author).parameters)
-    assert params == {"task_prompt", "backend", "document", "name", "expected_model"}
+    # `custom` (the vertical slice) is a flag: it chooses between two fixed catalogues.
+    assert params == {"task_prompt", "backend", "document", "name", "expected_model", "custom"}
+    assert inspect.signature(author).parameters["custom"].annotation in (bool, "bool")
 
 
 @pytest.mark.parametrize("document", [None, "A memo from the bank."])

@@ -25,10 +25,12 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from ..agentdojo.library import CATALOGUE, SLICE_CATALOGUE, Entry
 from ..llm import LLMBackend, LLMRequest, ModelCallError, UsageLimitReached
 from . import abstract, mapping, verdicts
 from .abstract import Reason
@@ -58,12 +60,14 @@ def sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def inputs(task_prompt: str, document: str | None = None) -> dict[str, str | None]:
+def inputs(
+    task_prompt: str, document: str | None = None, catalogue: Mapping[str, Entry] = CATALOGUE
+) -> dict[str, str | None]:
     """The hashes of everything fixed that the architect is shown. Its abstract graph,
     its replies and their reasons are its own, and are in the record whole."""
     return {
         "stage_one_system": sha256(abstract.STAGE_ONE_SYSTEM),
-        "stage_two_system": sha256(mapping.system()),
+        "stage_two_system": sha256(mapping.system(catalogue)),
         "task_prompt": sha256(task_prompt),
         "document": None if document is None else sha256(document),
     }
@@ -137,15 +141,18 @@ def author(
     *,
     name: str = "ArchitectGraph",
     expected_model: str | None = None,
+    custom: bool = False,
 ) -> dict:
     """One architect attempt, recorded whole. Raises `UsageLimitReached` if the
     backend stops (nothing is recorded), and `ModelMismatch` for a registered run
-    whose call resolved elsewhere."""
+    whose call resolved elsewhere. `custom` (the slice only) shows the catalogue with
+    the `Custom` entry; a flag, not a catalogue, so that no content can arrive by it."""
+    catalogue = SLICE_CATALOGUE if custom else CATALOGUE
     call = Caller(backend, expected_model)
     started = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     record: dict[str, Any] = {
         "started": started,
-        "inputs_sha256": inputs(task_prompt, document),
+        "inputs_sha256": inputs(task_prompt, document, catalogue),
         "max_repairs": MAX_REPAIRS,
     }
 
@@ -162,10 +169,10 @@ def author(
         out, reasons = mapping.parse(reply, name)
         if reasons or isinstance(out, mapping.Inexpressible):
             return out, reasons
-        return out, verdicts.check(out)
+        return out, verdicts.check(out, catalogue)
 
     shown_two = mapping.prompt(task_prompt, abstract_graph, document)
-    out, two = run_stage(call, "two", mapping.system(), shown_two, verdict)
+    out, two = run_stage(call, "two", mapping.system(catalogue), shown_two, verdict)
     record["attempts"] = one + two
     if isinstance(out, mapping.Inexpressible):
         outcome, graph, why = INEXPRESSIBLE, None, out.why

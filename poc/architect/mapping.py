@@ -15,6 +15,7 @@ link check (`formal.py`) holds each quote to the prompt.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from typing import Any
 from ..agentdojo.library import (
     CATALOGUE,
     COMPOSE,
+    CUSTOM,
     EXTRACT,
     READER,
     RECORDS,
@@ -29,6 +31,7 @@ from ..agentdojo.library import (
     SELECTOR,
     START,
     WRITER,
+    Entry,
 )
 from .abstract import SHAPE, Reason, parse_json_object
 
@@ -64,6 +67,10 @@ _FAMILY_NOTE = {
     "whose fields are the `fields` parameter.",
     RESPOND: "Inputs: any data, then `ResponseChannel<user-session>`. Output: "
     "`DeliveryConfirmation`. Every graph ends here.",
+    CUSTOM: "Inputs: any data, then the capabilities you grant it: a reader's "
+    "`DBHandle`, `LLMClient<inference>`, `Payments`, `ScheduledPayments` or "
+    "`UserProfile`, each written as below. Output: a type you name. It may not "
+    "discharge trust.",
 }
 
 
@@ -71,10 +78,11 @@ def _shape(fields: dict[str, str]) -> str:
     return "{" + ", ".join(f"{k}: {v}" for k, v in fields.items()) + "}"
 
 
-def catalogue() -> str:
-    """The library, as stage two is shown it."""
+def catalogue(entries: Mapping[str, Entry] = CATALOGUE) -> str:
+    """The library, as stage two is shown it. Only the slice passes
+    `SLICE_CATALOGUE`; the default is the text the registered run hashed."""
     lines: list[str] = []
-    for e in CATALOGUE.values():
+    for e in entries.values():
         line = f"- `{e.name}`: {e.doc}"
         if e.family == READER:
             scope = f"{e.scope}<name>" if e.scope == "file:" else e.scope
@@ -105,9 +113,9 @@ def section(title: str) -> str:
     return body.split("\n## ", 1)[0].strip()
 
 
-def system() -> str:
+def system(entries: Mapping[str, Entry] = CATALOGUE) -> str:
     text = (PROMPTS / "stage-two.md").read_text()
-    return text.replace("{{CATALOGUE}}", catalogue()).replace(
+    return text.replace("{{CATALOGUE}}", catalogue(entries)).replace(
         "{{EXAMPLE}}", json.dumps(EXAMPLE, indent=1)
     )
 

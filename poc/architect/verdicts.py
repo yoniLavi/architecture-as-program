@@ -15,9 +15,10 @@ tool output, no injection, no reviewer verdict.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 
 from ..agentdojo import corpus
-from ..agentdojo.library import check_graph
+from ..agentdojo.library import CATALOGUE, Entry, check_graph
 from ..evaluate import REASON_SIGNATURES as PAPER2_SIGNATURES
 from ..graph import validate_graph_dicts
 from .abstract import Reason
@@ -37,11 +38,11 @@ def classify(message: str) -> str:
     return VALIDATOR_OTHER
 
 
-def check(graph: dict) -> list[Reason]:
+def check(graph: dict, catalogue: Mapping[str, Entry] = CATALOGUE) -> list[Reason]:
     """Every reason `graph` is not a valid library graph; empty if it is."""
     reasons = [Reason(classify(m), _PREFIX.sub("", m)) for m in validate_graph_dicts([graph])]
     try:
-        library = check_graph(graph)
+        library = check_graph(graph, catalogue)
     except (KeyError, TypeError, AttributeError, ValueError):
         # A graph malformed enough to break the library's bookkeeping has already
         # earned the validator's reasons for it.
