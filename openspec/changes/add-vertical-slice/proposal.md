@@ -1,7 +1,7 @@
 # A thin vertical slice of the north star: all eight steps, crudely, on one domain
 
-> **Status: proposed, 1 November 2026. Not approved.** It is to be built in a new session.
-> The design questions in `design.md` are the author's, to settle at that session's start.
+> **Status: approved by the author, 1 November 2026** (task 0.1; the five answers are in
+> `design.md`).
 > Exploratory: not registered, and not a paper.
 
 ## Why

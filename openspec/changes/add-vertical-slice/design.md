@@ -52,6 +52,17 @@
 5. **The author's time.** Steps 7 and 8 need the author: a few minutes per graph, about
    three to six graphs.
 
+## The author's answers (1 November 2026, task 0.1)
+
+The author approved the proposal and took every recommendation:
+1. **Tasks:** banking 4, 15 and 0.
+2. **The custom node:** yes.
+3. **Step 4:** behaviour shown to the reviewer, and the scope-binding link check in shadow
+   mode (replayed over the registered records), both on the subscription; the author at
+   step 8. No paid spend.
+4. **A pretext at step 5:** yes, in one condition.
+5. **The author's time:** steps 7 and 8, a few minutes per graph, for three to six graphs.
+
 ## Risks
 
 - **Scope creep.** The slice is crude by design: it tests the flow, not each step's

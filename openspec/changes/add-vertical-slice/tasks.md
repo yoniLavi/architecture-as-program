@@ -6,7 +6,8 @@ nothing a run imports while it runs.
 
 ## 0. Approval
 
-- [ ] 0.1 **The author approves this proposal** and answers the five questions in `design.md`
+- [x] 0.1 **The author approves this proposal** and answers the five questions in `design.md`
+      (1 November 2026: every recommendation taken; recorded in `design.md`)
 
 ## 1. Steps 2 and 3: the custom node and the shadow link check
 
