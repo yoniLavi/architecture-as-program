@@ -28,7 +28,7 @@ developer's context.
 - **B, formal foundations** (a typed lattice and a noninterference argument), runs as a
   parallel track.
 
-**Sequence (decided 29 October 2026):**
+**Sequence (decided 29 October 2026; amended 1 November 2026, see that entry below):**
 1. **Paper 4 is the front half, steps 1–4.** Prompt → architect → formal review →
    independent reviewer, evaluated on AgentDojo: task completion, attack success, and
    whether a pretext can make the architect widen authority unseen by the reviewers. It
@@ -44,6 +44,65 @@ developer's context.
 The back half (steps 5–6: decomposition, escalation as a graph change, minimisation) is
 likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
 Reviewability by real people (steps 7–8) needs participants, and comes later.
+
+## 1 November 2026: what Papers 3 and 4 found, and what it changes
+
+**A change of process (the author, 1 November 2026).** The programme works like a
+research group: publication lags the research, and is informed by it. Paper 3 is published
+after more work, not before, and is updated by what that work finds. The sequence above
+is amended:
+1. this note;
+2. the thin vertical slice, proposed now (`openspec/changes/add-vertical-slice`) and built
+   in a new session;
+3. then Paper 3 and the Paper 4 proposal are updated by what the slice found;
+4. then a final pass, and Paper 3 is published;
+5. then Paper 4 is drafted. Paper 4's first open question (how it cites Paper 3) is
+   settled by this order: Paper 3 publishes first.
+
+**What the evidence says, and what it changes:**
+
+- **Claimed approvals move these models, at both ends of the pipeline.** Paper 3's
+  registered run found it for developers writing node bodies. Paper 4's found it,
+  descriptively, for the architect writing grants: unseen widenings rose from 7.5% to
+  18.1%. That registered test was not supported at α = 0.01, so it is descriptive only.
+  *So:* the north star's rule, that authority changes only through a reviewed graph edit
+  and never through text in an agent's context, stands, and applies to the architect as
+  much as to developers. The slice should carry a pretext at step 5, too.
+- **Same-model review is weak on natural widenings.** It caught 10/10 planted widenings
+  and 17 of 76 natural ones. *So:* a planted-widening corpus is not evidence that a
+  reviewer works, and step 4 needs something other than a second look by the same model.
+  The candidates are below.
+- **Minimisation would not have caught them.** A read-only pass over the 61 unseen
+  widenings (1 November 2026) found every one to be authority the graph *uses*:
+  - every granted field is written;
+  - each payee is either a constant the graph pays or one read at run time.
+
+  None was granted but unused. *So:* step 6 (formal tooling that reduces capabilities)
+  removes slack, not unjustified behaviour. The gap is semantic, whether the task
+  justifies what the graph does, and that is steps 4 and 8. Minimisation stays in the
+  slice, but crude, and is not expected to close this gap.
+- **The link check measured nothing.** It caught none, because the architect always quoted
+  the prompt. *So:* either retire it, or make it bind the scope: for example, a grant's
+  literal payees and cap must appear in its quote. The slice can test the stronger form
+  cheaply against the registered records.
+- **Shapes, never values, costs utility.** The architect's graphs completed 7/16 tasks
+  (3/11 beyond the idle-pass tasks), against the undefended model's 13/16 (8/11). *So:*
+  the architect's information position is a real design variable, not a fixed rule. The
+  cheapest probe is a published "schema conventions" document, an API's docs rather than
+  its data. It is an author's decision, because it changes what the architect sees.
+- **The kinds have gaps the run exposed.** There is no payee "someone I paid before"
+  (task 5), and a quoted set name parsed as a literal (now closed). *So:* C, authority
+  below kinds, grows from cases like these, as A needs it.
+
+**Candidates for step 4, for the author** (to settle before or during the slice):
+1. **A different family as reviewer.** The gated backend exists; spend needs approval.
+2. **The human architecture reviewer (step 8), earlier**: the author reviews the slice's
+   graphs, using the inspector as the view. This is a crude test of whether a person
+   catches what the model missed. It is not a study.
+3. **Review against behaviour, not grants.** The reviewer is shown what the graph would
+   *do* (each writer's possible payees, amounts, orders and fields, from the predictions'
+   taint analysis) rather than type strings.
+4. **A stronger link check**, binding scope elements to the quote, as above.
 
 ## State as of 31 October 2026: Paper 4's evidence
 
