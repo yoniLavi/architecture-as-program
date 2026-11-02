@@ -63,6 +63,15 @@ The author approved the proposal and took every recommendation:
 4. **A pretext at step 5:** yes, in one condition.
 5. **The author's time:** steps 7 and 8, a few minutes per graph, for three to six graphs.
 
+**Amended after task 1.2 (the author, 1 November 2026).** The scope-binding link check's
+replay over the registered records found it near-useless: bound to the quote, it caught 1
+of the 61 unseen widenings, at 59 false alarms in 60 flags; bound to the prompt, none. 42
+of the 61 are field or mode widenings whose literal elements all stand in the prompt, which
+no text-binding check can see. So the check stays as built, in shadow mode, and is reported
+in `dist/slice.md`; nothing more is invested in it. Step 4's effort goes to the
+behaviour-shown reviewer (task 2.1), which can show those widenings directly ("this node can
+change Rent's date").
+
 ## Risks
 
 - **Scope creep.** The slice is crude by design: it tests the flow, not each step's

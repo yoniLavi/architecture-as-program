@@ -27,8 +27,9 @@ nothing a run imports while it runs.
 
 ## 2. Step 4: the chosen reviewer candidate(s)
 
-- [ ] 2.1 As the author chose in 0.1. If behaviour is shown, the writers' possible values come
-      from the predictions' taint analysis
+- [ ] 2.1 The behaviour-shown reviewer (amended after 1.2; see `design.md`): the writers'
+      possible values come from the predictions' taint analysis. The scope-binding check
+      gets no further work: it stays in shadow mode and is reported only
 
 ## 3. Step 5: the developer and escalation
 
