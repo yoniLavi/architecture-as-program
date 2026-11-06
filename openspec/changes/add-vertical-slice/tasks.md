@@ -27,9 +27,30 @@ nothing a run imports while it runs.
 
 ## 2. Step 4: the chosen reviewer candidate(s)
 
-- [ ] 2.1 The behaviour-shown reviewer (amended after 1.2; see `design.md`): the writers'
+- [x] 2.1 The behaviour-shown reviewer (amended after 1.2; see `design.md`): the writers'
       possible values come from the predictions' taint analysis. The scope-binding check
-      gets no further work: it stays in shadow mode and is reported only
+      gets no further work: it stays in shadow mode and is reported only.
+      `poc/slice/behaviour.py` (taint generalised to provenance; held to taint on all 305
+      registered graphs), `poc/slice/review.py`; records in `poc/slice/runs/behaviour/`.
+      Replayed in shadow mode, Haiku on the subscription, 6 November 2026, over a sample
+      fixed in advance: the 76 registered trials with a counted widening, and 76 clean
+      ones by hash. Found (pinned by test):
+      - **Barely better, within noise.** 21 of 76 widened trials caught, against the
+        registered reviewer's 17 on the same graphs. 5 gained, 1 lost. Clean trials
+        flagged rose from 3 to 7. Most new flags ask to cap an amount the architect
+        could not know ("the usual Spotify amount").
+      - **The misses are not for lack of information.** The 42 field and mode widenings
+        are untouched: 0 of 21 on tasks 2 and 9 (`date`), 0 of 20 on task 15
+        (a new recurring 2200 to the new landlord instead of updating the rent order).
+        The view states exactly what the graph does ("date: a model's answer, from the
+        file 'landlord-notices.txt'"), and the reviewer judges it needed, quoting
+        "adjust my rent payment accordingly". It disagrees with the label, not with the
+        graph. Those are judgement calls, and they go to the author at step 8.
+      - **There is nothing to minimise in them.** No counted widening, and no grant in the
+        sample, admits a field its graph never sets. Every wide grant is exercised. So
+        step 6, as designed, will remove nothing from them, as the roadmap expected.
+      - By condition, caught (registered → behaviour): channel A 12 → 17 of 41,
+        channel B 4 → 3 of 28, Q0 1 → 1 of 7.
 
 ## 3. Step 5: the developer and escalation
 

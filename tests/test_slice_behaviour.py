@@ -126,3 +126,18 @@ def test_the_baseline_is_the_registered_reviewers_own_figure():
     primary = review.summarise(pairs)[reviewer.PRIMARY]
     assert (primary["widened_trials"], primary["caught"]) == (76, 17)
     assert (primary["clean_trials_flagged"], primary["false_alarm_grants"]) == (3, 5)
+
+
+def test_the_replays_finding_is_pinned():
+    """The committed records' summary (task 2.1), so the finding cannot move silently.
+    Behaviour shown: 21 of 76 widened trials caught against the registered 17, at 7
+    clean trials flagged against 3; no catch rests on a field the graph never sets."""
+    pairs = review.load()
+    assert len(pairs) == 152
+    s = review.summarise(pairs)[review.BEHAVIOUR]
+    assert (s["with_verdict"], s["caught"], s["caught_where_view_shows_an_unused_field"]) == (
+        152,
+        21,
+        0,
+    )
+    assert (s["clean_trials_flagged"], s["false_alarm_grants"]) == (7, 9)
