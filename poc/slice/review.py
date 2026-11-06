@@ -190,7 +190,8 @@ def main(argv: list[str] | None = None) -> int:
         path = RUNS / f"{record['trial']}.json"
         if path.exists():
             continue
-        if _git("status", "--porcelain", "poc", "scripts"):
+        # The run's own records are under poc/, and are not code it imports.
+        if _git("status", "--porcelain", "poc", "scripts", ":(exclude)poc/slice/runs"):
             print("refused: poc/ or scripts/ differs from HEAD; commit first")
             return EXIT_REFUSED
         task_prompt = cell(record["task"], record["condition"])[0]
