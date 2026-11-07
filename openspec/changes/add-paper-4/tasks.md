@@ -10,6 +10,12 @@ Every session working on this change first checks the feed recorder (standing ta
       (proposal approved 1 November 2026. The three open questions are still to be
       answered; the first decides the corpus's order, see `docs/ROADMAP.md`)
 
+- [ ] 0.2 **The author answers the remaining open questions** (`design.md`): title,
+      directory, and question 4, whether the slice's two replays over the registered
+      records are reported as labelled post-hoc analyses (added 7 November 2026)
+- [ ] 0.3 Paper 3 published and its `RECORD.json` committed (`add-paper-3` 6.5); until then
+      Paper 4 may be drafted but not stamped
+
 ## 1. The evidence, made quotable
 
 - [ ] 1.1 `poc/architect/report.py`: a `display` block in `dist/architect.json` with
@@ -22,7 +28,10 @@ Every session working on this change first checks the feed recorder (standing ta
 - [ ] 2.1 `papers/04-architect/proposal.typ`: a title block with no DOI, section labels, and
       `json("/dist/architect.json")`, `json("/dist/agentdojo-banking.json")`
 - [ ] 2.2 `Makefile` targets for Paper 4, and its citable PDF name
-- [ ] 2.3 The survey's entries in `citations.bib`, each checked against its source
+- [ ] 2.3 The survey's entries in `citations.bib`, each checked against its source, and a
+      Paper 3 entry with its DOI (`lavi_granted_2026`)
+- [ ] 2.4 If question 4 is (b): the replays' keys in `dist/slice.json` given a `display`
+      block, kept apart from the registered figures and labelled post hoc
 
 ## 3. Drafting
 

@@ -1,4 +1,6 @@
-"""Paper 4's architect and its reviewers (`openspec/changes/add-architect-and-reviewers`).
+"""Paper 4's architect and reviewers.
+
+Built by `openspec/changes/archive/2026-11-07-add-architect-and-reviewers`.
 
 A Product Owner's prompt goes to an **architect** model, which writes a signal graph over
 the banking node library (`poc/agentdojo/library.py`) in two stages: an abstract graph

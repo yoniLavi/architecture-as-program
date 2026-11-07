@@ -151,7 +151,7 @@ Built 29 October 2026; the decisions and their reasons are in that change's `des
 - `make agentdojo-banking` renders `dist/agentdojo-banking.{md,json}` from the committed records. It is part of `make build` and calls no model.
 - **AgentDojo's utility holds on an idle run** (no call, an empty answer) for tasks 5, 6, 8, 9 and 10 (`records/idle-pass.json`, held to the computation by a test). Every utility figure is given over all 16 tasks *and* over the other 11. Never quote the 16-task figure alone.
 
-### Paper 4's architect and reviewers (`openspec/changes/add-architect-and-reviewers`)
+### Paper 4's architect and reviewers (`openspec/changes/archive/2026-11-07-add-architect-and-reviewers`)
 
 Built 31 October 2026, in `poc/architect/`. The decisions and findings are in that change's `design.md`. None of it moves a Paper 2 figure.
 

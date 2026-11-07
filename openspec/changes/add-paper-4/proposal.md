@@ -4,6 +4,9 @@
 > The evidence is complete (`add-agentdojo-banking-harness`, archived;
 > `add-architect-and-reviewers`, 21/23 tasks, 5.3 open because no spend is approved).
 > Three questions are the author's before any prose (`design.md`, "Open questions").
+> **Revisited 7 November 2026**, after the vertical slice: Paper 3's DOI is reserved, so
+> the first question is settled; a fourth is added (the slice's replays); and the design
+> gains "What the slice changes".
 
 ## Why
 
@@ -61,9 +64,9 @@ settled as (a).
   Every figure is interpolated from `dist/architect.json` and
   `dist/agentdojo-banking.json`.
 - **It cites Paper 2** for the graph, the validator, the derivation and the confined tier,
-  and restates none of them. How it relates to Paper 3, which is unpublished, is an open
-  question for the author: Paper 3 holds the result that claimed approvals move these
-  models, and the data the reviewer's model was chosen from.
+  and restates none of them. It cites Paper 3 (DOI 10.5281/zenodo.24043532, reserved
+  7 November 2026) for the result that claimed approvals move these models, and for the
+  data the reviewer's model was chosen from. It is stamped only after Paper 3 publishes.
 - **The architect report gains a `display` block** for every non-integer figure the paper
   uses (the confirmatory p first), as Paper 3's did.
 - **No accounting of Paper 1** is restated. That has one owner, Paper 2.
@@ -72,8 +75,9 @@ settled as (a).
 - any edit to Paper 2 (the figure pin stands) or to Paper 3's draft;
 - a second model family (5.3 is open and unfunded);
 - the back half (steps 5–6);
-- human review (steps 7–8);
-- the vertical slice;
+- human review (steps 7–8), which nobody has done: the slice's judges were models;
+- the vertical slice's own units, which are exploratory. Its two replays over the
+  registered records are an open question (`design.md`, question 4);
 - any upload, DOI reservation or other outward-facing act.
 
 ## Impact

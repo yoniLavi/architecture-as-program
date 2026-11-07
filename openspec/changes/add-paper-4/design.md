@@ -11,7 +11,7 @@ The evidence is fixed and generated:
   - the pilot, kept apart.
 - **`dist/agentdojo-banking.{md,json}`**: the banking corpus, the oracle plans with their
   predictions, the undefended Haiku baseline, and the idle-pass tasks.
-- **`openspec/changes/add-architect-and-reviewers/design.md`**: every decision and finding
+- **`openspec/changes/archive/2026-11-07-add-architect-and-reviewers/design.md`**: every decision and finding
   ("As built", "What the registered run found").
 - **`docs/paper-4-survey/`** and **`docs/paper-4-design-questions.md`** (D1–D9).
 
@@ -50,7 +50,7 @@ What it does not say, stated in the introduction:
 | 5 | Results | ~1,400 | The confirmatory result first; the reviewers per column, never summed; pretexts loosen rather than steer; the quoted-name slips counted apart; AgentDojo beside the baseline, with the writer column |
 | 6 | Related work | ~1,000 | CaMeL, ACE, Conseca, FIDES, Progent (published numbers, labelled as other models), the design-patterns paper, AI Control, self-preference and correlated errors |
 | 7 | Limitations | ~1,000 | See below |
-| 8 | Future work | ~150 | A different family as reviewer; content-borne pretexts; the back half |
+| 8 | Future work | ~250 | A different family as reviewer; content-borne pretexts; run-time-value bounds; escalation by reviewed edit; placement; the back half |
 | 9 | Conclusion | ~150 | |
 
 ## What is not negotiable
@@ -65,6 +65,7 @@ What it does not say, stated in the introduction:
   - one model as both architect and reviewer, stated as a lower bound on independence;
   - labels that are the author's judgement;
   - the link check measures linkage, not adequacy;
+  - review measured need, never placement (which node holds a grant);
   - shapes, never values, cost utility, by design;
   - tasks 5 and 14 cannot succeed under least authority;
   - AgentDojo's idle-pass tasks and its goal-predicate precedence slip;
@@ -89,9 +90,45 @@ What it does not say, stated in the introduction:
    **Settled by the author's sequence (1 November 2026, `docs/ROADMAP.md`): (a).** The
    vertical slice comes next, then Paper 3 and this proposal are updated, then Paper 3
    publishes, and Paper 4 is drafted after. The proposal is revisited after the slice.
+   **Revisited 7 November 2026:** the slice is done, and Paper 3's DOI is reserved
+   (10.5281/zenodo.24043532). Paper 4 cites Paper 3 by that DOI, and the stamp check holds
+   it to Paper 3's `RECORD.json`: Paper 4 is not stamped before Paper 3 publishes.
 2. **Title.** Working: *Reviewed Before It Runs: Measuring Whether Automated Review Catches
    an Architect's Widened Authority*. The slug follows the title.
 3. **Directory.** `papers/04-architect/`.
+4. **The slice's replays over the registered records** (added 7 November 2026). Two shadow
+   analyses ran over this paper's own registered graphs, after the fact:
+   - the scope-binding link check flagged 1 of 61 unseen widenings, with 59 false alarms;
+   - the behaviour-shown reviewer caught 21 of 76 widened trials, against 17, and flagged
+     7 clean trials, against 3.
+
+   The slice's rule is that its findings are never a figure in a paper. Options:
+   - (a) keep the rule: Paper 4 uses them as framing only, in prose without numbers;
+   - (b) report both as post-hoc analyses, labelled as such, apart from the registered
+     results, interpolated from `dist/slice.json`. They answer the two objections a reader
+     will raise first ("bind the link check to scope", "show the reviewer what the graph
+     does"), and they are computed from the registered records, with no new model call
+     except the reviewer's;
+   - (c) drop them.
+
+   Recommendation: (b), because the objections are predictable and the answer is in hand.
+   It is the author's call, because it changes the rule the slice was approved under.
+
+## What the slice changes (7 November 2026)
+
+- **Limitations gain one item: placement.** Every check, the labels included, asks whether
+  the task needs a grant. None asks whether the node holding it should. In the slice, two
+  model judges called an open payment grant held by developer code "needed", and said in
+  prose that it was a concern. The labels cannot see this, so the paper must not imply its
+  reviewers were measured on it.
+- **"The link check measures linkage, not adequacy" stays as written**, and gains, under
+  4(a) or 4(b), that binding it to the scope does not change that.
+- **Future work grows to ~250 words** and takes three items from the slice, as directions
+  without evidence: grants bounded by values an upstream node produces; an escalation
+  answered by a reviewed edit that grants no more than was asked; placement as a review
+  dimension. The back half (steps 5–8) stays out of scope.
+- **No human review.** The slice's judges were models standing in for the author, so
+  nothing in Paper 4 may describe step 8 as tried.
 
 ## Risks
 

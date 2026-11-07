@@ -85,8 +85,11 @@ low priority. While a registered run is in progress, edit nothing it imports.
 - [x] 5.2 **The author decides**, from the subscription results, whether the control is worth
       the spend, and approves a ceiling (31 October 2026: **not now**. No ceiling approved,
       nothing spent; same-model review is reported as a lower bound)
-- [ ] 5.3 If approved: the reviewer, on the registered subset, by the other family. Reported
-      beside the same-family figures, never pooled with them
+- [x] 5.3 If approved: the reviewer, on the registered subset, by the other family. Reported
+      beside the same-family figures, never pooled with them. **Not run: 5.2 approved no
+      spend.** Closed as deferred on archiving (7 November 2026). It is carried as Paper 4's
+      future work and as the roadmap's step-4 candidate 1; the gated backend stays, and a
+      later change runs it if a ceiling is approved
 
 ## 6. Report and records
 
