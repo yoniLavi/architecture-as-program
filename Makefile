@@ -78,9 +78,9 @@ UI_FIGS := $(addprefix $(DIST)/ui/,$(UI_FIGS_USED))
 # dist/papers/02-demonstrator/ (see README).
 ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 
-.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect paper1 paper2 paper3 aliases api ui ui-check ui-e2e
+.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect slice paper1 paper2 paper3 aliases api ui ui-check ui-e2e
 
-build: validate-graphs check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect paper1 paper2 paper3 aliases
+build: validate-graphs check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect slice paper1 paper2 paper3 aliases
 	@echo "Build complete."
 
 grammar: $(DIST)/grammar.md
@@ -89,6 +89,7 @@ evaluation-feed: $(DIST)/evaluation-feed.md
 generation: $(DIST)/generation.md
 agentdojo-banking: $(DIST)/agentdojo-banking.md
 architect: $(DIST)/architect.md
+slice: $(DIST)/slice.md
 paper1: $(P1_SERVED) $(P1_DOCS)
 paper2: $(P2_DOCS) $(P2_PUB_PDF)
 paper3: $(P3_DOCS) $(P3_PUB_PDF)
@@ -159,6 +160,12 @@ $(DIST)/agentdojo-banking.md: poc/agentdojo/report.py poc/agentdojo/corpus.py $(
 ARCHITECT_RECORDS := $(wildcard poc/architect/registration.json poc/architect/runs/*/*/*.json poc/architect/runs/*/*.json poc/architect/predictions/*.json poc/agentdojo/records/idle-pass.json)
 $(DIST)/architect.md: poc/architect/report.py $(ARCHITECT_RECORDS) | $(DIST)
 	$(PY) -m poc.architect.report $(DIST)
+
+# The vertical slice (openspec/changes/add-vertical-slice): from committed records and
+# the author's verdict files; calls no model. Exploratory, and in no paper.
+SLICE_RECORDS := $(wildcard poc/slice/*.py poc/slice/runs/*/*.json poc/slice/verdicts/*.json)
+$(DIST)/slice.md: $(SLICE_RECORDS) $(ARCHITECT_RECORDS) | $(DIST)
+	$(PY) -m poc.slice.report $(DIST)
 
 # Each of the two artifacts above writes its .json in the same recipe as its .md;
 # these rules establish the ordering for Paper 3, which typesets from both.
