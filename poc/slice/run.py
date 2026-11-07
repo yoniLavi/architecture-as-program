@@ -156,6 +156,13 @@ def utility(graph: dict, task: str, components: dict[str, Path], backends: Backe
     return {"ran": True, **developer.runner(graph, task, backends())(bodies)}
 
 
+def graph_name(task: str, condition: str) -> str:
+    """PascalCase, as the validator requires: `SliceUserTask4Q0`, `SliceUserTask4AQ1`.
+    (The first run passed `Slice_user_task_4_Q0`, which the validator refused on every
+    reply: a harness fault, voided in `runs/voided/`.)"""
+    return "SliceUserTask" + task.rsplit("_", 1)[1] + condition.replace("-", "")
+
+
 def run_unit(task: str, condition: str, backends: Backends) -> dict:
     unit = f"{task}.{condition}"
     task_prompt, document = cell(task, condition)
@@ -164,8 +171,8 @@ def run_unit(task: str, condition: str, backends: Backends) -> dict:
         "step 5 has no contract check: the architect writes none for a Custom node",
         "step 7's security side is predictions only; no injected runs",
     ]}  # fmt: skip
-    arch = author(task_prompt, backends(), document, name=f"Slice_{task}_{condition}".replace(
-        "-", "_"), expected_model=MODEL, custom=True)  # fmt: skip
+    arch = author(task_prompt, backends(), document, name=graph_name(task, condition),
+                  expected_model=MODEL, custom=True)  # fmt: skip
     record["architect"] = arch
     graph = arch.get("graph")
     if not isinstance(graph, dict):
