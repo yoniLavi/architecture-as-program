@@ -27,6 +27,27 @@ artefact makes widening *countable* against registered labels, and here it showe
 automated reviewers falling short. A paper that reported this as a defence would overstate
 the artifact. One that stayed silent would waste a registered null.
 
+## What the vertical slice changes (7 November 2026)
+
+The slice (`add-vertical-slice`, `docs/ROADMAP.md` of 7 November) is exploratory, so it
+supplies framing, never a figure. Four findings bear on this paper:
+- **Showing the reviewer behaviour, not type strings, does not rescue it.** The replay
+  moved the catch rate a little and the false alarms up. The paper's reading, that
+  same-model review falls short on natural widenings, stands, and need not hedge on "it
+  was shown the wrong thing".
+- **Binding the link check to scope does not rescue it either.** The paper can say the
+  link check measures linkage and cannot be made to measure scope, rather than leave
+  that open.
+- **"Is it needed" is the wrong question to ask alone.** Every check, and two model
+  judges, called an open payment grant held by developer code needed. The paper's
+  discussion should name placement (which node holds a grant) as a dimension none of its
+  reviewers measured.
+- **An escalation came back wider than asked.** This is the back half, out of scope here,
+  but it belongs in Future work beside run-time-value bounds.
+
+None of this moves a figure or the registered result. The open question on Paper 3 stays
+settled as (a).
+
 ## What Changes
 
 - **A new living paper, `papers/04-architect/`**, of about 7,000 words. Its lead claim is
