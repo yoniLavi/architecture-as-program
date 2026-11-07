@@ -639,13 +639,21 @@ def body(node: dict, capabilities: list[str]) -> Callable[..., Any]:
     raise LibraryError(f"no body for {entry.name}")  # pragma: no cover
 
 
-def bodies(graph: dict, confined: Iterable[str] = ()) -> dict[str, Callable[..., Any]]:
+def bodies(
+    graph: dict,
+    confined: Iterable[str] = (),
+    supplied: Mapping[str, Callable[..., Any]] | None = None,
+) -> dict[str, Callable[..., Any]]:
     """Node name → body, for every node of a library graph. Nodes named in
-    `confined` get their component (`confined.py`, which needs wasmtime)."""
+    `confined` get their component (`confined.py`, which needs wasmtime). Nodes in
+    `supplied` get the body given there: a `Custom` node's, which the library has
+    not (the slice only)."""
     caps = list(graph.get("capabilities", []))
     confined = set(confined)
-    out: dict[str, Callable[..., Any]] = {}
+    out: dict[str, Callable[..., Any]] = dict(supplied or {})
     for n in graph["nodes"]:
+        if n["name"] in out:
+            continue
         if n["name"] in confined:
             from .confined import body as confined_body
 
@@ -657,8 +665,10 @@ def bodies(graph: dict, confined: Iterable[str] = ()) -> dict[str, Callable[...,
 
 def confinable(graph: dict) -> list[str]:
     """The nodes of a graph whose entry has a component: exactly those whose entry
-    holds a capability. The pure entries have none, and run on the host tier."""
-    return [n["name"] for n in graph["nodes"] if CATALOGUE[n["uses"]].capability is not None]
+    holds a capability. The pure entries have none, and run on the host tier. A
+    `Custom` node is confined by its developer's component, not the library's, so
+    it is not listed here."""
+    return [n["name"] for n in graph["nodes"] if SLICE_CATALOGUE[n["uses"]].capability is not None]
 
 
 __all__ = [

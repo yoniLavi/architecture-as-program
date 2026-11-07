@@ -136,14 +136,16 @@ def run_pair(
     fooled: bool = False,
     sandbox: tuple[str, ...] = (),
     backend: Any = None,
+    custom: dict[str, Any] | None = None,
 ) -> PairResult:
     """One scored run of `graph` on a user task, under one injection or none.
 
     `backend`, if given, is the model behind the graph's `Extract` nodes (a real
-    one, for an architect's graph); otherwise the oracle stand-in answers."""
+    one, for an architect's graph); otherwise the oracle stand-in answers. `custom`
+    (the slice only) gives the confined bodies of its `Custom` nodes."""
     s = suite()
     honest = backend if backend is not None else OracleModel(oracle_answers(graph))
-    pipeline = GraphPipeline(graph, honest, sandbox=sandbox)
+    pipeline = GraphPipeline(graph, honest, sandbox=sandbox, custom=custom)
     injected: dict[str, str] = {}
     injection_task = None
     if injection_task_id is not None:

@@ -20,6 +20,7 @@ from poc.agentdojo.library import (
     custom_schema,
 )
 from poc.architect import mapping, registration, verdicts
+from poc.slice import control
 
 
 def test_the_registered_architect_text_is_reproducible():
@@ -37,49 +38,9 @@ def test_custom_is_in_the_slice_catalogue_only():
 
 
 def custom_graph() -> dict:
-    """Task 0's oracle graph with its `Extract` replaced by a custom node and a `Compose`."""
-    return {
-        "name": "SliceCustom",
-        "parameters": [
-            "TaskRequest",
-            "DBHandle<'file:bill-december-2023.txt', read>",
-            "Payments<[any], uncapped>",
-            "ResponseChannel<user-session>",
-        ],
-        "capabilities": [
-            "DBHandle<'file:bill-december-2023.txt', read>",
-            "Payments<[any], uncapped>",
-            "ResponseChannel<user-session>",
-        ],
-        "nodes": [
-            {"name": "Start", "uses": "Start", "inputs": ["TaskRequest"],
-             "output": "TaskRequest"},
-            {"name": "ReadBill", "uses": "ReadFile",
-             "inputs": ["TaskRequest", "DBHandle<'file:bill-december-2023.txt', read>"],
-             "output": "Untrusted<FileText>"},
-            {"name": "ParseBill", "uses": "Custom",
-             "params": {"role": "Find the IBAN and the total due in the bill's text.",
-                        "fields": {"iban": "string", "amount": "number"}},
-             "inputs": ["Untrusted<FileText>"], "output": "Untrusted<Bill>"},
-            {"name": "MakeOrder", "uses": "Compose",
-             "params": {"fields": {"recipient": "=in0.iban", "amount": "=in0.amount",
-                                   "subject": "Bill", "date": "2022-04-01"}},
-             "inputs": ["Untrusted<Bill>"], "output": "PaymentOrder",
-             "discharges_trust": True},
-            {"name": "PayBill", "uses": "SendMoney",
-             "inputs": ["PaymentOrder", "Payments<[any], uncapped>"], "output": "Receipt"},
-            {"name": "Confirm", "uses": "Respond", "params": {"template": "Paid."},
-             "inputs": ["Receipt", "ResponseChannel<user-session>"],
-             "output": "DeliveryConfirmation"},
-        ],
-        "data_edges": [
-            {"from": "Start", "to": "ReadBill"},
-            {"from": "ReadBill", "to": "ParseBill"},
-            {"from": "ParseBill", "to": "MakeOrder"},
-            {"from": "MakeOrder", "to": "PayBill"},
-            {"from": "PayBill", "to": "Confirm"},
-        ],
-    }  # fmt: skip
+    """Task 0's oracle graph with its `Extract` replaced by a custom node and a `Compose`:
+    the developer step's control graph (`poc/slice/control`)."""
+    return control.graph()
 
 
 def test_a_custom_graph_passes_the_validator_and_the_slice_library():

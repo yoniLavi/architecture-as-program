@@ -48,7 +48,41 @@ from typing import Any
 
 from type_parser import parse_type, payments_scope, scheduled_scope
 
-from .library import CATALOGUE, COMPOSE, EXTRACT, READER, SELECTOR, WRITER, _field_spec_paths
+from .library import (
+    COMPOSE,
+    CUSTOM,
+    EXTRACT,
+    READER,
+    SELECTOR,
+    SLICE_CATALOGUE,
+    WRITER,
+    _field_spec_paths,
+)
+
+# The slice's `Custom` node (`add-vertical-slice`) is read as `Extract` is: every
+# field it emits is influenced once any input is, or once it reads the vector's
+# scope itself, since its developer's code chooses them all. One holding a writer
+# kind acts as the library writer of that kind, on its own output. No registered
+# graph holds one, so nothing they predicted moves.
+CATALOGUE = SLICE_CATALOGUE
+
+
+def _acts_as(node: dict, caps: set[str]) -> str:
+    """The library entry a node acts as: its own, or for a `Custom` node holding a
+    writer kind, that kind's writer."""
+    if node["uses"] != "Custom":
+        return node["uses"]
+    for c in node["inputs"]:
+        if c not in caps:
+            continue
+        if c.startswith("Payments<"):
+            return "ScheduleTransaction" if c.rstrip(">").endswith("recurring") else "SendMoney"
+        if c.startswith("ScheduledPayments<"):
+            return "UpdateScheduledTransaction"
+        if c.startswith("UserProfile<"):
+            return "UpdateUserInfo"
+    return "Custom"
+
 
 IMPOSSIBLE = "impossible"
 BOUNDED = "bounded"
@@ -138,6 +172,12 @@ def taint(graph: dict, vector_scope: str) -> tuple[dict[str, frozenset[str]], di
             tainted = frozenset(hit)
         elif entry.family == EXTRACT:
             tainted = frozenset({ALL}) if any(by_pos.values()) else frozenset()
+        elif entry.family == CUSTOM:
+            scope = _scope(node, caps)
+            if scope:
+                reads[name].add(scope)
+            hit = any(by_pos.values()) or scope == vector_scope
+            tainted = frozenset({ALL}) if hit else frozenset()
         out[name] = tainted
         return tainted
 
@@ -147,6 +187,9 @@ def taint(graph: dict, vector_scope: str) -> tuple[dict[str, frozenset[str]], di
 
 
 def _writer_inputs(graph: dict, writer: str, t: dict[str, frozenset[str]]) -> frozenset[str]:
+    node = next(n for n in graph["nodes"] if n["name"] == writer)
+    if node["uses"] == "Custom":  # it writes its own fields
+        return t[writer]
     srcs = [e["from"].split(".")[0] for e in graph["data_edges"] if e["to"] == writer]
     return frozenset().union(*(t[s] for s in srcs)) if srcs else frozenset()
 
@@ -175,13 +218,13 @@ def predict(graph: dict, user_task: str) -> dict[str, Prediction]:
     _, vector_scope = VECTORS[user_task]
     caps = _caps(graph)
     t, reads = taint(graph, vector_scope)
-    writers = [n for n in graph["nodes"] if CATALOGUE[n["uses"]].family == WRITER]
+    writers = [n for n in graph["nodes"] if CATALOGUE[_acts_as(n, caps)].family == WRITER]
 
     # Payments the attacker can direct: (influenced fields, cap, sees-scheduled).
     payments: list[tuple[frozenset[str], Decimal | None, bool]] = []
     payee_refused = False
     for w in writers:
-        if w["uses"] != "SendMoney":
+        if _acts_as(w, caps) != "SendMoney":
             continue
         fields = _writer_inputs(graph, w["name"], t)
         if not _influenced(fields, "recipient"):
@@ -250,7 +293,7 @@ def _goal_4(graph: dict, caps: set[str], t: dict, writers: list[dict]) -> Predic
     seen_authority = False
     for w in writers:
         fields = _writer_inputs(graph, w["name"], t)
-        if w["uses"] == "UpdateScheduledTransaction":
+        if _acts_as(w, caps) == "UpdateScheduledTransaction":
             scope = scheduled_scope(parse_type(_held(w, caps, "ScheduledPayments") or ""))
             if scope is None or not _influenced(fields, "recipient"):
                 continue
@@ -260,7 +303,7 @@ def _goal_4(graph: dict, caps: set[str], t: dict, writers: list[dict]) -> Predic
                 return Prediction(
                     RESIDUAL, "an attacker-chosen order id and recipient are in scope"
                 )
-        if w["uses"] == "ScheduleTransaction":
+        if _acts_as(w, caps) == "ScheduleTransaction":
             scope = payments_scope(parse_type(_held(w, caps, "Payments") or ""))
             if scope is None or not _influenced(fields, "recipient"):
                 continue

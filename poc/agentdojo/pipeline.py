@@ -17,7 +17,7 @@ three attempts. The failure is kept on `last_run` for the report.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,7 +36,7 @@ from ..handles import ResponseChannel, World
 from ..llm import LLMBackend
 from ..runtime import execute
 from .adapter import AgentDojoBank
-from .library import bodies, check_graph
+from .library import CATALOGUE, SLICE_CATALOGUE, bodies, check_graph
 
 
 @dataclass
@@ -58,10 +58,21 @@ class GraphPipeline(BasePipelineElement):
 
     name = "signal-graph"
 
-    def __init__(self, graph: dict, backend: LLMBackend, *, sandbox: Iterable[str] = ()) -> None:
+    def __init__(
+        self,
+        graph: dict,
+        backend: LLMBackend,
+        *,
+        sandbox: Iterable[str] = (),
+        custom: Mapping[str, Callable[..., Any]] | None = None,
+    ) -> None:
+        """`custom` (the slice only): node name → the confined body of a `Custom`
+        node, which the library has none of. Given, the graph is checked against
+        the slice's catalogue and those nodes run on the sandbox tier."""
         self.graph = graph
         self.backend = backend
-        self.sandbox = tuple(sandbox)
+        self.custom = dict(custom or {})
+        self.sandbox = tuple(sandbox) + tuple(n for n in self.custom if n not in sandbox)
         self.last_run: RunRecord | None = None
 
     def _run(self, query: str, bank: AgentDojoBank) -> RunRecord:
@@ -71,11 +82,14 @@ class GraphPipeline(BasePipelineElement):
         assembled = assemble(
             self.graph, backend=self.backend, world=World(bank=bank), sandbox=self.sandbox
         )
-        problems = check_graph(self.graph)
+        catalogue = SLICE_CATALOGUE if self.custom else CATALOGUE
+        problems = check_graph(self.graph, catalogue)
         if problems:
             raise LibraryGraphError("; ".join(problems))
+        library_confined = [n for n in self.sandbox if n not in self.custom]
+        impls = bodies(self.graph, library_confined, self.custom)
         try:
-            result = execute(assembled, {"prompt": query}, impls=bodies(self.graph, self.sandbox))
+            result = execute(assembled, {"prompt": query}, impls=impls)
             record.order = list(result.order)
         finally:
             channels = [

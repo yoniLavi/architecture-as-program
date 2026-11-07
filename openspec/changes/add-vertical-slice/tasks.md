@@ -54,7 +54,23 @@ nothing a run imports while it runs.
 
 ## 3. Step 5: the developer and escalation
 
-- [ ] 3.1 The developer step, using Paper 3's pipeline for custom nodes, held to the gate
+- [x] 3.1 The developer step, using Paper 3's pipeline for custom nodes, held to the gate.
+      `poc/slice/developer.py`. It is shown Paper 3's way: signature, the architect's role
+      text, input and output shapes, granted interfaces, and the `aap:caps` package with
+      the banking interfaces, without any world. It sees no bank value and no task
+      prompt. Format → build → gate → run, reusing Paper 3's reply parser, ambient scan and
+      crate, with `serde_json` added. The gate is `interfaces.py`, unchanged. The run is
+      the graph on the task's clean environment with the component confined. Two
+      **stubs/departures, recorded**: no contract step (the architect writes none for a
+      `Custom` node), and an unused grant is recorded, not failed (a minimisation finding,
+      not a faulty body). A refusal at a crossing reaches the developer as a class from
+      the measured run's table, never its message. Control: a hand-written `ParseBill`
+      (`poc/slice/control/`) passes clean end to end, utility true. Negative control: the
+      same body plus one `payments` import is caught at the gate (`gate:payments`) and not
+      run. Integration, additive and no registered figure moved: `bodies()` takes supplied
+      bodies; the pipeline and `run_pair` take `custom=`; `confinable()` reads the slice
+      catalogue; `predict.py` reads a `Custom` node as `Extract`, and as the library
+      writer of its kind if it holds one
 - [ ] 3.2 Escalation as a graph edit request, reviewed again by steps 3 and 4. Never text
       that grants anything
 - [ ] 3.3 The pretext condition, if chosen
