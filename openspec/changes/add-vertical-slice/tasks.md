@@ -87,7 +87,16 @@ nothing a run imports while it runs.
 
 ## 4. Steps 6–8
 
-- [ ] 4.1 The crude minimiser and its report
+- [x] 4.1 The crude minimiser and its report. `poc/slice/minimise.py`, from the behaviour
+      view's provenance: payees and cap narrow to the constants every writer sends,
+      `ScheduledPayments`/`UserProfile` fields to those the graph sets, and an unheld
+      grant is dropped. A grant a `Custom` node holds is not narrowed (its code is not
+      read). Never a re-spelling: a grant changes only if it narrows. Utility after
+      narrowing is 5.1's to measure. Found (pinned by test): **over all 305 registered
+      graphs it narrows 0 of 1,134 grants.** The architect's wide grants are wide
+      exactly where the graph computes the value (a model's answer, a bank record),
+      which no constant reaches. This bears out the roadmap note: minimisation removes
+      slack, and there is none; the widenings are judgement, not slack
 - [ ] 4.2 The human-review page, and a committed verdict file per graph
 - [ ] 4.3 **The author's verdicts**, steps 7 and 8
 
