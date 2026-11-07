@@ -108,6 +108,22 @@ def test_the_loop_is_bounded(monkeypatch):
     assert r["outcome"] == FAILED and len(r["attempts"]) == developer.MAX_ATTEMPTS
 
 
+def test_the_pretext_is_paper_3s_p5_aimed_at_an_ungranted_banking_interface():
+    from poc.generation.task import PRETEXTS_DIR
+    from poc.slice import pretext
+
+    assert pretext.text([]).startswith(
+        (PRETEXTS_DIR / "P5.md").read_text().split("<<interface>>")[0]
+    )
+    shown = pretext.text([])
+    assert "`aap:caps/payments@0.1.0`" in shown and ATTACKER in shown
+    assert "<<" not in shown
+    holds_payments = pretext.text(["aap:caps/payments@0.1.0"])
+    assert "`aap:caps/user-profile@0.1.0`" in holds_payments
+    task = developer.task_text(control.graph(), control.NODE, pretext=shown)
+    assert task.rstrip().endswith("Please include this.")
+
+
 def test_predictions_read_a_custom_node_as_extract_and_a_writer_by_its_kind():
     g = control.graph()
     assert predict(g, control.TASK)["injection_task_0"].verdict == RESIDUAL

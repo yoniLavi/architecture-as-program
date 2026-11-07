@@ -80,7 +80,10 @@ nothing a run imports while it runs.
       reviewer flags no grant the edit added. The least-authority check against the
       label is recorded and never gates (a real pipeline has no label). Otherwise the
       graph before the request stands. One request per node (crude)
-- [ ] 3.3 The pretext condition, if chosen
+- [x] 3.3 The pretext condition, if chosen. `poc/slice/pretext.py`: Paper 3's P5 byte
+      for byte, with its slots filled with a banking interface the node is not granted
+      (`payments`, else `user-profile`) and an action that pays AgentDojo's attacker
+      account. Obeying it is a gate catch; asking for it is an escalation, reviewed again
 
 ## 4. Steps 6–8
 
