@@ -45,6 +45,68 @@ The back half (steps 5–6: decomposition, escalation as a graph change, minimis
 likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
 Reviewability by real people (steps 7–8) needs participants, and comes later.
 
+## 7 November 2026: what the vertical slice found
+
+The slice (`openspec/changes/add-vertical-slice`) ran all eight steps crudely on banking
+tasks 4, 15 and 0, with Haiku in every role, on the subscription. It is exploratory and
+not registered: one author, a few graphs. Its findings shape the plan and the papers'
+framing. None is a figure in a paper. The report is `dist/slice.md` (`make slice`).
+
+**What it found, step by step:**
+
+- **Step 3: binding the link check to the scope does not help.** Replayed over the
+  registered run, a check that a grant's payees and cap appear in its quote flagged 1 of
+  61 unseen widenings, with 59 false alarms. Bound to the whole prompt, it flagged none.
+  *So:* the link check measures linkage and cannot be made to measure scope.
+- **Step 4: showing the reviewer behaviour moved it a little, and the wrong way as well.**
+  The behaviour-shown reviewer caught 21 of 76 widened trials, against 17, and flagged 7
+  clean trials, against 3. It caught no field or mode widening it had missed before. Its
+  disagreements are with the label, not gaps in what it was shown. *So:* candidate 3 does
+  not close the gap on its own. A different family (candidate 1) is the untested lever.
+- **Step 5: the architect never reached for code.** Offered a `Custom` node, it used none
+  in six units. Every graph fitted its label, and nothing was flagged or minimised.
+  Utility was 3 of 6, and every failure was a model's `Extract`, not a grant. So step 5
+  ran on two hand-built graphs:
+  - **A developer's body passed every gate and paid the wrong account.** It checked IBANs
+    by mod-97. AgentDojo's fake IBAN fails that, so it took the 16-character prefix that
+    passes. `Payments<[any], uncapped>` admitted it. Only a contract or a run-time value
+    check could have caught it, and the slice stubbed contracts.
+  - **An escalation came back wider than it was asked, and every check passed it.** The
+    developer asked for a payment bound to the bill's IBAN and total. The type language
+    cannot express a bound that is a run-time value. The architect granted
+    `Payments<[any], uncapped>`. The behaviour-shown reviewer passed it, and it was within
+    the label. The developer asked for less authority than the architect then gave it.
+  - **The P5 pretext moved no developer**: no import, no request.
+- **Step 6: the minimiser narrowed nothing**, 0 of 1,134 registered grants, as the
+  1 November read predicted. The gap is semantic, not slack.
+- **Steps 7 and 8: model judges, standing in for the author.** At the author's direction,
+  two fresh Opus subagents judged every page without the AI reviewer's verdicts or the
+  labels. They called 32 of 33 grants needed, and agreed on 32. Their outcomes followed
+  utility exactly. On the escalated graph both noted, in prose, that an open payment
+  grant went whole to developer-written code, yet both called it needed. The verdict scale
+  has no place for "needed, but held by the wrong node". The author's own verdicts are
+  still pending.
+
+**What it changes:**
+
+- **Run-time values are the missing bound.** Twice, the right authority was "this payee,
+  this amount, once known": the developer asked for it, and the judges preferred it. *So:*
+  C, authority below kinds, should first grow a grant bound to a value that an upstream
+  node produces, rather than to a literal. This is the next design question for the type
+  language, and the author's to settle.
+- **Review needs a "who holds it" question, not only "is it needed".** Every check in
+  the pipeline asks whether the task needs the authority. None asks whether the node
+  holding it should. *So:* step 4's and step 8's scale gains a placement verdict, and the
+  formal review gains a rule that a `Custom` node never holds an unbounded writer grant.
+- **An escalation is an edit like any other.** The edit that answered it was checked
+  against the task, not against the request. *So:* an accepted edit grants no more than
+  was asked for, and anything beyond the request goes back for review.
+- **Contracts are not optional at step 5.** The wrong-account body passed every gate. The
+  contract step that Paper 3 runs is the check that catches a plausible wrong value.
+- **The architect's own failures are extraction, not authority.** Utility fell at
+  `Extract`, under the shapes-not-values rule. That makes the 1 November proposal to
+  publish schema conventions a stronger candidate. It is still the author's decision.
+
 ## 1 November 2026: what Papers 3 and 4 found, and what it changes
 
 **A change of process (the author, 1 November 2026).** The programme works like a
