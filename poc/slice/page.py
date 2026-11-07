@@ -76,6 +76,17 @@ def page(record: dict) -> str:
         "One person's judgement on one graph: a verdict on each grant (step 8) and on the "
         "outcome (step 7). Fill `poc/slice/verdicts/" + record["unit"] + ".json`.",
         "",
+        *(
+            [
+                "**A hand-built graph.** The architect, offered the `Custom` entry, used it "
+                "in none of the six units, so this graph was built by hand to put a custom "
+                "node before the developer. The architect appears only if the developer's "
+                "request reached it as an edit.",
+                "",
+            ]
+            if record.get("hand_built")
+            else []
+        ),
         "## The task, as the architect and the reviewer saw it",
         "",
         "> " + record["prompt"].replace("\n", "\n> "),
@@ -100,7 +111,7 @@ def page(record: dict) -> str:
     for cap in graph["capabilities"]:
         m = minimised.get(cap, {})
         narrowed = m.get("narrowed")
-        trim = "nothing" if not m.get("changed") else (
+        trim = "unchanged" if not m.get("changed") else (
             "drop it" if narrowed is None else f"`{narrowed}`")  # fmt: skip
         out += [
             f"### `{cap}`",
@@ -144,7 +155,8 @@ def page(record: dict) -> str:
         "- **Your verdict** on the outcome (accept / reject), and why:",
         "",
     ]
-    return "\n".join(out)
+    # No trailing whitespace: a committed page must survive the whitespace hook unchanged.
+    return "\n".join(line.rstrip() for line in "\n".join(out).splitlines())
 
 
 def verdict_template(record: dict) -> dict:
