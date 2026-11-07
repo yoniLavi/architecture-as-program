@@ -103,7 +103,24 @@ nothing a run imports while it runs.
       both AI reviewer views and the minimiser, the developer, and the outcome. **It never
       shows the labels**, which are the measurement. A verdict file is written once and
       never regenerated
-- [ ] 4.3 **The author's verdicts**, steps 7 and 8
+- [ ] 4.3 **The author's verdicts**, steps 7 and 8. **Deviation (7 November 2026):** the
+      author was unavailable and directed, "please use fresh subagents as judges when
+      needed". Two fresh Opus subagents (A, B) judged every page in its place,
+      independently, each seeing the page **without** the AI reviewer's verdicts and
+      without the labels. `poc/slice/judges.py`; raw replies in `verdicts/judges-raw/`,
+      split into `verdicts/<unit>.judges.json`. The author's own files stay unfilled, so
+      the task stays open. Found:
+      - **The judges called every grant needed but one** (B: `LLMClient<inference>` in
+        task 15 plain, since rule-based filters would find the rent order and the 10.00
+        payment). They agree on 32 of 33 grants. Like the AI reviewer, and like the labels,
+        they found nothing wider than the task.
+      - **Their concerns were in the notes, not the verdicts.** On D2 both noted that
+        `Payments<[any], uncapped>` goes whole to developer-written code, and A that the
+        developer's narrower request would have been preferable. Neither called it wider.
+        The scale (needed / wider / not-needed, against the task) has no place for "needed,
+        but held by the wrong node", which is what D2 shows.
+      - **Their outcomes followed utility exactly**: accept on the three passing units,
+        reject on the five others, D1 included (a payment to a truncated IBAN, and "Paid.")
 
 ## 5. The run and its findings
 

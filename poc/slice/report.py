@@ -52,6 +52,8 @@ def _unit(record: dict) -> dict[str, Any]:
         devs.append(row)
     verdict_path = VERDICTS / f"{record['unit']}.json"
     author = json.loads(verdict_path.read_text()) if verdict_path.exists() else None
+    judges_path = VERDICTS / f"{record['unit']}.judges.json"
+    judges = json.loads(judges_path.read_text())["judges"] if judges_path.exists() else {}
     primary, behaviour_view, _ = _review_of_final(record)
 
     def said(review: dict | None, cap: str) -> str | None:
@@ -66,6 +68,8 @@ def _unit(record: dict) -> dict[str, Any]:
             "primary": said(primary, cap),
             "behaviour": said(behaviour_view, cap),
             "author": own.get("verdict"),
+            "judges": {j: (v["grants"].get(cap) or {}).get("verdict")
+                       for j, v in sorted(judges.items())},
         })  # fmt: skip
     final = (record.get("utility") or {}).get("final") or {}
     return {
@@ -87,6 +91,7 @@ def _unit(record: dict) -> dict[str, Any]:
         "grants": grants,
         "author_outcome": ((author or {}).get("outcome") or {}).get("verdict"),
         "author_filled": bool(author and author.get("date")),
+        "judge_outcomes": {j: v["outcome"]["verdict"] for j, v in sorted(judges.items())},
     }
 
 
@@ -137,8 +142,8 @@ def markdown(data: dict[str, Any]) -> str:
         "## The slice's units (task 5.1)",
         "",
         "| Unit | Custom nodes | Developer | Minimised | Utility | Residual goals | "
-        "Author: outcome |",
-        "|---|---|---|---|---|---|---|",
+        "Judges: outcome | Author: outcome |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for u in data["units"]:
         dev = "; ".join(
@@ -153,22 +158,38 @@ def markdown(data: dict[str, Any]) -> str:
             f"| {name} | {', '.join(u['custom_nodes']) or 'none'} | {dev} | "
             f"{len(u['minimised'])} | {_cell(u['utility'], 'not run')} | "
             f"{len(u['residual_goals'])} | "
+            f"{', '.join(f'{j}: {v}' for j, v in u['judge_outcomes'].items()) or 'pending'} | "
             f"{_cell(u['author_outcome'])} |"
         )
+    names = sorted({j for u in data["units"] for g in u["grants"] for j in g["judges"]})
+    rows = [g for u in data["units"] for g in u["grants"]]
+    agree = sum(len(set(g["judges"].values())) == 1 for g in rows if len(g["judges"]) > 1)
     out += [
         "",
-        "## Grant by grant: the labels, the AI reviewer and the author (steps 4 and 8)",
+        "## Grant by grant: the labels, the AI reviewer, the judges and the author",
         "",
-        "The author's verdicts are one person's judgement, never a study.",
+        "**The judges are not the author.** The author was unavailable and directed "
+        "(7 November 2026) that fresh model subagents judge steps 7 and 8 in their place. "
+        "Each judge saw every review page **without** the AI reviewer's verdicts and "
+        "without the labels, and judged independently of the other. Their verdicts are a "
+        "different model's (Opus; Haiku held every other role), never a person's, and "
+        "the author's column stays empty until the author fills it.",
         "",
-        "| Unit | Grant | Label | Primary | Behaviour | Author |",
-        "|---|---|---|---|---|---|",
     ]
+    if len(names) > 1:
+        out += [f"The judges agree on {agree} of {len(rows)} grants.", ""]
+    out += [
+        "| Unit | Grant | Label | Primary | Behaviour | "
+        + "".join(f"Judge {j} | " for j in names) + "Author |",
+        "|---|---|---|---|---|" + "---|" * len(names) + "---|",
+    ]  # fmt: skip
     for u in data["units"]:
         for g in u["grants"]:
             out.append(
                 f"| {u['unit']} | `{g['grant']}` | {g['label']} | {_cell(g['primary'], '—')} | "
-                f"{_cell(g['behaviour'], '—')} | {_cell(g['author'])} |"
+                f"{_cell(g['behaviour'], '—')} | "
+                + "".join(f"{_cell(g['judges'].get(j), '—')} | " for j in names)
+                + f"{_cell(g['author'])} |"
             )
     return "\n".join(out) + "\n"
 
