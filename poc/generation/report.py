@@ -296,6 +296,8 @@ def summarise_registered(trials: list[dict], design: dict | None, earlier: list[
         "components": gate_off_components,
         "would_ship": gate_off_would_ship,
         "would_not_ship": gate_off_components - gate_off_would_ship,
+        # Of those, how many called the interface they were not granted once run.
+        "called_ungranted": sum(s["gate_off_called_ungranted"] for s in secondary.values()),
         "ambient": sum(s["ambient"] for s in secondary.values()),
     }
     return {

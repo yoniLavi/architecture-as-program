@@ -112,9 +112,40 @@ graph, never through text in an agent's context. This needs no new experiment.
       wording, the per-model spread under P5, the gate-off control partly by construction,
       "reference" bodies (one was generated), counts computed, two citation wordings checked
       against their abstracts. The slice's one addition is the future-work paragraph on a
-      request path and run-time-value bounds (`714522e`). An extensive pre-publish review
-      follows in its own session
-- [ ] 5.2 Cross-check every citation of a Paper 2 section against Paper 2 as it stands.
+      request path and run-time-value bounds (`714522e`). **Round 2 (7 November 2026)**, the
+      extensive pre-publish review, in a fresh session: three fresh subagents (an unanchored
+      critical read, the external citations, the claims about Paper 2), every finding
+      verified against the JSON, the code or the source before it was applied. Fixed:
+      - *overstating*: the claim block and conclusion now scope "did not reach" to conditions
+        with no claimed approval (P3–P6 also ask); the gate-off summary keeps its 2
+        exceptions and "partly by construction" at every summary site; the abstract keeps
+        the per-model spread under P5; "is enough to change" became "can change", in the
+        wordings tested; the confirmatory test's independence assumption stated (§7);
+      - *understating*: every caught component, run with the gate off, called the interface
+        it had not been granted (`registered.gate_off.called_ungranted`, newly serialised);
+        the one live run of the hostile corpus on a real model, where no residual landed;
+        the reference bodies were AI-written too (§7, self-preference);
+      - *wrong descriptions of the data*: "declared-only" includes imports dropped at build;
+        no P1-withheld cell exists; the policy, not the validator, also checks the label at
+        entry; the run took ten hours, not "several days"; a garbled rule-withheld sentence;
+        a hand-typed "none was excluded" now computed;
+      - *citations*: Progent's solver classifies updates rather than applying them; Yang et al.
+        report a Claude model among the few rarely over-privileged, so the zero baseline is
+        not generalised beyond the family; Ernst's volume and article, and Sharma's ICLR
+        venue, added to the bib (the two `PRIOR-ART.md` §19 debts). Every other citation's
+        metadata and every attributed claim was checked against its source and held.
+
+      The hedge pin `service/policy-not-validator` was re-seeded: its claim widened (the
+      label at entry), and its hedge is unchanged.
+- [x] 5.2 Cross-check every citation of a Paper 2 section against Paper 2 as it stands.
+      Paper 3 cites Paper 2 by key, never by section, so every sentence attributing something
+      to "the demonstrator" was checked against Paper 2 as published (`0576a5d`; the text has
+      not changed since). Fixed in round 2: the experiment was named in Paper 2's future work,
+      not its close; the reference bodies were written "in the ordinary directed loop", not
+      "by hand"; components import a clock where the clause grants one; the gate compares
+      interface names, and a grant's scope is invisible to it; the service's shape is what
+      the argument "calls for", since Paper 2 predicted no feed service. No Paper 2 figure is
+      typed in Paper 3.
 
 ## 6. The author's read, then publication
 
@@ -126,7 +157,11 @@ Each step from 6.2 on is outward-facing or follows one, and needs an explicit go
 - [x] 6.3 The author reserves Paper 3's DOI. Stamp it, with the slug's year. Reserved
       7 November 2026: 10.5281/zenodo.24043532, stamped in Paper 2's form (Preprint · DOI ·
       CC BY 4.0), dated November 2026; the slug's year, 2026, stands
-- [ ] 6.4 Pin the `dist/generation.json` and `dist/evaluation-feed.json` keys Paper 3 typesets,
-      as `tests/test_paper2_figures_pinned.py` does for Paper 2
+- [x] 6.4 Pin the `dist/generation.json` and `dist/evaluation-feed.json` keys Paper 3 typesets,
+      as `tests/test_paper2_figures_pinned.py` does for Paper 2. Done:
+      `tests/test_paper3_figures_pinned.py` holds the subtrees Paper 3 reads
+      (`tests/paper3_figures_pin.json`, seeded after round 2), with the generation half
+      running without wasmtime. A third test reads the paper's source and fails if an
+      interpolation reaches a key outside the pin, so the pin set cannot fall behind the prose
 - [ ] 6.5 Upload, on the author's explicit go. Commit `RECORD.json`.
 - [ ] 6.6 `openspec archive add-paper-3 --yes`

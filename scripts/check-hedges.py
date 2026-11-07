@@ -316,7 +316,8 @@ PINS = (
         "sec:service",
         "service/policy-not-validator",
         "not by the graph validator",
-        "is checked by a policy written for this service, not by the graph validator.",
+        "and the label at entry are checked by a policy written for this service, "
+        "not by the graph validator.",
     ),
 )
 

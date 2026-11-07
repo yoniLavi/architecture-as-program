@@ -426,8 +426,10 @@ outside review, and Paper 3 says so.
 **Surveyed and not cited:** TAMAS (impersonation as an attack class: seen only in a search
 snippet), Bhardwaj 2026 (capability safety for agent skills; weak sourcing), Rauba et al. 2026
 ("least privilege" for a model's internal computation — same term, nothing else).
-**Unverified, so left out of the bib:** the ICLR venue of Sharma et al.; the volume and
-article number of Ernst and Baldassarre.
+**Verified 7 November 2026 and added to the bib** (they were left out until then): Sharma
+et al. appeared at ICLR 2024 (proceedings page); Ernst and Baldassarre is EMSE 28(2), article
+55 (Crossref). The same pass read Yang et al. in full: Claude Sonnet 4.6 is among the models
+below 10% over-privileged selection, which Paper 3 now notes beside its zero baseline.
 
 ## Open verification debts
 

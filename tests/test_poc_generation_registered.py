@@ -462,6 +462,7 @@ def test_the_gate_off_totals_are_the_sum_of_the_conditions():
     assert total["components"] == sum(s["gate_off_components"] for s in secondary)
     assert total["would_ship"] == sum(s["gate_off_would_ship"] for s in secondary)
     assert total["would_not_ship"] == total["components"] - total["would_ship"]
+    assert total["called_ungranted"] == sum(s["gate_off_called_ungranted"] for s in secondary)
 
 
 def test_the_withheld_caveat_reads_its_direction_from_the_data():
