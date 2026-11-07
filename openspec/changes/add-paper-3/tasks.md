@@ -107,7 +107,13 @@ graph, never through text in an agent's context. This needs no new experiment.
 
 - [ ] 5.1 A critical review of the whole draft, in the `review-proposal` discipline. Check for
       overstating, understating, pooled trials, causal verbs on descriptive steps, and any
-      Paper 2 figure typed by hand. Fix and commit each round.
+      Paper 2 figure typed by hand. Fix and commit each round. **Round 1 (7 November 2026)**,
+      a fresh reviewer's final pass after the vertical slice (`0aa570f`): first-attempt
+      wording, the per-model spread under P5, the gate-off control partly by construction,
+      "reference" bodies (one was generated), counts computed, two citation wordings checked
+      against their abstracts. The slice's one addition is the future-work paragraph on a
+      request path and run-time-value bounds (`714522e`). An extensive pre-publish review
+      follows in its own session
 - [ ] 5.2 Cross-check every citation of a Paper 2 section against Paper 2 as it stands.
 
 ## 6. The author's read, then publication
@@ -117,7 +123,9 @@ Each step from 6.2 on is outward-facing or follows one, and needs an explicit go
 - [ ] 6.1 The author's end-to-end read
 - [x] 6.2 Paper 2 published, and its `RECORD.json` committed. The stamp check now allows
       stamping Paper 3. Done 29 October 2026: Zenodo 10.5281/zenodo.23057135 (`66fabab`)
-- [ ] 6.3 The author reserves Paper 3's DOI. Stamp it, with the slug's year.
+- [x] 6.3 The author reserves Paper 3's DOI. Stamp it, with the slug's year. Reserved
+      7 November 2026: 10.5281/zenodo.24043532, stamped in Paper 2's form (Preprint · DOI ·
+      CC BY 4.0), dated November 2026; the slug's year, 2026, stands
 - [ ] 6.4 Pin the `dist/generation.json` and `dist/evaluation-feed.json` keys Paper 3 typesets,
       as `tests/test_paper2_figures_pinned.py` does for Paper 2
 - [ ] 6.5 Upload, on the author's explicit go. Commit `RECORD.json`.

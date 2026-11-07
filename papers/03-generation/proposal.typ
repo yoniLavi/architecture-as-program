@@ -2,7 +2,7 @@
 #set document(
   title: "Granted by Claim: Agent-Written Components Against a Derived Import Gate",
   author: ("Yoni Lavi"),
-  date: datetime(year: 2026, month: 10, day: 29),
+  date: datetime(year: 2026, month: 11, day: 7),
 )
 #set page(margin: 2.5cm, numbering: "1")
 #set text(font: "New Computer Modern", size: 11pt)
@@ -78,7 +78,13 @@
 ]
 
 #align(center)[
-  #text(size: 11pt)[October 2026 · draft, unpublished]
+  #text(size: 11pt)[November 2026]
+]
+
+#align(center)[
+  #text(size: 9pt)[
+    Preprint · #link("https://doi.org/10.5281/zenodo.24043532")[doi:10.5281/zenodo.24043532] · CC BY 4.0
+  ]
 ]
 
 // One line on purpose: pandoc's typst reader drops the space at a soft line break here.
