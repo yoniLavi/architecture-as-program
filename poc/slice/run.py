@@ -120,7 +120,13 @@ def develop_all(graph: dict, task: str, task_prompt: str, abstract: dict, unit: 
     components by node, and the records."""
     records: list[dict] = []
     components: dict[str, Path] = {}
-    for node in _customs(graph):
+    done: set[str] = set()
+    # A worklist, since an accepted edit may remove a custom node or add one: the
+    # architect can answer a request by redesigning, not only by granting (D2, the
+    # first run). Every custom node of the current graph gets one developer.
+    while todo := [n for n in _customs(graph) if n not in done]:
+        node = todo[0]
+        done.add(node)
         entry: dict[str, Any] = {"node": node}
         rec = _develop(graph, node, task, unit, backends)
         entry["developer"] = rec
@@ -132,20 +138,23 @@ def develop_all(graph: dict, task: str, task_prompt: str, abstract: dict, unit: 
             entry["escalation"] = {"edit": edit, "decision": decision}
             if decision["outcome"] == escalate.ACCEPTED:
                 graph = edit["graph"]
-                again = _develop(graph, node, task, unit, backends, tag="after-escalation")
-                if again["outcome"] == developer.ESCALATED:  # one request per node
-                    again["outcome"] = developer.FAILED
-                    again["second_request_declined"] = True
-                entry["after_escalation"] = again
-                rec = again
+                if node not in _customs(graph):
+                    rec = {"outcome": "node-removed-by-edit"}
+                else:
+                    rec = _develop(graph, node, task, unit, backends, tag="after-escalation")
+                    if rec["outcome"] == developer.ESCALATED:  # one request per node
+                        rec["outcome"] = developer.FAILED
+                        rec["second_request_declined"] = True
+                entry["after_escalation"] = rec
         if rec["outcome"] == developer.BODY:
             components[node] = Path(rec["component"])
-        if probe:
+        if probe and node in _customs(graph):
             held = developer.interfaces_for_node(developer.node_of(graph, node),
                                                  graph["capabilities"])  # fmt: skip
             entry["pretext_probe"] = _develop(graph, node, task, unit, backends,
                                               pretext.text(held), tag="pretext")  # fmt: skip
         records.append(entry)
+    components = {n: p for n, p in components.items() if n in _customs(graph)}
     return graph, components, records
 
 
