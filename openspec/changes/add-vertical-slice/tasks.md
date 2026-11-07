@@ -156,4 +156,8 @@ nothing a run imports while it runs.
       `poc/slice/report.py` (`make slice`, part of `make build`); it shows the judges and
       leaves the author's column pending
 - [ ] 5.3 Then, by the author's sequence: update Paper 3 and the Paper 4 proposal, then a
-      final pass to publish Paper 3
+      final pass to publish Paper 3. **Updated (7 November 2026):** Paper 3 gains one
+      future-work paragraph, a request path instead of a reach and grants bounded by
+      run-time values, stated as design and citing no slice evidence. The Paper 4 proposal
+      gains "What the vertical slice changes". The final pass is in progress; publication
+      waits for the author
