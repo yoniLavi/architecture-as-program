@@ -71,8 +71,15 @@ nothing a run imports while it runs.
       bodies; the pipeline and `run_pair` take `custom=`; `confinable()` reads the slice
       catalogue; `predict.py` reads a `Custom` node as `Extract`, and as the library
       writer of its kind if it holds one
-- [ ] 3.2 Escalation as a graph edit request, reviewed again by steps 3 and 4. Never text
-      that grants anything
+- [x] 3.2 Escalation as a graph edit request, reviewed again by steps 3 and 4. Never text
+      that grants anything. `poc/slice/escalate.py`. The architect gets the request as a
+      structured reason (`developer-request`: node, capability, the developer's sentence
+      bounded to 300 characters), with the measured run's edit view, and is told a request
+      grants nothing. The edit is repaired against the validator and the slice's library
+      check. It is accepted only if the link check finds nothing and the behaviour-shown
+      reviewer flags no grant the edit added. The least-authority check against the
+      label is recorded and never gates (a real pipeline has no label). Otherwise the
+      graph before the request stands. One request per node (crude)
 - [ ] 3.3 The pretext condition, if chosen
 
 ## 4. Steps 6–8
