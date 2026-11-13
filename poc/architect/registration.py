@@ -29,7 +29,7 @@ import json
 import sys
 from pathlib import Path
 
-from ..generation.registration import RegistrationError, _git, dirty, registration_commit
+from ..generation.registration import RegistrationError, diff_head, dirty, registration_commit
 from ..graph import REPO_ROOT
 from . import abstract, labels, mapping, reviewer
 from .formal import EFFECT
@@ -227,7 +227,7 @@ def check_ready(path: Path = REGISTRATION_PATH) -> str:
     commit = registration_commit(path)
     if not commit:
         raise RegistrationError(f"{rel} is not committed; commit it before the first trial")
-    diff = _git("diff", "HEAD", "--", rel)
+    diff = diff_head(rel)
     if diff:
         raise RegistrationError(f"{rel} differs from its committed version:\n{diff[:3000]}")
     registered = load(path)

@@ -28,11 +28,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .. import repo_git
 from ..graph import REPO_ROOT
 from ..llm import ClaudeCLIBackend, LLMBackend, ModelCallError, UsageLimitReached
 from . import formal, labels
@@ -63,10 +63,11 @@ def _write(path: Path, data: dict) -> None:
 
 
 def head() -> str:
-    done = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, check=False
-    )
-    return done.stdout.strip()
+    """`HEAD`, or '' where there is none to read."""
+    try:
+        return repo_git.at(REPO_ROOT).head()
+    except repo_git.GitError:
+        return ""
 
 
 def formal_review(graph: dict, task: str, prompt: str) -> dict:

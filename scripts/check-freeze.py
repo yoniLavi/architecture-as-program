@@ -79,6 +79,45 @@ def git_show(ref_path: str) -> bytes | None:
     return result.stdout if result.returncode == 0 else None
 
 
+# The guard's other git questions. Each is one function so the test suite, which
+# may not run the git binary, can answer them through pygit2 instead.
+
+
+def has_freeze_commit(root: Path) -> bool:
+    """True if the freeze commit, with Paper 1's source in it, is in this clone."""
+    return (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{FREEZE_REF}:papers/01-vision/proposal.typ"],
+            cwd=root,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+
+
+def freeze_commit_reachable(root: Path) -> bool:
+    """True if the freeze commit is an ancestor of HEAD."""
+    return (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", FREEZE_REF, "HEAD"],
+            cwd=root,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+
+
+def is_shallow(root: Path) -> bool:
+    """True for a shallow clone, or where git cannot say (treated alike: skip)."""
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    return shallow.returncode != 0 or shallow.stdout.strip() == "true"
+
+
 # Frozen papers that have been published, and so are served from their stored
 # artifacts rather than rebuilt.
 PUBLISHED_PAPERS = ["papers/01-vision"]
@@ -138,28 +177,9 @@ def main() -> int:
     # Probe once. A shallow checkout may simply not see the freeze commit, so it
     # skips; a full clone must both hold it and reach it from HEAD, or the guard
     # would be checking against a commit no fresh clone has.
-    probe = subprocess.run(
-        ["git", "cat-file", "-e", f"{FREEZE_REF}:papers/01-vision/proposal.typ"],
-        cwd=root,
-        capture_output=True,
-    )
-    reachable = (
-        probe.returncode == 0
-        and subprocess.run(
-            ["git", "merge-base", "--is-ancestor", FREEZE_REF, "HEAD"],
-            cwd=root,
-            capture_output=True,
-        ).returncode
-        == 0
-    )
+    reachable = has_freeze_commit(root) and freeze_commit_reachable(root)
     if not reachable:
-        shallow = subprocess.run(
-            ["git", "rev-parse", "--is-shallow-repository"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-        )
-        if shallow.returncode != 0 or shallow.stdout.strip() == "true":
+        if is_shallow(root):
             print(
                 f"check-freeze: freeze commit {FREEZE_REF} unavailable "
                 "(shallow checkout?); skipping frozen-paper guard.",

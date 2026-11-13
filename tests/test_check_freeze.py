@@ -12,9 +12,9 @@ import hashlib
 import importlib.util
 import json
 import shutil
-import subprocess
 from pathlib import Path
 
+import pygit2
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -107,14 +107,47 @@ def test_a_marker_listing_nothing_fails(paper):
 # clone had, and the guard skipped itself there without failing.
 
 
-def _is_shallow() -> bool:
-    out = subprocess.run(
-        ["git", "rev-parse", "--is-shallow-repository"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
-    return out.returncode != 0 or out.stdout.strip() == "true"
+# The suite may not run the git binary (tests/conftest.py), so the guard's git
+# questions are answered here through pygit2. The stand-ins read FREEZE_REF when
+# called, so a test that re-points it is honoured.
+
+REPO = pygit2.Repository(str(ROOT))
+
+
+def _object(spec: str):
+    try:
+        return REPO.revparse_single(spec)
+    except (KeyError, ValueError, pygit2.GitError):
+        return None
+
+
+def _git_show(ref_path: str) -> bytes | None:
+    blob = _object(f"{check_freeze.FREEZE_REF}:{ref_path}")
+    return blob.data if isinstance(blob, pygit2.Blob) else None
+
+
+def _has_freeze_commit(_root) -> bool:
+    return _object(f"{check_freeze.FREEZE_REF}:papers/01-vision/proposal.typ") is not None
+
+
+def _freeze_commit_reachable(_root) -> bool:
+    freeze = _object(check_freeze.FREEZE_REF)
+    if freeze is None:
+        return False
+    head = REPO.head.target
+    return freeze.id == head or REPO.descendant_of(head, freeze.id)
+
+
+def _is_shallow(_root=ROOT) -> bool:
+    return REPO.is_shallow
+
+
+@pytest.fixture(autouse=True)
+def _git_through_pygit2(monkeypatch):
+    monkeypatch.setattr(check_freeze, "git_show", _git_show)
+    monkeypatch.setattr(check_freeze, "has_freeze_commit", _has_freeze_commit)
+    monkeypatch.setattr(check_freeze, "freeze_commit_reachable", _freeze_commit_reachable)
+    monkeypatch.setattr(check_freeze, "is_shallow", _is_shallow)
 
 
 def test_the_marker_and_the_guard_name_the_same_commit():
@@ -124,12 +157,13 @@ def test_the_marker_and_the_guard_name_the_same_commit():
 
 @pytest.mark.skipif(_is_shallow(), reason="a shallow checkout cannot see the freeze commit")
 def test_the_freeze_commit_is_reachable_from_head():
-    reachable = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", check_freeze.FREEZE_REF, "HEAD"],
-        cwd=ROOT,
-        capture_output=True,
-    )
-    assert reachable.returncode == 0
+    assert _has_freeze_commit(ROOT)
+    assert _freeze_commit_reachable(ROOT)
+
+
+@pytest.mark.skipif(_is_shallow(), reason="a shallow checkout skips by design")
+def test_the_guard_passes_on_this_clone(capsys):
+    assert check_freeze.main() == 0, capsys.readouterr().err
 
 
 @pytest.mark.skipif(_is_shallow(), reason="a shallow checkout skips by design")

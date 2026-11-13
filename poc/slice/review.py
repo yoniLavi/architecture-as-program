@@ -28,13 +28,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .. import repo_git
 from ..architect import reviewer
 from ..architect.architect import Caller, run_stage, sha256
 from ..architect.registration import COUNTED, cell
+from ..graph import REPO_ROOT
 from ..llm import ClaudeCLIBackend, LLMBackend, UsageLimitReached
 from . import behaviour
 from .replay import trials
@@ -170,8 +171,8 @@ def load() -> list[tuple[dict, dict]]:
 # ── The run ─────────────────────────────────────────────────────────
 
 
-def _git(*args: str) -> str:
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout
+def _repo() -> repo_git.Repo:
+    return repo_git.at(REPO_ROOT)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -191,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         if path.exists():
             continue
         # The run's own records are under poc/, and are not code it imports.
-        if _git("status", "--porcelain", "poc", "scripts", ":(exclude)poc/slice/runs"):
+        if _repo().status(("poc", "scripts"), ("poc/slice/runs",)):
             print("refused: poc/ or scripts/ differs from HEAD; commit first")
             return EXIT_REFUSED
         task_prompt = cell(record["task"], record["condition"])[0]
@@ -208,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
             "condition": record["condition"],
             "counted_widenings": counted(record),
             "review": result,
-            "head": _git("rev-parse", "HEAD").strip(),
+            "head": _repo().head(),
             "priority": priority,
             "usage_windows": dict(backend.windows),
         }

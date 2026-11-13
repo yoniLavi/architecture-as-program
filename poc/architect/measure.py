@@ -34,10 +34,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
+from .. import repo_git
 from ..graph import REPO_ROOT
 from ..llm import ClaudeCLIBackend, LLMBackend, UsageLimitReached
 from . import mapping, verdicts
@@ -123,13 +123,8 @@ def predictions_committed() -> list[str]:
         if graph_for(task) is None:
             continue
         rel = prediction_path(task).relative_to(REPO_ROOT).as_posix()
-        tracked = subprocess.run(
-            ["git", "ls-files", "--error-unmatch", rel], cwd=REPO_ROOT, capture_output=True
-        ).returncode == 0  # fmt: skip
-        diff = subprocess.run(
-            ["git", "diff", "--quiet", "HEAD", "--", rel], cwd=REPO_ROOT
-        ).returncode  # fmt: skip
-        if not tracked or diff:
+        repo = repo_git.at(REPO_ROOT)
+        if not repo.tracked(rel) or repo.diff_head(rel):
             out.append(task)
     return out
 

@@ -17,6 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pygit2
 import pytest
 from type_parser import TApp, parse_type
 
@@ -336,10 +337,7 @@ def test_every_file_a_run_writes_is_under_var(tmp_path):
 
 def test_the_default_var_directory_is_inside_the_repository_and_ignored():
     assert serve.VAR_DIR == REPO_ROOT / "var"
-    ignored = subprocess.run(
-        ["git", "check-ignore", "-q", "var/state/seen.json"], cwd=REPO_ROOT, check=False
-    )
-    assert ignored.returncode == 0
+    assert pygit2.Repository(str(REPO_ROOT)).path_is_ignored("var/state/seen.json")
 
 
 def test_a_second_driver_is_refused_while_one_holds_the_lock(tmp_path, capsys):

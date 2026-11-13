@@ -27,10 +27,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
+from .. import repo_git
 from ..agentdojo.predict import document as prediction
 from ..architect import formal, labels, reviewer
 from ..architect.architect import author
@@ -71,13 +71,9 @@ class Backends:
         return out
 
 
-def _git(*args: str) -> str:
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=True,
-                          cwd=REPO_ROOT).stdout  # fmt: skip
-
-
-def dirty() -> str:
-    return _git("status", "--porcelain", "poc", "scripts", "graphs", ":(exclude)poc/slice/runs")
+def dirty() -> list[str]:
+    """Paths under poc/, scripts/ or graphs/ that differ from `HEAD`, this run's records aside."""
+    return repo_git.at(REPO_ROOT).status(("poc", "scripts", "graphs"), ("poc/slice/runs",))
 
 
 def formal_review(graph: dict, task: str, task_prompt: str) -> dict:
@@ -321,7 +317,7 @@ def main(argv: list[str] | None = None) -> int:
         except UsageLimitReached as e:
             print(f"usage ceiling reached, stopping; rerun to resume: {e}")
             return EXIT_USAGE
-        record.update(head=_git("rev-parse", "HEAD").strip(), priority=priority,
+        record.update(head=repo_git.at(REPO_ROOT).head(), priority=priority,
                       usage_windows=backends.windows(), backends=len(backends.made))  # fmt: skip
         path.write_text(json.dumps(record, indent=1, ensure_ascii=False, default=str) + "\n")
         devs = [(d["node"], d["developer"]["outcome"]) for d in record.get("developers", [])]

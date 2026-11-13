@@ -26,10 +26,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 
+from .. import repo_git
 from ..graph import REPO_ROOT
 from ..llm import CLAUDE_MODEL_IDS
 from . import task
@@ -158,30 +158,35 @@ def load(path: Path = REGISTRATION_PATH) -> dict:
 # ── git ──────────────────────────────────────────────────────────────
 
 
-def _git(*args: str) -> str:
-    done = subprocess.run(
-        ["git", *args], cwd=REPO_ROOT, capture_output=True, text=True, check=False
-    )
-    if done.returncode != 0:
-        raise RegistrationError(f"git {' '.join(args)}: {done.stderr.strip()}")
-    return done.stdout
+def _repo() -> repo_git.Repo:
+    return repo_git.at(REPO_ROOT)
+
+
+def _asking(question):
+    try:
+        return question()
+    except repo_git.GitError as e:
+        raise RegistrationError(str(e)) from e
 
 
 def head() -> str:
-    return _git("rev-parse", "HEAD").strip()
+    return _asking(lambda: _repo().head())
 
 
 def registration_commit(path: Path = REGISTRATION_PATH) -> str:
     """The commit that last changed the registration, or '' if it was never committed."""
     rel = path.relative_to(REPO_ROOT).as_posix()
-    return _git("log", "-1", "--format=%H", "--", rel).strip()
+    return _asking(lambda: _repo().last_commit(rel))
+
+
+def diff_head(rel: str) -> str:
+    """How `rel` differs from `HEAD`, as a patch; '' if it does not."""
+    return _asking(lambda: _repo().diff_head(rel))
 
 
 def dirty(paths: tuple[str, ...] = GUARDED, excepted: tuple[str, ...] = EXCEPTED) -> list[str]:
     """Files under `paths` that differ from `HEAD`, tracked or not, `excepted` aside."""
-    spec = [*paths, *(f":(exclude){e}" for e in excepted)]
-    out = _git("status", "--porcelain", "--untracked-files=all", "--", *spec)
-    return [line[3:] for line in out.splitlines() if line.strip()]
+    return _asking(lambda: _repo().status(paths, excepted))
 
 
 def check_tree() -> None:
@@ -203,7 +208,7 @@ def check_ready(path: Path = REGISTRATION_PATH) -> str:
     commit = registration_commit(path)
     if not commit:
         raise RegistrationError(f"{rel} is not committed; commit it before the first trial")
-    diff = _git("diff", "HEAD", "--", rel)
+    diff = diff_head(rel)
     if diff:
         raise RegistrationError(f"{rel} differs from its committed version:\n{diff[:3000]}")
     registered = load(path)

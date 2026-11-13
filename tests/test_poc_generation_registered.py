@@ -8,13 +8,13 @@ throwaway repository under `tmp_path`, so they exercise real git, not a mock.
 from __future__ import annotations
 
 import json
-import subprocess
 
 import pytest
 
 from poc.generation import harness, pipeline, registration, report, task
 from poc.generation.registration import RegistrationError
 from poc.generation.subjects import BY_NODE, SUBJECTS, graph_for
+from tests.gitrepo import commit_all, scratch_repo
 
 
 def _task(node: str, arm: str) -> str:
@@ -109,18 +109,12 @@ def test_the_registration_holds_the_design_the_change_records():
 # ── git refusals, against a throwaway repository ─────────────────────
 
 
-def _git(root, *args):
-    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
-
-
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
     root = tmp_path / "repo"
     path = root / "poc" / "generation" / "registration.json"
     path.parent.mkdir(parents=True)
-    _git(root, "init", "-q")
-    _git(root, "config", "user.email", "t@example.com")
-    _git(root, "config", "user.name", "t")
+    scratch_repo(root)
     monkeypatch.setattr(registration, "REPO_ROOT", root)
     (root / "README").write_text("a repository with history\n")
     _commit(root)
@@ -129,8 +123,7 @@ def repo(tmp_path, monkeypatch):
 
 
 def _commit(root):
-    _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "x")
+    commit_all(root)
 
 
 def test_an_uncommitted_registration_is_refused(repo):

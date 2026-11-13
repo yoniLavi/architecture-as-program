@@ -427,14 +427,14 @@ PAID_LEDGER = PAID_APPROVALS / "spend"
 
 def _committed(path: Path) -> bool:
     """True if `path` is tracked by git and equal to its committed version."""
+    from . import repo_git
+
     rel = path.relative_to(_REPO_ROOT).as_posix()
-    tracked = subprocess.run(
-        ["git", "ls-files", "--error-unmatch", rel], cwd=_REPO_ROOT, capture_output=True
-    )
-    if tracked.returncode != 0:
+    repo = repo_git.at(_REPO_ROOT)
+    try:
+        return repo.tracked(rel) and not repo.diff_head(rel)
+    except repo_git.GitError:
         return False
-    diff = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", rel], cwd=_REPO_ROOT)
-    return diff.returncode == 0
 
 
 @dataclass
