@@ -43,51 +43,54 @@ One spec per commit. For each: restructure, run the comparison script, read the 
 `--color-moved`, run `openspec validate <spec> --type spec --strict`, and list in the commit
 message every sentence that left a requirement without arriving in a scenario.
 
-- [ ] 2.1 `scripts/check-spec-restructure.py` and its test: a dropped normative sentence
+- [x] 2.1 `scripts/check-spec-restructure.py` and its test: a dropped normative sentence
       fails; a moved one passes; a reworded one fails
-- [ ] 2.2 `architect-pipeline`: 2 requirements, and its Purpose
-- [ ] 2.3 `trust-typing`: 4 requirements, and its Purpose
-- [ ] 2.4 `evaluation`: 5 requirements
-- [ ] 2.5 `paper-corpus`: 9 requirements. The two that `add-paper-3` added on 16 November
-      are among them
-- [ ] 2.6 `signal-graph-runtime`: 17 requirements
-- [ ] 2.7 `graph-inspector`: its Purpose
-- [ ] 2.8 `openspec validate --specs --strict`: 7 of 7 pass
+- [x] 2.2 `architect-pipeline`: 2 requirements, and its Purpose
+- [x] 2.3 `trust-typing`: 4 requirements, and its Purpose
+- [x] 2.4 `evaluation`: 5 requirements
+- [x] 2.5 `paper-corpus`: 9 requirements. The two that `add-paper-3` added on 16 November
+      are among them. *One split, the only one in the change*
+- [x] 2.6 `signal-graph-runtime`: 17 requirements
+- [x] 2.7 `graph-inspector`: its Purpose
+- [x] 2.8 `openspec validate --specs --strict`: 7 of 7 pass
 
 ## 3. The archive, and the check
 
-- [ ] 3.1 `2026-07-14-add-signal-graph-runtime` and
+- [x] 3.1 `2026-07-14-add-signal-graph-runtime` and
       `2026-08-01-update-papers-after-corpus-review`: read each unticked task, and annotate it
       with a dated note saying what became of it. Tick it only if the work was in fact done
-      later, with the commit named
-- [ ] 3.2 `make spec-check`: `openspec validate --all --strict` and
+      later, with the commit named. *The first was `[~]` (adjusted, and done as adjusted);
+      the second was closed as not done in its change, and the note names `4916d49`, the
+      archive of the merge that later cut Paper 2's length*
+- [x] 3.2 `make spec-check`: `openspec validate --all --strict` and
       `openspec validate --archived`, failing on either. Listed in `AGENTS.md` under Build
-- [ ] 3.2a A pre-commit hook runs `make spec-check` when the `openspec` binary is on `PATH`
+- [x] 3.2a A pre-commit hook runs `make spec-check` when the `openspec` binary is on `PATH`
       and skips with a message otherwise (author, Q2). Added only once 3.3 is green, so it
       never blocks the commits that make it green
-- [ ] 3.2b A pre-commit hook runs `make ui-check` on changes under `ui/` (author, Q2; it
+- [x] 3.2b A pre-commit hook runs `make ui-check` on changes under `ui/` (author, Q2; it
       takes ~10s), and skips with a message when `npm` is absent, so a clone without Node
       can still commit
-- [ ] 3.3 `make spec-check` green
+- [x] 3.3 `make spec-check` green
 
 ## 4. The open changes
 
-- [ ] 4.1 Re-validate each with `--strict` after phase 1 and again after phase 2:
+- [x] 4.1 Re-validate each with `--strict` after phase 1 and again after phase 2:
       `add-paper-4`, `add-vertical-slice`, `strengthen-generation-evidence`,
       `build-feed-triage-and-generation-experiment`. If 2.0 wants a different shape for a
-      change in flight, report it and leave the change alone
-- [ ] 4.2 `add-vertical-slice`, `strengthen-generation-evidence` and
+      change in flight, report it and leave the change alone. *All valid both times; 2.0
+      asked for no different shape*
+- [x] 4.2 `add-vertical-slice`, `strengthen-generation-evidence` and
       `build-feed-triage-and-generation-experiment` each add a new capability. Add to each
       one's archive task: write the new spec's Purpose in the same commit, and run
-      `make spec-check`
-- [ ] 4.3 Any added requirement in an open change that is over 500 characters is restructured
-      by the same rules, so that it does not fail the standing spec at archive
-- [ ] 4.4 Repoint any reference in an open change's `tasks.md` to `openspec/AGENTS.md` or an
-      `/openspec:*` command
+      `make spec-check`. *None had an archive task, so each gained one*
+- [x] 4.3 Any added requirement in an open change that is over 500 characters is restructured
+      by the same rules, so that it does not fail the standing spec at archive. *None was*
+- [x] 4.4 Repoint any reference in an open change's `tasks.md` to `openspec/AGENTS.md` or an
+      `/openspec:*` command. *None existed*
 
 ## 5. Close
 
-- [ ] 5.1 `AGENTS.md` (the OpenSpec section, Key files, Build) and `METHODOLOGY.md` describe
+- [x] 5.1 `AGENTS.md` (the OpenSpec section, Key files, Build) and `METHODOLOGY.md` describe
       the 2.0 layout and the check
 - [ ] 5.2 Delete or keep the comparison script, as the author decided
 - [ ] 5.3 `make build` and `make spec-check` green. Archive, and write `spec-workflow`'s

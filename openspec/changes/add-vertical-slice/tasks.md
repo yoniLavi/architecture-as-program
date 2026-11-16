@@ -163,3 +163,9 @@ nothing a run imports while it runs.
       read added one labelled anecdote from the slice to Paper 3's limitations, the final
       pass found nothing more to add, and Paper 3 was published
       (https://zenodo.org/records/24043532)
+
+## 6. Archive
+
+- [ ] 6.1 At archive (added 16 November 2026 by `update-openspec-to-2`): write the Purpose of
+      the new `vertical-slice` spec in the archive commit, since the placeholder `openspec
+      archive` writes fails strict validation, and run `make spec-check` before and after

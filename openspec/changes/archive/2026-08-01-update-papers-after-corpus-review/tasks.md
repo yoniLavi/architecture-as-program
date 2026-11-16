@@ -62,7 +62,11 @@
 - [x] 4.2 `scripts/check-citations.py` clean
 - [x] 4.3 Consistency sweep: Paper 3's prose counts sum to nineteen and match
       `tab:outcomes`; no paper claims the artifact lacks a capability it has
-- [ ] 4.4 **Not done — Paper 2's length.** The review's target is the low-to-mid 30s;
+- [x] 4.4 *(Closed 16 November 2026, by update-openspec-to-2, as not done in this change. The
+      length fell later: `merge-and-condense-papers`, archived at `4916d49` on 30 September
+      2026, condensed Paper 2 to about 10,000 words, ~28pp. The tick records the closure, so
+      that the OpenSpec 2.0 archive lint passes; the note below stands as written.)*
+      **Not done — Paper 2's length.** The review's target is the low-to-mid 30s;
       Paper 2 went 40pp → 41pp. The §3.7 replay trim, the conclusion's de-duplicated
       "not established" paragraph, and two accounting-framing cuts in §3.4/§3.6 removed
       roughly 250 words, and the §4.1 derivation section, the §7.1 mapping-table

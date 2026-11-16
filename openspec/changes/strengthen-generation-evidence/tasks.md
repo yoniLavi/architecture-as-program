@@ -120,3 +120,7 @@ Reading and writing a short document; touches no code, so it may run alongside 1
 
 - [ ] 5.1 `docs/ROADMAP.md` and `AGENTS.md` updated per phase
 - [x] 5.2 Spec deltas reconciled with what was built; `openspec validate --strict`
+- [ ] 5.3 At archive (added 16 November 2026 by `update-openspec-to-2`): if this change is
+      the first to create `feed-triage-service` or `node-generation`, write each new spec's
+      Purpose in the archive commit, since the placeholder `openspec archive` writes fails
+      strict validation, and run `make spec-check` before and after

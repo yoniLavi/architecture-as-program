@@ -191,3 +191,7 @@ toy is built around the answer.
 - [x] 10.2 `AGENTS.md` tooling section: state, real HTTP, driver, map, join, CLI backend,
       generation harness; test count
 - [x] 10.3 Spec deltas reconciled with what was built; `openspec validate --strict`
+- [ ] 10.4 At archive (added 16 November 2026 by `update-openspec-to-2`): if this change is
+      the first to create `feed-triage-service` or `node-generation`, write each new spec's
+      Purpose in the archive commit, since the placeholder `openspec archive` writes fails
+      strict validation, and run `make spec-check` before and after

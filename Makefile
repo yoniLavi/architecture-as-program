@@ -329,7 +329,7 @@ ui-e2e:
 
 # Every standing spec and open change strictly valid, and the archive lint clean.
 # Needs the openspec CLI, so it is not a build step: the corpus builds without it.
-# Pre-commit runs it where the CLI is on PATH (scripts/precommit-if-present.sh).
+# Pre-commit runs it where the CLI is on PATH (.pre-commit-config.yaml, spec-check).
 spec-check:
 	openspec validate --all --strict --no-interactive
 	openspec validate --archived --no-interactive

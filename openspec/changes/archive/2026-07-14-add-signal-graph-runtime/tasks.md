@@ -24,7 +24,10 @@
 - [x] 4.3 AI-generate `ParseMessage` from its signature+contract; commit the generation prompt
       (`poc/generated/parse_message.prompt.md`) and resulting code as artifacts
 - [x] 4.4 Topological executor that propagates signals along the active path
-- [~] 4.5 **Adjusted:** rather than recording fixtures from a live run, the default backend is a
+- [x] 4.5 *(Closed 16 November 2026, by update-openspec-to-2: this line was marked `[~]`
+      for "adjusted", which the OpenSpec 2.0 archive lint counts as incomplete. The adjusted
+      task below was done in this change. Recording fixtures from a live run, the task as
+      first written, was not.)* **Adjusted:** rather than recording fixtures from a live run, the default backend is a
       deterministic offline stub. Same benefit (reproducible, network-free CI), less machinery.
       Spec updated to match. The `--live` path exists but has **not been exercised** — no API call
       has been made from this repo yet.
