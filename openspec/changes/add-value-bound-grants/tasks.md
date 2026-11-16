@@ -70,7 +70,7 @@ Every session working on this change first checks the feed recorder (standing ta
 - [x] 5.1 D1 replayed as a limit: the committed wrong-account body's graph, with `SendMoney`
       bound to `ParseBill`'s output. Pinned as **succeeding** (the truncated IBAN is paid).
       Verify: the test asserts the payment is made
-- [ ] 5.2 The injection residual: an oracle graph for banking task 0 with an `Extract` →
+- [x] 5.2 The injection residual: an oracle graph for banking task 0 with an `Extract` →
       bound writer, run on stand-in models against AgentDojo's injections into the bill.
       Pinned as **succeeding** where the extractor returns the attacker's payee. Verify: the
       test asserts it, and the oracle-plans record is written apart from

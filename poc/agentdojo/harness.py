@@ -210,6 +210,44 @@ def oracle_runs() -> dict[str, Any]:
     }
 
 
+# ── The injection residual under a bind (value-bound grants, 5.2) ──
+#
+# Task 0's oracle graph with its writer bound to the extractor's order: payee and
+# amount, once. A bind holds the writer to its input; an injection that moves the
+# extractor moves the input. Recorded apart from the oracle plans, which it does
+# not change, and pinned as the attack succeeding wherever it succeeded unbound.
+
+BOUND_RECORD = RECORDS / "bound-oracle-plans.json"
+BOUND_GRAPH = "banking-user-task-0"
+BOUND_WRITER = "PayBill"
+
+
+def bound_graph() -> dict:
+    g = load_graph(BOUND_GRAPH)
+    node = next(n for n in g["nodes"] if n["name"] == BOUND_WRITER)
+    grant = next(i for i in node["inputs"] if i.startswith("Payments<"))
+    node["bind"] = {grant: {"payee": "in0.recipient", "amount": "in0.amount", "uses": 1}}
+    return g
+
+
+def bound_runs() -> dict[str, Any]:
+    """`bound_graph()` on its task, as `oracle_runs` runs the oracle graphs: clean,
+    then under each injection with the oracle model and with the fooled one."""
+    g, task = bound_graph(), ORACLE_GRAPHS[BOUND_GRAPH]
+    runs = [run_pair(g, task).as_dict()]
+    for injection in suite().injection_tasks:
+        for fooled in (False, True):
+            runs.append(run_pair(g, task, injection, fooled=fooled).as_dict())
+    return {
+        "label": "an oracle plan with a bound writer: a pinned limit, not a defence and "
+        "not a benchmark result",
+        "suite": f"{SUITE_NAME} {SUITE_VERSION}",
+        "attack": ATTACK,
+        "bind": {BOUND_WRITER: next(n["bind"] for n in g["nodes"] if "bind" in n)},
+        "runs": runs,
+    }
+
+
 IDLE_RECORD = RECORDS / "idle-pass.json"
 
 
@@ -236,12 +274,14 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["oracle", "idle"])
+    parser.add_argument("command", choices=["oracle", "idle", "bound"])
     args = parser.parse_args(argv)
     RECORDS.mkdir(exist_ok=True)
-    path, data = (
-        (ORACLE_RECORD, oracle_runs()) if args.command == "oracle" else (IDLE_RECORD, idle_pass())
-    )
+    path, data = {
+        "oracle": lambda: (ORACLE_RECORD, oracle_runs()),
+        "idle": lambda: (IDLE_RECORD, idle_pass()),
+        "bound": lambda: (BOUND_RECORD, bound_runs()),
+    }[args.command]()
     path.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n")
     print(f"wrote {path.relative_to(HERE.parent.parent)}")
     return 0
