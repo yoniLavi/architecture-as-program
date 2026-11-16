@@ -92,6 +92,7 @@ message every sentence that left a requirement without arriving in a scenario.
 
 - [x] 5.1 `AGENTS.md` (the OpenSpec section, Key files, Build) and `METHODOLOGY.md` describe
       the 2.0 layout and the check
-- [ ] 5.2 Delete or keep the comparison script, as the author decided
-- [ ] 5.3 `make build` and `make spec-check` green. Archive, and write `spec-workflow`'s
+- [x] 5.2 Delete or keep the comparison script, as the author decided. *Deleted, with its
+      test; it is in the history at `4cd94e1`*
+- [x] 5.3 `make build` and `make spec-check` green. Archive, and write `spec-workflow`'s
       Purpose in the same commit
