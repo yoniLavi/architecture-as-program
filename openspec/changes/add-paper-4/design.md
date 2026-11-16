@@ -137,7 +137,8 @@ that this is the after-the-fact reanalysis registration exists to discount. Comp
 and declined. A test rerun because p sat near α cannot rescue the original, and one at the
 registered size would have about even power (41–53% at the observed rates). The paper
 states what the run found, the slip and the threshold included, and the programme moves on.
-Do not propose a replication of this run for its own sake.
+A later proposal may revisit a replication if it would bring a new benefit, for example a
+changed pipeline or a reviewer from another family. Replication for its own sake is not one.
 
 ## What the slice changes (7 November 2026)
 
