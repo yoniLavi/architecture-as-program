@@ -39,7 +39,7 @@ from types import SimpleNamespace
 from type_parser import TApp, TList, TName, TString, parse_type
 
 from . import contracts
-from .attenuate import AttenuationError, attenuate
+from .attenuate import AttenuationError, BindError, attenuate, bind_from
 from .graph import (
     TIER_GRAPH,
     TIER_SANDBOX,
@@ -178,23 +178,63 @@ def _resolver(graphs: GraphResolver | Mapping[str, dict] | None) -> GraphResolve
 
 
 def _capability_handles(
-    graph: AssembledGraph, node: Node, collector: TraceCollector
+    graph: AssembledGraph, node: Node, collector: TraceCollector, data: tuple = ()
 ) -> list[object]:
     """The node's capability handles, in the order they appear in its inputs, each
     wrapped so its use records a crossing against the running node.
 
     Resolved through `handle_for`, so a node that declared a distinct capability
     identity at assembly time receives its own instance rather than the
-    shared-by-type default."""
+    shared-by-type default. A grant the node binds is narrowed to `data`, this
+    activation's input values (`_bound`)."""
     return [
-        _wrap(graph.handle_for(node, inp), inp, graph, node, collector)
+        _bound(graph.handle_for(node, inp), inp, graph, node, collector, data)
         for inp in node.inputs
         if inp in graph.handles
     ]
 
 
+def _bound(
+    handle: object,
+    cap_type: str,
+    graph: AssembledGraph,
+    node: Node,
+    collector: TraceCollector,
+    data: tuple,
+) -> object:
+    """`handle`, wrapped to record crossings, and bound for this activation if the
+    node binds `cap_type` (value-bound grants).
+
+    The bind's paths are resolved against `data`, so a fresh facade, with its own
+    use count, is built every time the node runs: one per activation, and under a
+    per-item map one per item. A path that does not resolve, or resolves to a value
+    of the wrong type, fails the run before the node runs; nothing falls back to the
+    grant's static bound. The bound facade sits outermost over whatever routing
+    produced, and inside the recording proxy, under the instance label the handle
+    already carried, as a routing-point facade does (`_attenuated`)."""
+    spec = node.bind.get(cap_type)
+    if spec is None:
+        return _wrap(handle, cap_type, graph, node, collector)
+    if isinstance(handle, RecordingHandle):
+        target = object.__getattribute__(handle, "_target")
+        instance = object.__getattribute__(handle, "_instance")
+    else:
+        target, instance = handle, _instance_name(graph, node, cap_type)
+    try:
+        bound = bind_from(target, cap_type, spec, data)
+    except BindError as e:
+        raise ExecutionError(
+            f"node {node.name!r}: its bind on {cap_type!r} cannot be applied: {e}"
+        ) from e
+    return RecordingHandle(bound, _crossing_interface(cap_type), instance, collector)
+
+
 def _route_handles(
-    parent: AssembledGraph, node: Node, child: dict, collector: TraceCollector
+    parent: AssembledGraph,
+    node: Node,
+    child: dict,
+    collector: TraceCollector,
+    value: object = None,
 ) -> dict[str, object]:
     """Bind the handles the parent provisioned for `node` to the child's capability
     parameters, position by position.
@@ -237,7 +277,37 @@ def _route_handles(
             )
         handle = parent.handle_for(node, provided)
         routed[expected] = _attenuated(handle, provided, expected, parent, node, collector)
+        if provided in node.bind:
+            # A bind on a sub-graph node narrows what the child receives, resolved
+            # against this run's input: under `each`, against one element, so every
+            # item's child run gets its own facade and its own count.
+            data = value if len(parent.data_inputs(node)) > 1 else (value,)
+            routed[expected] = _rebound(
+                routed[expected],
+                expected,
+                node.bind[provided],
+                node,
+                data,  # type: ignore[arg-type]
+            )
     return routed
+
+
+def _rebound(handle: object, cap_type: str, spec: dict, node: Node, data: tuple) -> object:
+    """A routed (already recording) handle, bound by the node's bind for this run.
+    Bound at the child's declared type, which the routed handle already holds."""
+    target = object.__getattribute__(handle, "_target")
+    try:
+        bound = bind_from(target, cap_type, spec, data)
+    except BindError as e:
+        raise ExecutionError(
+            f"node {node.name!r}: its bind on {cap_type!r} cannot be applied: {e}"
+        ) from e
+    return RecordingHandle(
+        bound,
+        object.__getattribute__(handle, "_interface"),
+        object.__getattribute__(handle, "_instance"),
+        object.__getattribute__(handle, "_collector"),
+    )
 
 
 def _attenuated(
@@ -368,7 +438,7 @@ def _run_child(
     # parent's principal rather than provisioning one of its own.
     nested = assemble(
         child,
-        handles=_route_handles(parent, node, child, collector),
+        handles=_route_handles(parent, node, child, collector, value),
         sandbox=child_sandbox,
         principal=parent.principal,
     )
@@ -655,7 +725,8 @@ def execute(
                 )
             entry.tier = result.tiers[node_name] = node.tier
             data = value if is_join else (value,)
-            output = impl(*data, *_capability_handles(graph, node, collector))  # type: ignore[misc]
+            handles = _capability_handles(graph, node, collector, data)  # type: ignore[arg-type]
+            output = impl(*data, *handles)  # type: ignore[misc]
 
         # Postconditions see the value the node actually emitted. A Variant is
         # checked on its payload, so a contract talks about the value that flows

@@ -33,7 +33,7 @@ Every session working on this change first checks the feed recorder (standing ta
       `within`, and a use counter that only successful calls spend. Verify: unit tests in
       `tests/test_poc_attenuation.py` for another payee, an amount over the bound, a second
       call, a refused call that spends nothing, and a bind beneath a routing-point facade
-- [ ] 2.2 Binding at node activation in `poc/runtime.py`: resolve the paths per activation,
+- [x] 2.2 Binding at node activation in `poc/runtime.py`: resolve the paths per activation,
       one facade per item under `each`, and fail the run on a path that does not resolve or
       has the wrong type. Verify: runtime tests for each case, including that no payment is
       made on a failed resolution

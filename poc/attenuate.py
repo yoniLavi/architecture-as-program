@@ -362,6 +362,33 @@ class BoundRecurringPaymentsFacade(_BoundFacade):
         )
 
 
+def resolve_path(inputs: tuple, path: str) -> object:
+    """The value `path` (`inN.field...`) names in a node's data inputs. Raises
+    `BindError` where it does not resolve: a bind never falls back to the static
+    bound."""
+    from graph_validator import BIND_PATH
+
+    m = BIND_PATH.fullmatch(path) if isinstance(path, str) else None
+    if m is None:
+        raise BindError(f"{path!r} is not a path of the form inN.field")
+    index = int(m.group(1))
+    if index >= len(inputs):
+        raise BindError(f"{path!r} names input {index}, but the node has {len(inputs)}")
+    value = inputs[index]
+    for part in filter(None, m.group(2).split(".")):
+        if not isinstance(value, Mapping) or part not in value:
+            raise BindError(f"{path!r} does not resolve: no field {part!r}")
+        value = value[part]
+    return value
+
+
+def bind_from(handle: object, grant: str, spec: Mapping[str, Any], inputs: tuple) -> object:
+    """`handle` bound by `spec` (a node's bind on `grant`), its paths resolved
+    against `inputs`, one activation's data values."""
+    values = {f: resolve_path(inputs, spec[f]) for f in ("payee", "amount") if f in spec}
+    return bind(handle, grant, uses=spec.get("uses"), **values)  # type: ignore[arg-type]
+
+
 def bind(handle: object, grant: str, payee: object = None, amount: object = None,
          uses: int = 1) -> _BoundFacade:  # fmt: skip
     """`handle`, held as `grant`, bound to `payee`, `amount` and `uses`."""

@@ -74,6 +74,10 @@ class Node:
     # A per-item map: the node is a sub-graph applied to each element of its
     # `List<_>` input, one isolated child run per element.
     each: bool = False
+    # Value-bound grants: grant type string → its bind (`payee`/`amount` paths into
+    # the node's data inputs, `uses`, optionally `trusted`). Empty for a node
+    # declaring none, which runs exactly as before.
+    bind: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -417,6 +421,7 @@ def assemble(
             ensures=_contract(n, "ensures"),
             tier=TIER_SANDBOX if n["name"] in sandbox_nodes else TIER_HOST,
             each=bool(n.get("each", False)),
+            bind=dict(n.get("bind") or {}),
         )
         for n in graph["nodes"]
     }
