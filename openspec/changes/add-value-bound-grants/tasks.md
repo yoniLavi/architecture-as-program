@@ -14,12 +14,12 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 1. Declaring and checking a bind
 
-- [ ] 1.1 The bindable-kind table (`Payments` → `payee`, `amount`, `uses`) and the
+- [x] 1.1 The bindable-kind table (`Payments` → `payee`, `amount`, `uses`) and the
       validator's structural bind checks in `scripts/graph_validator.py`, stdlib-only: a held
       grant, a bindable kind, data-input paths in range, a positive `uses`. Verify: new
       `tests/test_bind_validation.py` covers each rejection in the spec, and every canonical
       graph and corpus case still validates as pinned (`make evaluation` unchanged)
-- [ ] 1.2 Trust labels for binds, per variant, and enforcement of a claimed `trusted`.
+- [x] 1.2 Trust labels for binds, per variant, and enforcement of a claimed `trusted`.
       Verify: tests for an untrusted payee (accepted, labelled), a false `trusted` claim
       (rejected), and a sum input with one untrusted variant (labelled `untrusted`)
 - [ ] 1.3 The library's field-type check for binds against record schemas (`Extract`

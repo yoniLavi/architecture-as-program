@@ -271,6 +271,7 @@ def _validate_semantic(graph: dict, path: Path, errors: list[str]) -> dict[str, 
     _validate_each_shape(path, node_map, caps, errors)
     _validate_entry(path, node_map, data_params, caps, edges, errors)
     _validate_node_trust_flow(path, node_map, caps, errors)
+    _validate_binds(path, node_map, caps, errors)
     _validate_identities(path, node_map, caps, errors)
     _validate_layout(path, node_map, graph.get("layout", {}), errors)
 
@@ -805,6 +806,149 @@ def _validate_node_trust_flow(
                     f"upward coercion of its own input — trust laundering by "
                     f"relabelling the consumer."
                 )
+
+
+# ── Value-bound grants (`bind`) ─────────────────────────────────────
+#
+# A node may narrow a grant it holds to values read from its own data inputs:
+#
+#     "bind": {"Payments<[any], '2000'>": {"payee": "in0.iban", "amount": "in0.total",
+#                                          "uses": 1}}
+#
+# The grant's type stays its static upper bound; the runtime enforces the bound
+# values at the crossing (`poc/attenuate.py`, `BoundPaymentsFacade`). This layer
+# checks structure only, and computes each bind's trust label. It knows types by
+# name, not by fields, so whether `in0.iban` exists and is a string is the node
+# library's check (`poc/agentdojo/library.py`), where record schemas are known.
+
+# Bindable kind → its bindable fields and the JSON type each must resolve to.
+# `uses` and `trusted` are not fields of the scope: every bind carries `uses`, and
+# may claim `trusted`.
+BINDABLE: dict[str, dict[str, str]] = {"Payments": {"payee": "string", "amount": "number"}}
+
+# `inN.field...`: data input N of the node, then fields. Mirrors `_PATH` in
+# `poc/agentdojo/library.py`, which resolves the same paths at run time.
+BIND_PATH = re.compile(r"in(\d+)((?:\.[A-Za-z_][A-Za-z0-9_]*)*)")
+
+
+def bind_paths(spec: dict) -> dict[str, str]:
+    """The bound fields of one bind and the path each reads, in table order."""
+    return {k: spec[k] for k in ("payee", "amount") if isinstance(spec.get(k), str)}
+
+
+def _bind_index(p: str) -> int:
+    m = BIND_PATH.fullmatch(p)
+    return int(m.group(1)) if m else -1
+
+
+def bind_label(node: dict, caps: list[str], spec: dict) -> str:
+    """`untrusted` if any data input a path of `spec` reads is `Untrusted<_>`,
+    anywhere inside it (a sum variant, a type constructor), else `trusted`. A
+    bind with no paths reads nothing, and is `trusted`. An unparseable input or a
+    path out of range counts as untrusted: the label never errs toward trust.
+
+    "Trusted" is the input's label and no more. Discharge in this artifact is
+    declared, so a bind reading the output of a declared discharger is trusted
+    nominally; every rendering names the bind's source so a reviewer sees it."""
+    data = _data_inputs(node, caps)
+    for p in bind_paths(spec).values():
+        m = BIND_PATH.fullmatch(p)
+        if m is None or int(m.group(1)) >= len(data):
+            return "untrusted"
+        try:
+            ast = parse_type(data[int(m.group(1))])
+        except ParseError:
+            return "untrusted"
+        if deep_trust_level(ast) is Trust.UNTRUSTED:
+            return "untrusted"
+    return "trusted"
+
+
+def bind_labels(node: dict, caps: list[str]) -> dict[str, str]:
+    """Grant → trust label, for every bind a node declares."""
+    binds = node.get("bind")
+    if not isinstance(binds, dict):
+        return {}
+    return {g: bind_label(node, caps, s) for g, s in binds.items() if isinstance(s, dict)}
+
+
+def _validate_binds(
+    path: Path,
+    node_map: dict[str, dict],
+    caps: list[str],
+    errors: list[str],
+) -> None:
+    """A bind names a grant the node holds, of a bindable kind; each path names
+    one of the node's data inputs (never a capability) and is well formed; `uses`
+    is a positive integer; and a claimed `trusted` holds. An untrusted source is
+    allowed, and labelled (`bind_label`)."""
+    for nname, n in node_map.items():
+        if "bind" not in n:
+            continue
+        binds = n["bind"]
+        where = f"{path.name}: node {nname!r}"
+        if not isinstance(binds, dict) or not binds:
+            errors.append(f"{where} `bind` must be a non-empty object of grant → bind")
+            continue
+        data = _data_inputs(n, caps)
+        for grant, spec in binds.items():
+            at = f"{where} bind on {grant!r}"
+            if grant not in n["inputs"] or grant not in caps:
+                errors.append(f"{at}: the node holds no such grant; a bind narrows a held one")
+                continue
+            try:
+                kind = _head(parse_type(grant))
+            except ParseError:
+                kind = None
+            fields = BINDABLE.get(kind or "")
+            if fields is None:
+                errors.append(
+                    f"{at}: {kind!r} is not a bindable kind (bindable: {sorted(BINDABLE)})"
+                )
+                continue
+            if not isinstance(spec, dict):
+                errors.append(f"{at}: must be an object")
+                continue
+            unknown = sorted(set(spec) - set(fields) - {"uses", "trusted"})
+            if unknown:
+                allowed = [*fields, "uses", "trusted"]
+                errors.append(f"{at}: unknown fields {unknown} (allowed: {allowed})")
+            uses = spec.get("uses")
+            if isinstance(uses, bool) or not isinstance(uses, int) or uses < 1:
+                errors.append(f"{at}: `uses` must be a positive integer, not {uses!r}")
+            if "trusted" in spec and not isinstance(spec["trusted"], bool):
+                errors.append(f"{at}: `trusted` must be boolean")
+            paths_ok = True
+            for fname in fields:
+                if fname not in spec:
+                    continue
+                p = spec[fname]
+                m = BIND_PATH.fullmatch(p) if isinstance(p, str) else None
+                if m is None:
+                    errors.append(f"{at}: {fname} path {p!r} is not of the form inN.field")
+                    paths_ok = False
+                    continue
+                index = int(m.group(1))
+                if index >= len(data):
+                    held = index < len(n["inputs"]) and n["inputs"][index] in caps
+                    errors.append(
+                        f"{at}: {fname} path {p!r} names data input {index}, but the node "
+                        f"has {len(data)}"
+                        + ("; a bind reads data, never a capability" if held else "")
+                    )
+                    paths_ok = False
+            if paths_ok and spec.get("trusted") is True:
+                untrusted = [
+                    f"{fname}={spec[fname]} reads {data[_bind_index(spec[fname])]!r}"
+                    for fname in fields
+                    if isinstance(spec.get(fname), str)
+                    and bind_label(n, caps, {fname: spec[fname]}) == "untrusted"
+                ]
+                if untrusted:
+                    errors.append(
+                        f"{at}: claims `trusted`, but {', '.join(untrusted)}, an "
+                        f"`Untrusted<_>` input"
+                    )
 
 
 def _holds_tool_scoped_llm(node: dict, caps: list[str]) -> bool:
