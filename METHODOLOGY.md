@@ -30,7 +30,10 @@ human decisions being made and an instrument carrying them out.
 Work is driven through **OpenSpec** (`openspec/`). Non-trivial changes begin as a
 written proposal — a `proposal.md` (why and what), a `design.md` (the decisions
 and the alternatives weighed), spec deltas, and a `tasks.md` checklist — which is
-validated and approved *before* implementation. This dogfoods the corpus's own
+validated strictly and approved *before* implementation. Since 16 November 2026 the
+repository runs OpenSpec 2.0: its workflow is a set of skills, its project rules are
+in `openspec/config.yaml`, and `make spec-check`, run before every commit where the
+CLI is installed, holds every spec and change to strict validation. This dogfoods the corpus's own
 argument: that the primary artifact is structured *intent*, and the
 implementation is the compiled consequence of it.
 

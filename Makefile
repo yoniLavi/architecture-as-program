@@ -78,7 +78,7 @@ UI_FIGS := $(addprefix $(DIST)/ui/,$(UI_FIGS_USED))
 # dist/papers/02-demonstrator/ (see README).
 ALIASES := $(DIST)/proposal.pdf $(DIST)/proposal.md $(DIST)/proposal.html
 
-.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect slice paper1 paper2 paper3 aliases api ui ui-check ui-e2e
+.PHONY: build clean validate-graphs test wasm check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect slice paper1 paper2 paper3 aliases api ui ui-check ui-e2e spec-check
 
 build: validate-graphs check-freeze check-hedges check-corpus-citations grammar evaluation evaluation-feed generation agentdojo-banking architect slice paper1 paper2 paper3 aliases
 	@echo "Build complete."
@@ -326,6 +326,13 @@ ui-check:
 # End-to-end checks of the paper-facing claims; regenerates ui/screenshots/.
 ui-e2e:
 	cd ui && npm install && npm run e2e
+
+# Every standing spec and open change strictly valid, and the archive lint clean.
+# Needs the openspec CLI, so it is not a build step: the corpus builds without it.
+# Pre-commit runs it where the CLI is on PATH (scripts/precommit-if-present.sh).
+spec-check:
+	openspec validate --all --strict --no-interactive
+	openspec validate --archived --no-interactive
 
 # ── WASM sandbox tier (unchanged) ───────────────────────────────────
 RUST_DIR    := $(ROOT)/poc/sandbox/rust

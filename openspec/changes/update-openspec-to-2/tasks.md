@@ -14,22 +14,28 @@ progress. This change edits nothing under `poc/`, `scripts/` (but for one new sc
 
 ## 1. The instruction files
 
-- [ ] 1.1 Record the starting point in the commit message: `openspec --version`,
+- [x] 1.1 Record the starting point in the commit message: `openspec --version`,
       `openspec doctor`, and the totals of `openspec validate --all --strict` and
       `--archived`
-- [ ] 1.2 `openspec update --force`. Read the whole diff before staging anything
-- [ ] 1.3 Check by hand (design, decision 5): `CLAUDE.md` is still a symlink to `AGENTS.md`;
+- [x] 1.2 `openspec update --force`. Read the whole diff before staging anything
+- [x] 1.3 Check by hand (design, decision 5): `CLAUDE.md` is still a symlink to `AGENTS.md`;
       the managed block is written once; the repository's own text in `AGENTS.md` is
-      byte-identical outside the block
-- [ ] 1.4 `openspec/config.yaml`, so that `openspec doctor` reports the root healthy
-- [ ] 1.5 Carry over what `openspec/AGENTS.md` held and the 2.0 skills do not: strict
+      byte-identical outside the block. *As found: 2.0 writes no managed block at all; it
+      removed the old one and left a blank first line, which was dropped. The symlink
+      survived. Outside the block only the OpenSpec paragraph and the Build list changed
+      (1.5, 3.2)*
+- [x] 1.4 `openspec/config.yaml`, so that `openspec doctor` reports the root healthy. *The
+      update asked for `openspec/project.md` to be migrated into it and then deleted. It
+      was: its still-true content became `context`, and the rest was stale (it said the
+      repo commits only when asked, and named Technical Note A)*
+- [x] 1.5 Carry over what `openspec/AGENTS.md` held and the 2.0 skills do not: strict
       validation before approval, and no implementation before approval. Into `AGENTS.md`,
-      "Spec-driven development"
-- [ ] 1.6 Repoint every reference to `openspec/AGENTS.md` and to the `/openspec:*` commands:
+      "Spec-driven development", and into `config.yaml`'s rules
+- [x] 1.6 Repoint every reference to `openspec/AGENTS.md` and to the `/openspec:*` commands:
       `AGENTS.md`, `METHODOLOGY.md`, `openspec/project.md`, `README.md`, `papers/README.md`.
       Archived changes are history and are left as written. Frozen and published papers are
-      not touched
-- [ ] 1.7 `make build` green. Commit
+      not touched. *Only `AGENTS.md` named them; `METHODOLOGY.md` gained the 2.0 sentence*
+- [x] 1.7 `make build` green. Commit
 
 ## 2. The standing specs
 

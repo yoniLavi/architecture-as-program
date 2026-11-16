@@ -1,22 +1,3 @@
-<!-- OPENSPEC:START -->
-# OpenSpec Instructions
-
-These instructions are for AI assistants working in this project.
-
-Always open `@/openspec/AGENTS.md` when the request:
-- Mentions planning or proposals (words like proposal, spec, change, plan)
-- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
-- Sounds ambiguous and you need the authoritative spec before coding
-
-Use `@/openspec/AGENTS.md` to learn:
-- How to create and apply change proposals
-- Spec format and conventions
-- Project structure and guidelines
-
-Keep this managed block so 'openspec update' can refresh the instructions.
-
-<!-- OPENSPEC:END -->
-
 # Architecture as Program — Notes for all Agents (This AGENTS.md is also symlinked for Claude Code to access as CLAUDE.md)
 
 ## What this repo is
@@ -169,7 +150,14 @@ The toolchain is **not** the Phase 1 language: it implements no noninterference 
 
 ## Spec-driven development (OpenSpec)
 
-Work on this repo is driven through **OpenSpec** (`openspec/`). Read `openspec/AGENTS.md` before planning changes. Non-trivial work gets a change proposal (`openspec/changes/<id>/` with `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas), validated with `openspec validate <id> --strict`, and approved before implementation. This dogfoods the proposal's own thesis: structured intent as the primary artifact.
+Work on this repo is driven through **OpenSpec 2.0** (`openspec/`). Plan through it whenever a request mentions a proposal, spec, change or plan, introduces a capability or a breaking or architectural shift, or is ambiguous enough to need the authoritative spec first. The workflow is the six skills `openspec update` installs (`.agents/skills/openspec-*`, linked into `.claude/skills/`): `openspec-propose`, `openspec-apply-change`, `openspec-archive-change`, `openspec-update-change`, `openspec-sync-specs`, `openspec-explore`. Project context and per-artifact rules for them are in `openspec/config.yaml`. Non-trivial work gets a change proposal (`openspec/changes/<id>/` with `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas). This dogfoods the proposal's own thesis: structured intent as the primary artifact.
+
+Two conventions of this repository that the 2.0 skills do not state, and that hold regardless:
+
+- **Validate strictly before approval.** `openspec validate <id> --strict` passes before a change is put to the author, and again before it is archived.
+- **Nothing is implemented before the author approves.** A proposal says "proposed, not approved" until the author says otherwise, and task 0.1 records the approval and the answers to the design's open questions. The propose skill's planning boundary stops at the artifacts; this rule extends it to the author's decision.
+
+`make spec-check` runs `openspec validate --all --strict` and `openspec validate --archived`, and a pre-commit hook runs it wherever `openspec` is on `PATH`. A requirement's text before its first scenario stays under 500 characters (move cases into scenarios, or split it; never drop a normative sentence), and a capability created by an archive gets its Purpose written in the same commit.
 
 ## Version control
 
@@ -189,7 +177,8 @@ make generation   # Render the generation experiment from committed results → 
 make test         # Run the type-parser, graph-validator, and runtime unit tests (pytest)
 make wasm         # Rebuild the sandbox-tier .wasm artifacts from Rust (needs a Rust toolchain)
 make ui           # Opt-in: run the graph inspector (execution API + Next.js dev server; needs Node)
-make ui-check     # Opt-in: typecheck + production build of the inspector UI
+make ui-check     # Typecheck + production build of the inspector UI (pre-commit runs it on ui/ changes when npm is present)
+make spec-check   # openspec validate --all --strict and --archived (pre-commit runs it when openspec is on PATH; not a build step)
 make ui-e2e       # Opt-in: Playwright e2e of the paper-facing claims; regenerates ui/screenshots/
 make api          # Opt-in: the inspector's execution API alone (http://127.0.0.1:8123)
 make clean        # Remove dist/
