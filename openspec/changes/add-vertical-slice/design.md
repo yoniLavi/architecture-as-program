@@ -78,4 +78,8 @@ change Rent's date").
   quality. A step that needs more than a few hours of building is stubbed, and the stub is
   recorded as such.
 - **Reading a slice as a result.** One author, a few graphs. Its findings shape the plan
-  and the papers' framing, never a figure in a paper.
+  and the papers' framing, never a figure in a paper. **One exception, the author's
+  (16 November 2026, `add-paper-4` question 4):** the two replays over the registered
+  records (the scope-binding link check, and the behaviour-shown reviewer) may appear in
+  Paper 4 as labelled post-hoc analyses, apart from its registered results. They are
+  computed over the registered graphs, not over the slice's own few.

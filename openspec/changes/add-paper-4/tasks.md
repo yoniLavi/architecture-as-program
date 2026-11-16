@@ -10,9 +10,13 @@ Every session working on this change first checks the feed recorder (standing ta
       (proposal approved 1 November 2026. The three open questions are still to be
       answered; the first decides the corpus's order, see `docs/ROADMAP.md`)
 
-- [ ] 0.2 **The author answers the remaining open questions** (`design.md`): title,
+- [x] 0.2 **The author answers the remaining open questions** (`design.md`): title,
       directory, and question 4, whether the slice's two replays over the registered
-      records are reported as labelled post-hoc analyses (added 7 November 2026)
+      records are reported as labelled post-hoc analyses (added 7 November 2026).
+      Answered 16 November 2026: title *Reviewed Before It Runs: Automated Review of an
+      Architect's Authority* (citable PDF `lavi-2026-reviewed-before-it-runs.pdf`);
+      directory `papers/04-architect/`; question 4 is **(b)**, labelled post-hoc analyses
+      from `dist/slice.json`, kept apart from the registered results
 - [x] 0.3 Paper 3 published and its `RECORD.json` committed (`add-paper-3` 6.5); until then
       Paper 4 may be drafted but not stamped. Published 16 November 2026
       (https://zenodo.org/records/24043532)

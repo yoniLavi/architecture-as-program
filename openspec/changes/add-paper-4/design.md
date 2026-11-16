@@ -95,7 +95,9 @@ What it does not say, stated in the introduction:
    it to Paper 3's `RECORD.json`: Paper 4 is not stamped before Paper 3 publishes.
 2. **Title.** Working: *Reviewed Before It Runs: Measuring Whether Automated Review Catches
    an Architect's Widened Authority*. The slug follows the title.
-3. **Directory.** `papers/04-architect/`.
+   **Answered 16 November 2026:** *Reviewed Before It Runs: Automated Review of an
+   Architect's Authority*; the citable PDF is `lavi-2026-reviewed-before-it-runs.pdf`.
+3. **Directory.** `papers/04-architect/`. **Answered 16 November 2026: as proposed.**
 4. **The slice's replays over the registered records** (added 7 November 2026). Two shadow
    analyses ran over this paper's own registered graphs, after the fact:
    - the scope-binding link check flagged 1 of 61 unseen widenings, with 59 false alarms;
@@ -113,6 +115,12 @@ What it does not say, stated in the introduction:
 
    Recommendation: (b), because the objections are predictable and the answer is in hand.
    It is the author's call, because it changes the rule the slice was approved under.
+
+   **Answered 16 November 2026: (b).** The two replays appear in Paper 4 as post-hoc
+   analyses, labelled so wherever they are cited, in a subsection of their own after the
+   registered results, interpolated from `dist/slice.json`, and never pooled with or
+   compared as a test against the registered figures. The slice's rule otherwise stands:
+   no other slice finding becomes a figure.
 
 ## What the slice changes (7 November 2026)
 
