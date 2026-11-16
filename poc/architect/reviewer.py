@@ -30,6 +30,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ..binds import render_bind
 from ..llm import CLAUDE_MODEL_IDS, LLMBackend
 from . import mapping
 from .abstract import SHAPE, Reason, parse_json_object
@@ -91,6 +92,11 @@ def canonical(graph: dict, *, keep_because: bool = False) -> dict:
     for n in sorted(graph["nodes"], key=lambda n: rename[n["name"]]):
         node = {k: v for k, v in n.items() if k != "because" or keep_because}
         node["name"] = rename[n["name"]]
+        if "bind" in n:
+            # A bound grant reads as one line, with its trust label (slice runs and
+            # their successors only: no registered graph binds, so this branch never
+            # changes what the registered reviewer was shown).
+            node["bind"] = [render_bind(graph, n, g, rename) for g in n["bind"]]
         nodes.append(node)
     edges = []
     for e in graph["data_edges"]:

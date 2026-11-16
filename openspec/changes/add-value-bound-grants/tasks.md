@@ -45,7 +45,7 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 3. Rendering
 
-- [ ] 3.1 A bound grant renders with its bind and trust label in the reviewers' canonical
+- [x] 3.1 A bound grant renders with its bind and trust label in the reviewers' canonical
       graph (for slice runs), in `poc/slice/behaviour.py`, and on `poc/slice/page.py`. Verify:
       rendering tests, and a check that the registered reviewer's canonicalisation of a graph
       with no bind is byte-identical to before

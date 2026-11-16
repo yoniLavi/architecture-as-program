@@ -45,6 +45,7 @@ from ..agentdojo.library import (
     _field_spec_paths,
     custom_schema,
 )
+from ..binds import render_bind
 
 ALL = "*"  # every field of a value
 
@@ -341,5 +342,10 @@ def render(graph: dict, names: dict[str, str] | None = None) -> str:
                              "It may use this handle in any way the handle admits.")  # fmt: skip
             else:
                 lines.append(f"  {n} ({node['uses']}) holds it.")
+            if cap in (node.get("bind") or {}):
+                lines.append(f"  {n} holds it bound: {render_bind(graph, node, cap, names)}. "
+                             "It can pay only the bound payee, at most the bound amount, "
+                             "that many times; where the bound values come from is said "
+                             "above for each field it reads.")  # fmt: skip
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)

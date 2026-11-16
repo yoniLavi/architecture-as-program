@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ..binds import render_bind
 from .behaviour import render
 
 HERE = Path(__file__).resolve().parent
@@ -31,10 +32,13 @@ def _listing(graph: dict) -> str:
     lines = []
     for n in graph["nodes"]:
         data = [i for i in n["inputs"] if i not in caps]
-        held = [i for i in n["inputs"] if i in caps]
+        bound = n.get("bind") or {}
+        held = [i for i in n["inputs"] if i in caps and i not in bound]
         lines.append(f"{n['name']} [{n['uses']}] : ({', '.join(data)}) -> {n['output']}")
         if held:
             lines.append(f"    with {', '.join(held)}")
+        for grant in bound:
+            lines.append(f"    with {render_bind(graph, n, grant)}")
         for k, v in (n.get("params") or {}).items():
             lines.append(f"    {k}: {json.dumps(v, ensure_ascii=False)}")
     lines.append("")
