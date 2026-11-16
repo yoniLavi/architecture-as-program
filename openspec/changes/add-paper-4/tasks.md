@@ -13,8 +13,9 @@ Every session working on this change first checks the feed recorder (standing ta
 - [ ] 0.2 **The author answers the remaining open questions** (`design.md`): title,
       directory, and question 4, whether the slice's two replays over the registered
       records are reported as labelled post-hoc analyses (added 7 November 2026)
-- [ ] 0.3 Paper 3 published and its `RECORD.json` committed (`add-paper-3` 6.5); until then
-      Paper 4 may be drafted but not stamped
+- [x] 0.3 Paper 3 published and its `RECORD.json` committed (`add-paper-3` 6.5); until then
+      Paper 4 may be drafted but not stamped. Published 16 November 2026
+      (https://zenodo.org/records/24043532)
 
 ## 1. The evidence, made quotable
 

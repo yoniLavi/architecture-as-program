@@ -14,7 +14,7 @@ one bibliography.
 |---|---|---|---|
 | 1. The founding vision | `01-vision/` | **Frozen** (errata-only), published | Served from its published files (`published/`), never rebuilt |
 | 2. *Confinement by Construction* | `02-demonstrator/` | Living | The shared root artifact |
-| 3. *Granted by Claim* (working title) | `03-generation/` | Living; DOI **10.5281/zenodo.24043532** reserved and stamped (7 November 2026), record not yet published | `dist/generation.json`, `dist/evaluation-feed.json` |
+| 3. *Granted by Claim* | `03-generation/` | Living; **published** on Zenodo, 16 November 2026, DOI **10.5281/zenodo.24043532** (`RECORD.json`) | `dist/generation.json`, `dist/evaluation-feed.json` |
 
 Paper 2 reports **what the artifact establishes** and owns the
 predictions-and-outcomes accounting of Paper 1 against it. From August to

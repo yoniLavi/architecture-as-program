@@ -14,7 +14,7 @@ SHALL carry each limit of its experiment where that limit bounds a claim. These 
 - one model family;
 - registration inside one repository, not in a registry;
 - the authorised arm's post-hoc origin;
-- the pretext ladder is not a factorial, and two of its steps are bundled;
+- the pretext ladder is not a factorial, and several of its steps carry more than one change;
 - the pretext was placed in the task, not delivered through content;
 - behavioural equality holds on the contract's inputs only;
 - a service-specific policy check is not a validator analysis;
@@ -42,7 +42,7 @@ It SHALL NOT restate the predictions-and-outcomes accounting, which has one owne
 - **WHEN** the paper describes what keeps a model in the feed-triage service from reaching the
   network
 - **THEN** it attributes the placement rule to the service's own policy check, not to the graph
-  validator, and states that the validator accepts the rewirings that check rejects
+  validator
 
 ### Requirement: The generation paper's figures are interpolated from the generated artifacts
 Every figure in the generation paper SHALL be interpolated from the generation artifact or the

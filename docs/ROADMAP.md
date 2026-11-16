@@ -45,6 +45,15 @@ The back half (steps 5–6: decomposition, escalation as a graph change, minimis
 likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
 Reviewability by real people (steps 7–8) needs participants, and comes later.
 
+## 16 November 2026: Paper 3 is published
+
+*Granted by Claim: Do Coding Agents Stay Within the Authority an Architecture Grants?* is
+published on Zenodo ([doi:10.5281/zenodo.24043532](https://doi.org/10.5281/zenodo.24043532),
+`papers/03-generation/RECORD.json`), after the author's read and one final review. The
+review added nothing from Paper 4 or the slice: Paper 4's result is unpublished, and the
+slice is in the paper only as one labelled anecdote. `add-paper-3` is archived. Paper 4
+(`add-paper-4`) may now cite Paper 3 and be stamped; its open questions are the author's.
+
 ## 7 November 2026: what the vertical slice found
 
 The slice (`openspec/changes/add-vertical-slice`) ran all eight steps crudely on banking

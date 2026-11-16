@@ -105,7 +105,7 @@ improve with more distance. It does not rewrite the paper's assumptions. One can
 already noted: state the implication for escalation. Authority must change through the
 graph, never through text in an agent's context. This needs no new experiment.
 
-- [ ] 5.1 A critical review of the whole draft, in the `review-proposal` discipline. Check for
+- [x] 5.1 A critical review of the whole draft, in the `review-proposal` discipline. Check for
       overstating, understating, pooled trials, causal verbs on descriptive steps, and any
       Paper 2 figure typed by hand. Fix and commit each round. **Round 1 (7 November 2026)**,
       a fresh reviewer's final pass after the vertical slice (`0aa570f`): first-attempt
@@ -151,7 +151,10 @@ graph, never through text in an agent's context. This needs no new experiment.
 
 Each step from 6.2 on is outward-facing or follows one, and needs an explicit go.
 
-- [ ] 6.1 The author's end-to-end read
+- [x] 6.1 The author's end-to-end read. Done 13–15 November 2026 (`a4a897f`, `d6011ab`),
+      then one final review in a fresh session on 16 November (`6d432ef`): one sentence that
+      described the demonstrator as compiling every node to a component, three small
+      wordings, and nothing added from the other changes
 - [x] 6.2 Paper 2 published, and its `RECORD.json` committed. The stamp check now allows
       stamping Paper 3. Done 29 October 2026: Zenodo 10.5281/zenodo.23057135 (`66fabab`)
 - [x] 6.3 The author reserves Paper 3's DOI. Stamp it, with the slug's year. Reserved
@@ -163,5 +166,8 @@ Each step from 6.2 on is outward-facing or follows one, and needs an explicit go
       (`tests/paper3_figures_pin.json`, seeded after round 2), with the generation half
       running without wasmtime. A third test reads the paper's source and fails if an
       interpolation reaches a key outside the pin, so the pin set cannot fall behind the prose
-- [ ] 6.5 Upload, on the author's explicit go. Commit `RECORD.json`.
-- [ ] 6.6 `openspec archive add-paper-3 --yes`
+- [x] 6.5 Upload, on the author's explicit go. Commit `RECORD.json`. Published by the author
+      on 16 November 2026: https://zenodo.org/records/24043532, the PDF byte-identical to the
+      build at `6d432ef`; the record's metadata checked after upload (description, date and
+      language corrected by the author)
+- [x] 6.6 `openspec archive add-paper-3 --yes`

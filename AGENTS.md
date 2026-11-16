@@ -37,7 +37,7 @@ This is primarily a **writing project**: the papers are the outputs that matter.
 | File | Role |
 |---|---|
 | `papers/02-demonstrator/proposal.typ` | Paper 2, *Confinement by Construction* (Typst) — the living paper: evidence, and the accounting of Paper 1 against it. |
-| `papers/03-generation/proposal.typ` | Paper 3, *Granted by Claim* (Typst), **DOI 10.5281/zenodo.24043532 reserved and stamped** (7 November 2026), record not yet published; in pre-publish review: agent-written components held to the derived import gate. Every figure from `dist/generation.json` / `dist/evaluation-feed.json`; cites Paper 2 for the gate and restates none of it; no accounting of Paper 1. Change `openspec/changes/add-paper-3`. |
+| `papers/03-generation/proposal.typ` | Paper 3, *Granted by Claim* (Typst), **published** on Zenodo on 16 November 2026 (DOI 10.5281/zenodo.24043532, `papers/03-generation/RECORD.json`; the PDF is the build at `6d432ef`): agent-written components held to the derived import gate. Every figure from `dist/generation.json` / `dist/evaluation-feed.json`; cites Paper 2 for the gate and restates none of it; no accounting of Paper 1. Change `add-paper-3`, archived 16 November 2026. A later revision is a new version of the record, and updates `RECORD.json`. |
 | `scripts/check-corpus-citations.py` | Fails the build if a DOI-stamped paper cites a corpus paper with no publication marker (`PUBLISHED.json`, or a living paper's `RECORD.json`). Trusts the marker; corpus papers only. |
 | `docs/ROADMAP.md` | The plan for the next artifact: a feed-triage "useful toy" and the agent-generated-node-body experiment. |
 | `docs/PRIOR-ART.md` | Standing record of the community-of-practice survey: what was taken, what was refused, and open verification debts. |
