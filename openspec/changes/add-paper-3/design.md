@@ -130,7 +130,12 @@ defect the corpus's other guards exist to remove.
 ## Open questions for the author
 
 1. **Title.** Working: *Granted by Claim: Agent-Written Components Against a Derived Import
-   Gate*. The slug follows the title.
+   Gate*. The slug follows the title. **Changed by the author's read, 15 November 2026,** to
+   *Granted by Claim: Do Coding Agents Stay Within the Authority an Architecture Grants?*, so
+   the subtitle states the question for a reader who has not read Paper 2. The slug
+   (`granted-by-claim`) is unchanged. In the same read, §5 (the service) was folded into §2 as
+   `sec:service` (a paragraph, its hedge pins verbatim): the service is the experiment's
+   vehicle, not its result, so it is no longer a contribution.
 2. **Directory.** `papers/03-generation/`, with the label as a rough content hint, as for
    `02-demonstrator/`.
 3. **Year in the slug.** `lavi-2026-…` is provisional; it follows Paper 2's upload.
