@@ -1032,10 +1032,11 @@ def _validate_cross_graph(
                         f"rules"
                     )
                 elif _is_tool_scoped(pa) and not _is_tool_scoped(ea):
-                    # Narrowing is checked, not enforced: the handle is routed
-                    # whole. A tool client routed into an inference-only slot
-                    # would make every child node holding that slot a node that
-                    # holds a tool-scoped LLMClient the sink rule never saw.
+                    # The sink rule reads declared clauses, so it must see every
+                    # node that holds a tool client. The runtime now attenuates a
+                    # routed handle to the child's type (`poc/attenuate.py`), but
+                    # this refusal is static and does not rest on that: a tool
+                    # client routed into an inference-only slot is refused here.
                     mismatches.append(
                         f"position {i}: provided {p!r} is tool-scoped but {e!r} is "
                         f"inference-only; a tool client may not be routed into an "

@@ -10,8 +10,9 @@ actually be injected, that a node cannot exceed the authority its signature decl
 the unsafe wirings the proposal calls "ill-typed" really are rejected before anything runs.
 Assembly runs the validator over the graph *and* every canonical graph it reaches as a sub-graph,
 and the runtime re-checks a parent against a caller-supplied child before running it, so a
-composition the cross-graph checks reject never runs. One limit: capability narrowing is checked
-there, not enforced — a parent's wider handle is routed to a sub-graph unattenuated.
+composition the cross-graph checks reject never runs. Capability narrowing is checked there and
+enforced at the routing point: a parent's wider handle reaches a sub-graph as a facade limited to
+the type the sub-graph declares (`attenuate.py`).
 
 ## Run it
 

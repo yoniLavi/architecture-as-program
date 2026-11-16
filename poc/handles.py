@@ -99,9 +99,17 @@ class ToolLLM:
         system: str,
         prompt: str,
         tools: Mapping[str, Callable[..., str]] | None = None,
+        within: tuple[frozenset[str], ...] = (),
     ) -> str:
+        # `within` is how a routing-point facade (`poc/attenuate.py`) narrows this
+        # handle for a sub-graph: each bound is intersected with the handle's own
+        # scope, so it can only take tools away, and the offer and the refusal
+        # below both read the result.
+        allowed = self.allowed_tools
+        for bound in within:
+            allowed = allowed & bound
         tools = tools or {}
-        offered = tuple(sorted(self.allowed_tools))
+        offered = tuple(sorted(allowed))
         convo = prompt
         for _ in range(self._MAX_ROUNDS):
             resp = self.backend.generate(
@@ -111,10 +119,10 @@ class ToolLLM:
                 return resp.text
             results = []
             for call in resp.tool_calls:
-                if call.name not in self.allowed_tools:
+                if call.name not in allowed:
                     raise CapabilityError(
                         f"node attempted tool {call.name!r} outside its "
-                        f"LLMClient scope {sorted(self.allowed_tools)}"
+                        f"LLMClient scope {sorted(allowed)}"
                     )
                 impl = tools.get(call.name)
                 if impl is None:
@@ -159,6 +167,13 @@ class ReadWriteDBHandle:
 
     def write(self, key: str, value: str) -> None:
         self._data.setdefault(key, []).append(value)
+
+    def append(self, record: str) -> None:
+        """`read-write` covers `append` in the mode lattice, so the handle has the
+        operation. A log has no key; its records are the list under the store's
+        own name, so `read(scope)` returns them. This is what an `append` view of
+        this handle, routed to a sub-graph, writes through."""
+        self.write(self.scope, record)
 
 
 @dataclass
@@ -294,7 +309,7 @@ class HTTPClient:
     max_bytes: int = HTTP_MAX_BYTES
     timeout: float = HTTP_TIMEOUT_S
 
-    def _check(self, url: str) -> None:
+    def _check(self, url: str, within: tuple[frozenset[str], ...] = ()) -> None:
         # Refuse what parsers disagree on before reading the host: a backslash is a
         # path separator to a WHATWG client and userinfo to `urlsplit`, so
         # `https://evil.example\@feeds.example.com/` passed here and would reach
@@ -304,27 +319,32 @@ class HTTPClient:
         host = parts.hostname
         if "\\" in url or parts.scheme not in ("http", "https") or parts.username is not None:
             host = None
-        allowed = {h.lower() for h in self.allowlist}
+        # `within` is a routing-point facade's narrowing (`poc/attenuate.py`): each
+        # bound is intersected with the handle's own allowlist, so it can only take
+        # hosts away, and it applies to every hop because every hop comes here.
+        scope = self.allowlist
+        for bound in within:
+            scope = scope & bound
+        allowed = {h.lower() for h in scope}
         if host is None or host not in allowed:
             raise CapabilityError(
-                f"node attempted HTTP to host {host!r} outside its "
-                f"allowlist {sorted(self.allowlist)}"
+                f"node attempted HTTP to host {host!r} outside its allowlist {sorted(scope)}"
             )
 
-    def get(self, url: str) -> str:
-        self._check(url)
+    def get(self, url: str, *, within: tuple[frozenset[str], ...] = ()) -> str:
+        self._check(url, within)
         if not self.live:
             return self._responses.get(url, "")
-        return self._live_get(url)
+        return self._live_get(url, within)
 
-    def fetch(self, url: str) -> FetchResult:
-        self._check(url)
+    def fetch(self, url: str, *, within: tuple[frozenset[str], ...] = ()) -> FetchResult:
+        self._check(url, within)
         if not self.live:
             if url not in self._responses:
                 return FetchResult(ok=False, error="no response")
             return FetchResult(ok=True, body=self._responses[url])
         try:
-            return FetchResult(ok=True, body=self._live_get(url))
+            return FetchResult(ok=True, body=self._live_get(url, within))
         except FetchError as e:
             return FetchResult(ok=False, error=str(e))
         except RedirectRefused as e:
@@ -336,8 +356,9 @@ class HTTPClient:
             # redirect.) `get`, which has no failure value, still raises.
             return FetchResult(ok=False, error=str(e))
 
-    def _live_get(self, url: str) -> str:
-        check = self._check
+    def _live_get(self, url: str, within: tuple[frozenset[str], ...] = ()) -> str:
+        def check(target: str) -> None:
+            self._check(target, within)
 
         class _AllowlistedRedirects(urllib.request.HTTPRedirectHandler):
             """Apply the handle's own check to every redirect target, so an

@@ -109,8 +109,13 @@ class PaymentsHandle:
     scope: PaymentsScope
     _bank: Bank = field(repr=False)
 
-    def send(self, recipient: str, amount: float, subject: str, date: str) -> Any:
-        _check_payment(self.scope, self._bank, recipient, amount)
+    def send(
+        self, recipient: str, amount: float, subject: str, date: str, *, within: tuple = ()
+    ) -> Any:
+        # `within`: scopes a routing-point facade narrows this handle to
+        # (`poc/attenuate.py`). Every one must permit the payment, as this one must.
+        for scope in (self.scope, *within):
+            _check_payment(scope, self._bank, recipient, amount)
         return self._bank.send_money(recipient, amount, subject, date)
 
 
@@ -122,9 +127,17 @@ class RecurringPaymentsHandle:
     _bank: Bank = field(repr=False)
 
     def schedule(
-        self, recipient: str, amount: float, subject: str, date: str, recurring: bool
+        self,
+        recipient: str,
+        amount: float,
+        subject: str,
+        date: str,
+        recurring: bool,
+        *,
+        within: tuple = (),
     ) -> Any:
-        _check_payment(self.scope, self._bank, recipient, amount)
+        for scope in (self.scope, *within):
+            _check_payment(scope, self._bank, recipient, amount)
         return self._bank.schedule_transaction(recipient, amount, subject, date, recurring)
 
 
@@ -138,24 +151,29 @@ class ScheduledPaymentsHandle:
     scope: ScheduledScope
     _bank: Bank = field(repr=False)
 
-    def update(self, id: int, **changes: Any) -> Any:
+    def update(self, id: int, *, within: tuple = (), **changes: Any) -> Any:
         changes = {k: v for k, v in changes.items() if v is not None}
         if not changes:
             raise CapabilityError("an update must change at least one field")
-        outside = sorted(set(changes) - self.scope.fields)
-        if outside:
-            raise CapabilityError(
-                f"fields {outside} are outside the handle's fields {sorted(self.scope.fields)}"
-            )
+        # `within`: scopes a routing-point facade narrows this handle to
+        # (`poc/attenuate.py`); each is checked as the handle's own is.
+        scopes = (self.scope, *within)
+        for scope in scopes:
+            outside = sorted(set(changes) - scope.fields)
+            if outside:
+                raise CapabilityError(
+                    f"fields {outside} are outside the handle's fields {sorted(scope.fields)}"
+                )
         scheduled = self._bank.inspect("scheduled-transactions")
         order = next((t for t in scheduled if t["id"] == id), None)
         if order is None:
             raise BankError(f"no scheduled transaction with id {id}")
-        if order["subject"].lower() not in self.scope.orders:
-            raise CapabilityError(
-                f"scheduled transaction {id} ({order['subject']!r}) is outside the "
-                f"handle's orders {sorted(self.scope.orders)}"
-            )
+        for scope in scopes:
+            if order["subject"].lower() not in scope.orders:
+                raise CapabilityError(
+                    f"scheduled transaction {id} ({order['subject']!r}) is outside the "
+                    f"handle's orders {sorted(scope.orders)}"
+                )
         if "amount" in changes and not isinstance(changes["amount"], int | float):
             raise CapabilityError(f"amount {changes['amount']!r} is not a number")
         if "recipient" in changes and not isinstance(changes["recipient"], str):
@@ -170,15 +188,17 @@ class UserProfileHandle:
     fields: frozenset[str]
     _bank: Bank = field(repr=False)
 
-    def update(self, **changes: Any) -> Any:
+    def update(self, *, within: tuple = (), **changes: Any) -> Any:
         changes = {k: v for k, v in changes.items() if v is not None}
         if not changes:
             raise CapabilityError("an update must change at least one field")
-        outside = sorted(set(changes) - self.fields)
-        if outside:
-            raise CapabilityError(
-                f"fields {outside} are outside the handle's fields {sorted(self.fields)}"
-            )
+        # `within`: field sets a routing-point facade narrows this handle to.
+        for fields in (self.fields, *within):
+            outside = sorted(set(changes) - fields)
+            if outside:
+                raise CapabilityError(
+                    f"fields {outside} are outside the handle's fields {sorted(fields)}"
+                )
         return self._bank.update_user_info(**changes)
 
 

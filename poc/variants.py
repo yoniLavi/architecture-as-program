@@ -155,9 +155,11 @@ def route_tool_into_inference_slot(platform: dict) -> dict:
     inference-only slot.
 
     `LLMClient<[lookup]>` is assignable where `LLMClient<inference>` is expected
-    (narrowing), and the handle is routed whole. The child's `ParseMessage` —
-    declared inference-only, and a discharger consuming `Untrusted<_>` — would then
-    hold a tool client the sink rule, which reads declared clauses, never saw."""
+    (narrowing). When the case was added the handle was routed whole, so the child's
+    `ParseMessage` — declared inference-only, and a discharger consuming
+    `Untrusted<_>` — would have held a tool client the sink rule, which reads
+    declared clauses, never saw. The routing point now attenuates (`attenuate.py`);
+    the static refusal stands on its own, and the case is pinned as it was."""
     g = copy.deepcopy(platform)
     for node in g["nodes"]:
         if node["name"] == "CustomerSupport":

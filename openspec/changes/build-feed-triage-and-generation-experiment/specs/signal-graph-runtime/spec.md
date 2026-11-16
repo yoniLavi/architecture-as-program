@@ -78,12 +78,64 @@ The confined tier SHALL distinguish a component that imports an interface it was
 - **THEN** instantiation fails naming the incomplete binding, not an ungranted capability
 
 ### Requirement: A routed handle is attenuated to the child's declared scope
-When a parent routes a capability to a sub-graph, the runtime SHALL deliver a facade limited to the child's declared type (mode, tool set, allowlist, store name), keeping the caretaker so revocation still reaches it. This requirement is implemented only after Paper 2 publishes, together with Paper 2 version 1.1.
+When a parent routes a capability wider than the child declares, the runtime SHALL deliver a facade limited to the child's declared type (allowlist, tool set, mode, payees, cap, orders, fields), holding the parent's handle as routed so a caretaker still revokes and rotates it. A handle routed at its declared type SHALL pass through unchanged.
 
 #### Scenario: A child declares a narrower allowlist
 - **WHEN** a parent routes `HTTPClient<['a.example', 'b.example']>` to a child declaring `HTTPClient<['a.example']>`
-- **THEN** a request from inside the child to `b.example` is refused at the crossing
+- **THEN** a request from inside the child to `b.example` is refused at the crossing, and so is a redirect to it from an allowlisted host
+
+#### Scenario: A child declares a narrower tool set
+- **WHEN** a parent routes `LLMClient<[lookup, refund]>` to a child declaring `LLMClient<[lookup]>`
+- **THEN** the model inside the child is offered `lookup` alone, on both tiers, and a call to `refund` is refused
+
+#### Scenario: A child declares a narrower mode
+- **WHEN** a parent routes a `read-write` `DBHandle` or `StateHandle` to a child declaring `read`
+- **THEN** the child's handle has no write operation and exposes no route to the store behind the parent's handle
 
 #### Scenario: Revocation still reaches the facade
 - **WHEN** the parent revokes the routed instance
 - **THEN** the child's next crossing through the facade fails
+
+#### Scenario: Narrowing composes
+- **WHEN** a handle is narrowed at two nested boundaries
+- **THEN** the innermost child is bound by the narrowest scope, and its crossings keep the instance label the outermost parent declared
+
+## MODIFIED Requirements
+
+### Requirement: Assembly validates a graph together with every graph it executes
+The runtime SHALL, when assembling a graph, validate it together with every canonical graph it
+reaches through sub-graph nodes, transitively, so that the cross-graph analyses (signature
+matching, capability narrowing, and the boundary-output check) run before execution and not only
+when graphs are validated as a batch at build. Capability narrowing is checked here, and enforced
+when the handle is routed (a routed handle is attenuated to the child's declared scope).
+
+#### Scenario: A composition the cross-graph checks reject does not assemble
+- **WHEN** a parent graph routes a capability into a sub-graph parameter it cannot satisfy (for
+  example, a billing store into the sub-graph's knowledge-base parameter), or declares a sub-graph
+  node's output narrower than the child's terminals
+- **THEN** assembly raises an assembly error naming the cross-graph reason, and nothing executes
+
+#### Scenario: The canonical composition still assembles
+- **WHEN** the canonical `support-platform.json` is assembled
+- **THEN** it assembles and runs as before
+
+#### Scenario: A name collision does not skip the checks
+- **WHEN** a parent is named after its own sub-graph node, or a resolver returns a sub-graph under
+  another name
+- **THEN** the composition is rejected before the sub-graph runs
+
+#### Scenario: Resolver-supplied sub-graphs and name collisions are checked
+- **WHEN** a caller's resolver supplies a sub-graph, or a graph or batch reuses a name
+- **THEN** It SHALL also validate a parent together with a sub-graph a caller's resolver supplied before
+  running it, SHALL refuse a resolved sub-graph whose name differs from its node's, and SHALL reject a graph
+  containing a node of its own name and a batch in which two graphs share a name, since graphs are resolved
+  by name and each collision would skip the cross-graph checks.
+
+#### Scenario: A sub-graph node's precondition is checked
+- **WHEN** a sub-graph node declares a `requires` contract
+- **THEN** A sub-graph node's `requires` contract SHALL be checked as a leaf's is.
+
+#### Scenario: Validating a graph alone is not enough for a composition
+- **WHEN** a graph that contains sub-graph nodes is validated alone
+- **THEN** A graph validated alone leaves the cross-graph layer silent, and a runtime that executes a
+  composition the validator rejects makes "rejected before anything runs" false for composed systems.

@@ -20,7 +20,9 @@ second execution model. What the parent routes to that node is exactly what the
 sub-graph gets: the handles are supplied to the nested assembly, and since
 `execute` holds no backend to provision from, a sub-graph *cannot* mint authority
 of its own. Confinement across the boundary is a property of the plumbing rather
-than a rule someone has to remember.
+than a rule someone has to remember. A handle wider than the sub-graph declares is
+attenuated on the way in (`poc/attenuate.py`), so the child holds the authority
+its own signature names, not the parent's.
 
 The executor records a trace of which nodes ran and what each received, so tests
 and the demo can inspect exactly what reached each node — in particular, what the
@@ -37,6 +39,7 @@ from types import SimpleNamespace
 from type_parser import TApp, TList, TName, TString, parse_type
 
 from . import contracts
+from .attenuate import AttenuationError, attenuate
 from .graph import (
     TIER_GRAPH,
     TIER_SANDBOX,
@@ -206,8 +209,11 @@ def _route_handles(
     string: the two can legitimately differ where the parent supplies a handle with
     more authority than the sub-graph asks for (capability narrowing, which the
     cross-graph validator has already checked at assembly). The wider handle is
-    routed as is, *not* attenuated to the child's declared scope: narrowing is
-    checked, not enforced. The handle itself is resolved
+    **attenuated** to the child's declared type here: the child receives a facade
+    (`poc/attenuate.py`) with the declared type's surface and scope, holding the
+    parent's handle as routed, so a caretaker behind it still revokes and rotates
+    the child's view. Narrowing is checked at validation and enforced at this
+    point. A handle routed at its declared type passes through. The handle itself is resolved
     through `handle_for`, so a parent that declared a distinct identity for this
     node routes *that instance* across the boundary — which is what gives the
     assembly-time identity routing an executable consequence."""
@@ -229,13 +235,44 @@ def _route_handles(
                 f"{expected!r} parameter of {child['name']!r}, but its {provided!r} "
                 f"input is not a capability of the parent graph"
             )
-        # Wrap at the routing point, keyed by the *parent's* input and node, so the
-        # crossing this handle records inside the child carries the parent's declared
-        # instance label (e.g. `customer_session`). The child receives it already
-        # wrapped and passes it through, so the label survives the boundary.
         handle = parent.handle_for(node, provided)
-        routed[expected] = _wrap(handle, provided, parent, node, collector)
+        routed[expected] = _attenuated(handle, provided, expected, parent, node, collector)
     return routed
+
+
+def _attenuated(
+    handle: object,
+    provided: str,
+    expected: str,
+    parent: AssembledGraph,
+    node: Node,
+    collector: TraceCollector,
+) -> object:
+    """The routed handle narrowed to `expected`, wrapped so its use records a crossing.
+
+    Wrapped at the routing point, keyed by the *parent's* input and node, so the
+    crossing this handle records inside the child carries the parent's declared
+    instance label (e.g. `customer_session`). The child receives it already wrapped
+    and passes it through, so the label survives the boundary.
+
+    The facade goes *inside* the recording proxy: the trace records what the child
+    node reaches for, not the facade's own forwarding. A handle routed in from a
+    grandparent arrives already wrapped; it is unwrapped, narrowed, and re-wrapped
+    under the label it carried. A narrowed crossing names the interface the child
+    declared, which is the one it now goes through."""
+    if isinstance(handle, RecordingHandle):
+        target = object.__getattribute__(handle, "_target")
+        instance = object.__getattribute__(handle, "_instance")
+    else:
+        target = handle
+        instance = _instance_name(parent, node, provided)
+    try:
+        narrowed = attenuate(target, provided, expected)
+    except AttenuationError as e:
+        raise ExecutionError(f"sub-graph node {node.name!r}: {e}") from e
+    if narrowed is target:
+        return _wrap(handle, provided, parent, node, collector)
+    return RecordingHandle(narrowed, _crossing_interface(expected), instance, collector)
 
 
 def _boundary_output(name: str, sub: ExecutionResult) -> object:

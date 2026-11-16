@@ -995,9 +995,9 @@ class TestTheSinkRule(unittest.TestCase):
 
 class TestNoToolClientIntoAnInferenceSlot(unittest.TestCase):
     def test_a_tool_client_routed_into_an_inference_slot_is_rejected(self):
-        """Narrowing accepts `LLMClient<[lookup]>` for `LLMClient<inference>`, and
-        the handle is routed whole, so the child node would hold a tool client
-        the sink rule never saw."""
+        """Narrowing accepts `LLMClient<[lookup]>` for `LLMClient<inference>`, but
+        the sink rule reads declared clauses and must see every tool client, so the
+        routing is refused statically (not left to the runtime's attenuation)."""
         child = {
             "name": "Svc",
             "parameters": ["Req", "LLMClient<inference>"],

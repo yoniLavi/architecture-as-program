@@ -703,8 +703,9 @@ def is_assignable(actual: Type, target: Type) -> bool:
         return tmode.name in _STATE_MODE_COVERS.get(amode.name, frozenset())
     if actual.head == "Payments":
         # Set inclusion on payees and cap ≤ cap, as for an HTTP allowlist: a parent
-        # may route a wider handle, never a narrower one. Checked, not enforced: the
-        # child receives the parent's handle whole (Paper 2 §7.6).
+        # may route a wider handle, never a narrower one. Checked here, and enforced
+        # at the routing point, where the child receives a facade bound to its own
+        # scope (`poc/attenuate.py`).
         ascope, tscope = payments_scope(actual), payments_scope(target)
         return ascope is not None and tscope is not None and ascope.covers(tscope)
     if actual.head == "ScheduledPayments":

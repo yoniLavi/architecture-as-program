@@ -282,7 +282,9 @@ for the second model family the roadmap asks for below.
 
 **What is left of this change:**
 - **The author starts the service** (task 8.1) and, two weeks on, an operations summary (8.3).
-- **Attenuation at the routing point** (9.x), held until Paper 2 publishes.
+- **Attenuation at the routing point**: 9.1 (the runtime) landed 16 November 2026
+  (`poc/attenuate.py`); 9.2 (Paper 2 v1.1, dropping the routed-scope qualifier) waits for the
+  author's go.
 - **Decisions made on the author's behalf, to review:** the feed list; five trials a cell; the
   third arm; and two limits the build surfaced that Paper 3 will have to state — the validator
   has no rule about where a graph fetches (the service carries its own check), and the feed

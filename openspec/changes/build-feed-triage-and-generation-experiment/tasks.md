@@ -177,11 +177,25 @@ toy is built around the answer.
 - [ ] 8.3 After two weeks: an operations summary committed (failures by class, any trace
       anomalies)
 
-## 9. Attenuation at the routing point (held until Paper 2 publishes)
+## 9. Attenuation at the routing point (held until Paper 2 publishes; it published 29 October 2026)
 
-- [ ] 9.1 Facade wrapping each routed handle to the child's declared scope; caretaker kept so
+- [x] 9.1 Facade wrapping each routed handle to the child's declared scope; caretaker kept so
       revocation reaches it; tests that a child cannot use the parent's wider allowlist, tool
       set, mode or store
+      — Done 16 November 2026 (approved by the author that day; Paper 2 had published on 29
+      October, which unblocked the section). `poc/attenuate.py`, called from `_route_handles`:
+      one facade per narrowable kind, holding the parent's handle *as routed* (so a caretaker
+      still revokes and rotates it), with only the declared type's operations. Scopes enforced
+      inside an operation (the tool loop's offer, every redirect hop, payee and order checks)
+      pass down as a `within` bound that the base handle intersects with its own, so nesting
+      composes. `ReadWriteDBHandle` gained `append` (the lattice already said read-write covers
+      it; a log's records sit under the store's own name). A narrowed crossing names the
+      child's interface and keeps the parent's instance label. `tests/test_poc_attenuation.py`
+      (24 tests, incl. the redirect hop, a three-level chain, and the shipped platform with a
+      widened tool set on both tiers). No canonical graph narrows at a boundary, so no Paper 2,
+      3 or 4 figure moved. The `route_tool_into_inference_slot` corpus note in
+      `poc/evaluate.py` still says "checked, not enforced"; it is pinned Paper 2 output, left
+      for 9.2.
 - [ ] 9.2 Paper 2 v1.1: the routed-scope qualifier dropped where it no longer holds; task 0.1's
       pin updated deliberately; hedge pins checked
 

@@ -240,6 +240,14 @@ which the repo treats as drift. So the task is last, and it is executed only aft
 publishes, together with the Paper 2 v1.1 prose change. Until then it stays unchecked in
 `tasks.md`.
 
+*Amended 16 November 2026.* Paper 2 published on 29 October, and the author approved 9.1 on
+its own: the code lands first, and the v1.1 prose (9.2) waits for the author's separate go,
+since it edits a published record. Until then Paper 2 understates the artifact on this point,
+knowingly. Two choices made in building it: a scope enforced inside an operation (an LLM's
+tool offer, a redirect hop, a payee read from the bank) is passed to the handle as a `within`
+bound rather than re-implemented in the facade; and a `read-write` `DBHandle` narrowed to
+`append` writes its records under the store's own name as key.
+
 ## Risks
 
 - **The gate never fires on honest generation.** That is likely, and it is still a result. The
