@@ -1,7 +1,11 @@
 # trust-typing Specification
 
 ## Purpose
-TBD - created by archiving change add-trust-label-lattice. Update Purpose after archive.
+How trust is typed in a signal graph: a two-point lattice (`Untrusted ⊑ Trusted`) with no upward
+coercion, raised only at a declared discharger, checked on every edge and node body as part of the
+edge check, and kept away from tool-capable nodes by a sink rule beside the order. It also holds the
+two monotonic-narrowing rules at composition (the principal, and an outbound-host allowlist), and
+says which of them is designed but not built.
 
 ## Requirements
 
@@ -23,11 +27,7 @@ an explicit, declared discharge (below).
 ### Requirement: Trust discharge is a declared, typed transformation
 The type system SHALL permit raising trust only at a node explicitly declared as a discharger, and
 SHALL treat discharge as producing a distinct output type rather than as silently dropping a label. A
-node not declared as a discharger SHALL NOT emit a higher-trust output than its input. A node holding a
-tool-scoped `LLMClient<[...]>` SHALL NOT be declared a discharger, and SHALL NOT consume `Untrusted<_>`
-input: untrusted data reaches a tool-capable node only after an upstream discharger. Because narrowing is
-checked but not enforced, a parent SHALL NOT route a tool-scoped client into a sub-graph's inference-only
-slot, where the node holding it would escape this rule.
+node not declared as a discharger SHALL NOT emit a higher-trust output than its input.
 
 #### Scenario: Only a declared discharger may lower trust
 - **WHEN** a node consumes an `Untrusted<_>` input and emits a non-`Untrusted` output (raising the
@@ -40,18 +40,36 @@ slot, where the node holding it would escape this rule.
 - **WHEN** a node holding a tool-scoped client consumes `Untrusted<_>`, whether or not its outputs stay
   untrusted and whether or not it is declared a discharger
 - **THEN** the graph is rejected
+- **AND** A node holding a tool-scoped `LLMClient<[...]>` SHALL NOT be declared a discharger, and
+  SHALL NOT consume `Untrusted<_>` input: untrusted data reaches a tool-capable node only after an
+  upstream discharger.
+
+#### Scenario: A tool-scoped client is not routed into an inference-only slot
+- **WHEN** a parent routes an `LLMClient` into a sub-graph whose node declares it inference-only
+- **THEN** Because narrowing is checked but not enforced, a parent SHALL NOT route a tool-scoped
+  client into a sub-graph's inference-only slot, where the node holding it would escape this rule.
 
 ### Requirement: Trust laundering is rejected structurally
 The type system SHALL reject trust laundering — reaching a clean requirement from an untrusted source
 without transiting a declared discharger — as a violation of the lattice order, not by a rule checked
 independently of edge typing. Widening a consumer's declared input to the untrusted type SHALL NOT
-launder trust. A node's output SHALL be checked per variant, since each variant leaves on its own port, and a
-role SHALL name exactly one variant (a repeated role would let a second variant leave on a port the
-edge check resolved to the first),
-and an input SHALL count as untrusted when `Untrusted<_>` appears anywhere inside it; a sub-graph's
-boundary output SHALL keep trust in its comparison with the child's terminals. Laundering through an
-undeclared node is a lattice violation; laundering by declaring a tool-capable consumer a discharger is
-caught by the sink rule beside the lattice (see "Trust discharge is a declared, typed transformation").
+launder trust.
+
+#### Scenario: Laundering is checked per variant, inside constructors, and at a boundary
+- **WHEN** an untrusted value could reach a clean requirement through a sum's variant, a type
+  constructor, or a sub-graph's boundary output
+- **THEN** A node's output SHALL be checked per variant, since each variant leaves on its own port,
+  and a role SHALL name exactly one variant (a repeated role would let a second variant leave on a
+  port the edge check resolved to the first), and an input SHALL count as untrusted when
+  `Untrusted<_>` appears anywhere inside it; a sub-graph's boundary output SHALL keep trust in its
+  comparison with the child's terminals.
+
+#### Scenario: Which check catches which laundering
+- **WHEN** trust is laundered either through an undeclared node or by declaring a tool-capable
+  consumer a discharger
+- **THEN** Laundering through an undeclared node is a lattice violation; laundering by declaring a
+  tool-capable consumer a discharger is caught by the sink rule beside the lattice (see "Trust
+  discharge is a declared, typed transformation").
 
 #### Scenario: Widening the consumer's input does not launder trust
 - **WHEN** a graph is "repaired" by widening a tool-capable node's input to `Untrusted<_>` so every
@@ -68,11 +86,19 @@ caught by the sink rule beside the lattice (see "Trust discharge is a declared, 
 A run's principal SHALL never widen wherever the run is routed, including across a sub-graph
 composition boundary. The runtime achieves this structurally: a sub-graph is assembled with its
 parent's principal and has no way to supply another, and only a node declared `binds_principal` may
-extend the chain of parties acting on its behalf. No capability instance is bound to the principal — it
-is recorded and propagated only — and binding one SHALL NOT be described as implemented until it is. *Narrowing* a principal — by intersection over a fixed
-set of dimensions, so the principals a node can act as stay enumerable from the graph — is the recorded
-design and SHALL NOT be described as implemented until it is: today a node cannot attenuate the principal
-it was given, and the validator cannot say statically which principals a node could act as.
+extend the chain of parties acting on its behalf.
+
+#### Scenario: The principal is recorded, not bound to a handle
+- **WHEN** the principal binding is described in a paper, a spec or a test
+- **THEN** No capability instance is bound to the principal — it is recorded and propagated only —
+  and binding one SHALL NOT be described as implemented until it is.
+
+#### Scenario: Narrowing a principal is designed, not built
+- **WHEN** narrowing a principal is described in a paper, a spec or a test
+- **THEN** *Narrowing* a principal — by intersection over a fixed set of dimensions, so the
+  principals a node can act as stay enumerable from the graph — is the recorded design and SHALL
+  NOT be described as implemented until it is: today a node cannot attenuate the principal it was
+  given, and the validator cannot say statically which principals a node could act as.
 
 #### Scenario: Narrowing across a composition boundary cannot widen
 - **WHEN** a parent runs a sub-graph under a principal
@@ -93,9 +119,13 @@ capability-narrowing analysis to a scope that is a set rather than a mode or a n
 ### Requirement: Wiring checks carry trust
 The wiring checker SHALL treat an edge as well-typed only if, in addition to data-type compatibility,
 the source's trust level is at or above the level the target requires, in the lattice ordered by
-trustworthiness (`Untrusted ⊑ Trusted`, the reverse of the flows-to order of integrity labels). Trust
-compatibility SHALL be a property of the edge check itself, not a separate rule applied beside it. Labels
+trustworthiness (`Untrusted ⊑ Trusted`, the reverse of the flows-to order of integrity labels). Labels
 are fixed by declared types, so the check is not flow-sensitive in the information-flow sense.
+
+#### Scenario: Trust is part of the edge check, not beside it
+- **WHEN** an edge is checked
+- **THEN** Trust compatibility SHALL be a property of the edge check itself, not a separate rule
+  applied beside it.
 
 #### Scenario: An edge that raises required trust without discharge is ill-typed
 - **WHEN** an edge connects a source carrying `Untrusted<_>` to a target that requires a clean input,
