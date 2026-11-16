@@ -25,27 +25,38 @@ its document sources; no paper SHALL require another paper's sources to build.
 
 ### Requirement: The founding vision paper is frozen and self-contained
 The corpus SHALL contain the founding vision as a frozen paper that reflects the repository's state before the
-executable demonstrator existed, dated as that document dated itself at the freeze point. A frozen paper SHALL
-be self-contained with respect to its inputs: it SHALL carry its own copies of the figures and figure sources
-it references as of the freeze, and its build SHALL read only those, so that later evolution of the shared
-artifact cannot alter it.
+executable demonstrator existed, dated as that document dated itself at the freeze point.
 
-A frozen paper SHALL be changed only by dated errata, never by silent rewriting, with a single exception: a
-frozen paper MAY undergo **one editorial-and-metadata revision for the purpose of publication** (for example,
-posting it as a preprint). That revision SHALL change no **prediction, hedge, or argument** of the paper —
-none added, removed, strengthened, or weakened — and SHALL be otherwise limited to typographic, grammatical,
-phrasing, formatting, and publication-metadata changes, correction of factually wrong details that would
-otherwise be errata, and removal of incidental material that is out of place for the paper's scope (such as an
-implementation-progress note).
+#### Scenario: A frozen paper builds only from its own inputs
+- **WHEN** a frozen paper is built
+- **THEN** A frozen paper SHALL be self-contained with respect to its inputs: it SHALL carry its own copies of
+  the figures and figure sources it references as of the freeze, and its build SHALL read only those, so that
+  later evolution of the shared artifact cannot alter it.
 
-The single publication revision SHALL be considered concluded only when the paper is actually published.
-Publication-day changes that cannot exist before the publication venue's record exists — the DOI or identifier
-of the record the paper is published under, and its licence statement — together with rendering-legibility
-fixes to pinned figure sources, MAY be applied as the concluding step of that same single revision, even when
-preparation and conclusion land as separate commits (for example because the publication venue changed between
-them). Each step SHALL be recorded in the paper's errata record, the paper SHALL be re-frozen at the final
-published commit, and it SHALL be errata-only thereafter. The paper SHALL NOT represent its revised text as
-byte-identical to the original freeze-point text where they differ.
+#### Scenario: A frozen paper changes only by errata or its one publication revision
+- **WHEN** a frozen paper's text is changed
+- **THEN** A frozen paper SHALL be changed only by dated errata, never by silent rewriting, with a single
+  exception: a frozen paper MAY undergo **one editorial-and-metadata revision for the purpose of publication**
+  (for example, posting it as a preprint).
+- **AND** That revision SHALL change no **prediction, hedge, or argument** of the paper — none added, removed,
+  strengthened, or weakened — and SHALL be otherwise limited to typographic, grammatical, phrasing,
+  formatting, and publication-metadata changes, correction of factually wrong details that would otherwise be
+  errata, and removal of incidental material that is out of place for the paper's scope (such as an
+  implementation-progress note).
+
+#### Scenario: The publication revision is concluded only by publication
+- **WHEN** it is decided whether a frozen paper's single publication revision is concluded
+- **THEN** The single publication revision SHALL be considered concluded only when the paper is actually
+  published.
+- **AND** Publication-day changes that cannot exist before the publication venue's record exists — the DOI or
+  identifier of the record the paper is published under, and its licence statement — together with
+  rendering-legibility fixes to pinned figure sources, MAY be applied as the concluding step of that same
+  single revision, even when preparation and conclusion land as separate commits (for example because the
+  publication venue changed between them).
+- **AND** Each step SHALL be recorded in the paper's errata record, the paper SHALL be re-frozen at the final
+  published commit, and it SHALL be errata-only thereafter.
+- **AND** The paper SHALL NOT represent its revised text as byte-identical to the original freeze-point text
+  where they differ.
 
 #### Scenario: The frozen paper does not drift with the shared artifact
 - **WHEN** the shared artifact changes after the freeze (for example, a canonical graph gains new content)
@@ -97,16 +108,24 @@ change proposals as the evidence trail. The record SHALL NOT claim autonomous re
 ### Requirement: The demonstrator paper is in paper form and reports what the artifact establishes
 The demonstrator paper SHALL be structured as a paper — an abstract, an introduction stating a falsifiable
 central claim scoped to what the artifact substantiates, and design, implementation, evaluation,
-predictions-and-outcomes, related-work, threats-to-validity, and conclusion sections. It SHALL include an
-evaluation section whose figures and verdicts are drawn from the generated evaluation artifact rather than
-hand-transcribed. It SHALL preserve the project's hedging discipline: a claim is stated in present tense only
-where the artifact backs it.
+predictions-and-outcomes, related-work, threats-to-validity, and conclusion sections. It SHALL preserve the
+project's hedging discipline: a claim is stated in present tense only where the artifact backs it.
 
-The demonstrator paper SHALL carry the corpus's predictions-and-outcomes accounting of the frozen vision, in
-condensed form: the protocol under which the vision was frozen at its last pre-build state, every prediction with its
-verdict, and the design corrections the artifact forced. It SHALL position itself against the prior art for
-LLM-agent security, including capability- and provenance-based defences against prompt injection, wherever it
-claims prompt-injection attenuation.
+#### Scenario: The evaluation is drawn from the artifact, not transcribed
+- **WHEN** the demonstrator paper's evaluation figures and verdicts are written
+- **THEN** It SHALL include an evaluation section whose figures and verdicts are drawn from the generated
+  evaluation artifact rather than hand-transcribed.
+
+#### Scenario: The paper carries the condensed accounting
+- **WHEN** the demonstrator paper accounts for the frozen vision
+- **THEN** The demonstrator paper SHALL carry the corpus's predictions-and-outcomes accounting of the frozen
+  vision, in condensed form: the protocol under which the vision was frozen at its last pre-build state, every
+  prediction with its verdict, and the design corrections the artifact forced.
+
+#### Scenario: Prompt-injection attenuation is positioned against the prior art
+- **WHEN** the demonstrator paper claims prompt-injection attenuation
+- **THEN** It SHALL position itself against the prior art for LLM-agent security, including capability- and
+  provenance-based defences against prompt injection, wherever it claims prompt-injection attenuation.
 
 #### Scenario: The demonstrator paper carries an artifact-sourced evaluation
 - **WHEN** the demonstrator paper is built
@@ -133,9 +152,12 @@ section covering the underlying artifact, and SHALL NOT give it a dedicated sect
 contribution. Any statement a paper makes about such an interface SHALL still correspond to a tested
 requirement of the capability that provides it.
 
-A demonstration interface SHALL NOT raise the verdict of any prediction in the predictions-and-outcomes
-accounting. Where an interface partially exercises a predicted capability, the verdict SHALL follow the
-underlying capability, and the interface MAY be noted alongside it.
+#### Scenario: An interface never raises a verdict
+- **WHEN** the accounting records the verdict of a prediction
+- **THEN** A demonstration interface SHALL NOT raise the verdict of any prediction in the
+  predictions-and-outcomes accounting.
+- **AND** Where an interface partially exercises a predicted capability, the verdict SHALL follow the
+  underlying capability, and the interface MAY be noted alongside it.
 
 #### Scenario: An interface gets a mention, not a section
 - **WHEN** a paper reports a demonstration interface
@@ -155,29 +177,31 @@ a capability it has at the point the paper describes; where a capability exists 
 than the corpus once anticipated, the paper SHALL state the *restriction* rather than the
 absence.
 
-A paper that names a commit SHALL say so once, where a reader orients, and SHALL name there
-the capabilities built since that it does not report, so that its statements of absence read
-as dated rather than current. This is how a paper reaches a fixed published state while the
-repository keeps growing; it was adopted on 29 October 2026, when the demonstrator paper,
-then awaiting publication, had been overtaken by work it does not report (node-local state,
-fan-in, a generative contract mode, generated bodies at scale). The alternative, sweeping each
-absence into a restriction, would have moved verdicts in the accounting on evidence the paper
-does not present.
+#### Scenario: A paper reaches a fixed published state while the repository keeps growing
+- **WHEN** a living paper is fixed at a commit, so that it can reach a published state while the
+  repository keeps growing
+- **THEN** A paper that names a commit SHALL say so once, where a reader orients, and SHALL name there
+  the capabilities built since that it does not report, so that its statements of absence read
+  as dated rather than current.
+- **AND** The alternative, sweeping each absence into a restriction, would have moved verdicts in
+  the accounting on evidence the paper does not present.
 
-This closes the gap the corpus's other guards leave open. Interpolation prevents a *number*
-from drifting and pinned verdicts prevent a *mechanism* from silently regressing, but a
-sentence asserting an absence stays green forever after the thing is built. When a change adds
-a capability, correcting every "the demonstrator has no X" claim in every living paper that
-describes the artifact at build time is part of that change, not a later sweep.
+#### Scenario: The sweep is part of the change that lands a capability
+- **WHEN** a change adds a capability
+- **THEN** correcting every "the demonstrator has no X" claim in every living paper that describes the
+  artifact at build time is part of that change, not a later sweep
+- **AND** This closes the gap the corpus's other guards leave open. Interpolation prevents a
+  *number* from drifting and pinned verdicts prevent a *mechanism* from silently regressing, but a
+  sentence asserting an absence stays green forever after the thing is built.
 
-This requirement rests on review and no check enforces it, which is recorded here because it
-has already failed once undetected: the change that built principal binding left three passages
-of the demonstrator paper (§2.3, and §2.5 twice, in its August 2026 numbering) calling the binding *undesigned*, and they were
-found four days later by a tightening pass that had no mandate to look for them. The evaluation
-harness guards only the *overstating* direction — a paper cannot claim what the artifact cannot
-do, because the harness runs the artifact — and there is no artifact against which to decide
-that a sentence understates. The sweep is therefore a step in any change that lands a
-capability, and the absence of a check on it SHALL stay stated rather than assumed.
+#### Scenario: The sweep rests on review
+- **WHEN** the corpus states what enforces this requirement
+- **THEN** This requirement rests on review and no check enforces it.
+- **AND** The evaluation harness guards only the *overstating* direction — a paper cannot claim what the
+  artifact cannot do, because the harness runs the artifact — and there is no artifact against which to
+  decide that a sentence understates.
+- **AND** The sweep is therefore a step in any change that lands a capability, and the absence of a check on
+  it SHALL stay stated rather than assumed.
 
 #### Scenario: A newly built capability is swept through the prose
 
@@ -213,8 +237,10 @@ exactly as the figure is, and a hand-typed magnitude beside an interpolated figu
 as a hand-typed count beside an interpolated one: it stays green while the data moves underneath it.
 Such a magnitude SHALL be interpolated from the evaluation artifact.
 
-A later corpus paper that does not itself source a measurement SHALL cite the published paper that does
-rather than state a magnitude in its own voice.
+#### Scenario: A paper that sources no measurement cites the one that does
+- **WHEN** a later corpus paper refers to a measurement it does not itself source
+- **THEN** A later corpus paper that does not itself source a measurement SHALL cite the published paper
+  that does rather than state a magnitude in its own voice.
 
 #### Scenario: A magnitude in the demonstrator paper is interpolated
 - **WHEN** the demonstrator paper states the magnitude of a measured figure anywhere, including
@@ -255,9 +281,11 @@ work SHALL NOT be paid for out of qualification. Where a rewrite cannot meet a l
 weakening a hedge, the hedge SHALL win and the target SHALL be missed, because length is a target and
 hedging is a claim.
 
-This applies with most force to the demonstrator paper's design section, which describes intent inside
-a paper otherwise written in the present tense, so a claim there reads as substantiated unless its mood
-is deliberately kept conditional.
+#### Scenario: A passage of the demonstrator paper's design section is revised
+- **WHEN** a revision touches the demonstrator paper's design section, which describes intent inside a paper
+  otherwise written in the present tense
+- **THEN** this requirement applies with most force there, because a claim in that section reads as
+  substantiated unless its mood is deliberately kept conditional
 
 #### Scenario: A shortened passage keeps its qualification
 - **WHEN** a passage stating an unproven property is rewritten shorter
@@ -286,15 +314,25 @@ guard over the passages it pins.
 ### Requirement: A published frozen paper is served from its published artifacts
 A frozen paper that has been published SHALL carry a machine-readable publication marker recording its
 identifier, its record, its publication date, the source commit it was published from, the record's own
-checksum of the published file, and a checksum for every artifact the corpus serves for it. The build SHALL
-serve those stored artifacts rather than regenerate them, so that no shared build input — filter,
-citation style, bibliography, or toolchain version — can alter what readers of a published paper receive.
-The published PDF SHALL be the record's file byte-for-byte. The freeze guard SHALL fail the build if a
-stored artifact is missing, differs from its recorded checksum, or is present but unlisted, or if the
-published PDF no longer matches the record's checksum.
+checksum of the published file, and a checksum for every artifact the corpus serves for it. The published
+PDF SHALL be the record's file byte-for-byte.
 
-Derived web renderings of a published paper MAY be regenerated at most by a deliberate, author-approved
-act recorded in the paper's errata record, and SHALL NOT change as a side effect of any other change.
+#### Scenario: The build copies a published paper's artifacts
+- **WHEN** the corpus builds a published paper
+- **THEN** The build SHALL serve those stored artifacts rather than regenerate them, so that no shared build
+  input — filter, citation style, bibliography, or toolchain version — can alter what readers of a published
+  paper receive.
+
+#### Scenario: The freeze guard checks the stored artifacts
+- **WHEN** the freeze guard runs over a published paper
+- **THEN** The freeze guard SHALL fail the build if a stored artifact is missing, differs from its recorded
+  checksum, or is present but unlisted, or if the published PDF no longer matches the record's checksum.
+
+#### Scenario: A derived web rendering is regenerated
+- **WHEN** a derived web rendering of a published paper would change
+- **THEN** Derived web renderings of a published paper MAY be regenerated at most by a deliberate,
+  author-approved act recorded in the paper's errata record, and SHALL NOT change as a side effect of any
+  other change.
 
 #### Scenario: A shared build input changes
 - **WHEN** a filter, citation style, bibliography entry, or toolchain version used by the living papers changes
@@ -351,21 +389,6 @@ the import gate derived from the graph. Its central claim SHALL rest on how ofte
 happened next. It SHALL NOT present the gate's catch rate as an empirical finding, because the
 gate is a set comparison and catches every over-importing component by construction.
 
-The paper SHALL cite the demonstrator paper for the gate, the derivation, the enforcement tiers
-and every measurement that paper sources, and SHALL restate none of them in its own voice. It
-SHALL carry each limit of its experiment where that limit bounds a claim. These include:
-
-- one model family;
-- registration inside one repository, not in a registry;
-- the authorised arm's post-hoc origin;
-- the pretext ladder is not a factorial, and several of its steps carry more than one change;
-- the pretext was placed in the task, not delivered through content;
-- behavioural equality holds on the contract's inputs only;
-- a service-specific policy check is not a validator analysis;
-- replayed history is not operation.
-
-It SHALL NOT restate the predictions-and-outcomes accounting, which has one owner.
-
 #### Scenario: The gate's rejections are reported
 - **WHEN** the paper reports that the gate rejected over-importing components
 - **THEN** it says the rejection follows from the gate's construction
@@ -387,6 +410,28 @@ It SHALL NOT restate the predictions-and-outcomes accounting, which has one owne
   network
 - **THEN** it attributes the placement rule to the service's own policy check, not to the graph
   validator
+
+### Requirement: The generation paper cites the demonstrator, carries its experiment's limits, and restates no accounting
+The paper SHALL cite the demonstrator paper for the gate, the derivation, the enforcement tiers
+and every measurement that paper sources, and SHALL restate none of them in its own voice.
+It SHALL NOT restate the predictions-and-outcomes accounting, which has one owner.
+
+#### Scenario: A limit of the experiment bounds a claim
+- **WHEN** the generation paper makes a claim that a limit of its experiment bounds
+- **THEN** It SHALL carry each limit of its experiment where that limit bounds a claim.
+- **AND** these limits include:
+  - one model family;
+  - registration inside one repository, not in a registry;
+  - the authorised arm's post-hoc origin;
+  - the pretext ladder is not a factorial, and several of its steps carry more than one change;
+  - the pretext was placed in the task, not delivered through content;
+  - behavioural equality holds on the contract's inputs only;
+  - a service-specific policy check is not a validator analysis;
+  - replayed history is not operation.
+
+#### Scenario: The accounting is not restated
+- **WHEN** the generation paper refers to a prediction of the frozen vision
+- **THEN** it refers to the demonstrator paper's accounting rather than restating it
 
 ### Requirement: The generation paper's figures are interpolated from the generated artifacts
 Every figure in the generation paper SHALL be interpolated from the generation artifact or the
@@ -411,9 +456,11 @@ looks like a corpus paper maps to no paper. A frozen paper's marker is its exist
 marker; a living paper's is a record marker committed at its upload. The check SHALL be offline
 and dependency-free.
 
-It SHALL be documented as trusting the marker: the build cannot see the publication record, so
-a marker committed early would pass. Citations of work outside the corpus remain a review
-obligation.
+#### Scenario: The check's trust in the marker is documented
+- **WHEN** the check is documented
+- **THEN** It SHALL be documented as trusting the marker: the build cannot see the publication record, so
+  a marker committed early would pass.
+- **AND** Citations of work outside the corpus remain a review obligation.
 
 #### Scenario: A paper is stamped before the paper it cites is published
 - **WHEN** a paper carries a DOI stamp and cites a corpus paper with no publication marker
