@@ -77,8 +77,7 @@ The runtime SHALL provide an executable demonstration that an adversarial user m
 tool actions through the inference-only nodes, and that the tool-capable node never receives raw
 user text. The demonstration SHALL state its enforcement fidelity honestly, naming the tier actually
 in force for each node: `host` (discipline — the shape of confinement, forgeable) or `sandbox`
-(no ambient authority — unforgeable at the WASM boundary). It SHALL continue to name the tiers it
-does **not** yet reach, in particular CHERI-backed memory-level enforcement.
+(no ambient authority — unforgeable at the WASM boundary).
 
 #### Scenario: Adversarial instructions cannot trigger tools at the parse/moderate stage
 - **WHEN** a message containing adversarial instructions (e.g. "ignore previous instructions and
@@ -101,6 +100,11 @@ does **not** yet reach, in particular CHERI-backed memory-level enforcement.
 - **WHEN** the demonstration runs on the sandbox tier
 - **THEN** it still reports that a bounded free-text field reaches the tool-capable node as data, and
   that the capability scope — not the sandbox — is what bounds the resulting damage
+
+#### Scenario: The tiers not yet reached are named
+- **WHEN** the demonstration states its enforcement fidelity
+- **THEN** It SHALL continue to name the tiers it does **not** yet reach, in particular CHERI-backed
+  memory-level enforcement.
 
 ### Requirement: Nodes execute with no ambient authority
 The runtime SHALL provide a sandbox execution tier in which a node body runs as a WebAssembly module
@@ -191,8 +195,7 @@ interface's declared type is a boundary error rather than a marshalling accident
 ### Requirement: A component node imports no ambient WASI functions
 The runtime SHALL, on the component tier, produce node components whose import set contains only their
 typed capability interfaces, the function-free type vocabulary, and no WASI function their node's `with`
-clause did not grant. This strengthens "no ambient authority" from a property of an empty runtime context
-(behind powerless WASI stubs, as on the core-wasm tier) to the absence of the imports themselves. Whether a
+clause did not grant. Whether a
 vocabulary interface such as the clock was granted is a per-node question, checked against the node's own
 clause rather than against the whole capability vocabulary.
 
@@ -208,6 +211,11 @@ clause rather than against the whole capability vocabulary.
   against a node on the component tier
 - **THEN** each attempt fails, as it does on the core-wasm tier, so the confinement result is
   preserved rather than weakened by the port
+
+#### Scenario: Ambient authority is absent as imports, not disabled by context
+- **WHEN** the component tier is compared with the core-wasm tier
+- **THEN** This strengthens "no ambient authority" from a property of an empty runtime context (behind
+  powerless WASI stubs, as on the core-wasm tier) to the absence of the imports themselves.
 
 ### Requirement: Capability identity is expressible at the graph boundary
 The runtime SHALL allow distinct instances of the same capability type to be named at the graph
@@ -268,9 +276,7 @@ SHALL be distinct from the authority to use it.
 ### Requirement: Revocation is opt-in and leaves un-revoked provisioning unchanged
 The runtime SHALL wrap in a forwarding caretaker only capability instances explicitly provisioned as
 revocable or rotatable; type-only and plain-identity instances SHALL be provisioned exactly as before, so
-graphs that use neither revocation nor rotation are unaffected. An instance MAY be declared revocable,
-rotatable, or both; the runtime SHALL expose the revoke operation only for revocable instances and the
-rotate operation only for rotatable instances, so the two authorities are granted independently.
+graphs that use neither revocation nor rotation are unaffected.
 
 #### Scenario: Non-managed capabilities are unchanged
 - **WHEN** a graph declares no revocable and no rotatable capability
@@ -281,12 +287,17 @@ rotate operation only for rotatable instances, so the two authorities are grante
 - **WHEN** an instance is declared rotatable but not revocable
 - **THEN** the host can rotate it but the runtime exposes no revoke authority for it, and vice versa
 
+#### Scenario: Each operation is exposed only for the instances declared for it
+- **WHEN** an instance is provisioned as revocable, rotatable, or both
+- **THEN** An instance MAY be declared revocable, rotatable, or both; the runtime SHALL expose the revoke
+  operation only for revocable instances and the rotate operation only for rotatable instances, so the
+  two authorities are granted independently.
+
 ### Requirement: A named capability instance can be rotated at runtime
 The runtime SHALL allow a capability instance provisioned with a declared identity to be rotated after
 assembly: re-pointed at a freshly provisioned backing handle of the same capability kind, such that a
 node's subsequent use of that instance exercises the new authority through the same forwarding caretaker.
-The authority to rotate a capability SHALL be distinct from the authority to use it and SHALL be held only
-by the host that assembled the graph — never given to a node. Rotation SHALL be targeted: rotating one
+Rotation SHALL be targeted: rotating one
 instance SHALL NOT affect other identities of the same type, nor any shared-by-type sibling.
 
 #### Scenario: Rotation re-points authority
@@ -305,6 +316,11 @@ instance SHALL NOT affect other identities of the same type, nor any shared-by-t
 - **WHEN** a rotatable capability is provisioned
 - **THEN** the rotate authority is held only by the host that assembled the graph, and no node receives a
   means to rotate any capability
+
+#### Scenario: The rotate authority is separate from the authority to use
+- **WHEN** a rotatable capability instance is provisioned and used
+- **THEN** The authority to rotate a capability SHALL be distinct from the authority to use it and SHALL be
+  held only by the host that assembled the graph — never given to a node.
 
 #### Scenario: Rotation preserves the capability kind
 - **WHEN** the host attempts to rotate an instance to a replacement of a different capability kind
@@ -331,9 +347,7 @@ hold at the WIT capability boundary; it makes no claim at the memory level (CHER
 The runtime SHALL allow a node in the canonical graph JSON to declare a capability *identity* — a label
 naming a specific instance of a capability type the node holds — and SHALL derive its per-node instance
 routing from those declarations, so identity lives in the source of truth rather than only in the assembly
-API. A node with no identity declaration SHALL be provisioned by type exactly as before. The graph schema
-and the graph validator SHALL check identity declarations, rejecting an identity declared for a capability
-the node does not hold, at validation time.
+API. A node with no identity declaration SHALL be provisioned by type exactly as before.
 
 #### Scenario: Identity declared in the graph routes distinct instances
 - **WHEN** a graph declares two nodes of the same capability type with distinct identity labels in the graph
@@ -348,6 +362,11 @@ the node does not hold, at validation time.
 #### Scenario: Graphs without identity are unchanged
 - **WHEN** a graph declares no capability identity
 - **THEN** it validates, renders, and assembles exactly as before this change
+
+#### Scenario: Identity declarations are checked by the schema and the validator
+- **WHEN** a graph that declares capability identities is validated
+- **THEN** The graph schema and the graph validator SHALL check identity declarations, rejecting an
+  identity declared for a capability the node does not hold, at validation time.
 
 ### Requirement: Capability identity routes across sub-graph boundaries
 The runtime SHALL allow a parent graph to bind a named capability instance to a sub-graph's capability, so
@@ -364,7 +383,7 @@ The runtime SHALL provision a `DBHandle` in `read-write` mode as a handle exposi
 operations, and a `DBHandle` in `append` mode as a handle exposing an append operation and **no** read
 operation, so that each handle's surface matches its declared mode and no handle grants authority its mode
 does not name. Provisioning a `DBHandle` whose mode the runtime does not model SHALL raise a loud error
-rather than silently substituting another mode. `read`-mode provisioning SHALL be unchanged.
+rather than silently substituting another mode.
 
 #### Scenario: A read-write handle can read and write
 - **WHEN** a `DBHandle<scope, read-write>` is provisioned
@@ -379,6 +398,10 @@ rather than silently substituting another mode. `read`-mode provisioning SHALL b
 #### Scenario: An unmodelled DBHandle mode is rejected
 - **WHEN** a `DBHandle` is provisioned with a mode the runtime does not model
 - **THEN** provisioning raises an error that names the modes the runtime does model
+
+#### Scenario: Read-mode provisioning is unchanged
+- **WHEN** a `DBHandle<scope, read>` is provisioned
+- **THEN** `read`-mode provisioning SHALL be unchanged.
 
 ### Requirement: The SupportPlatform composition graph assembles and routes identity end-to-end
 The runtime SHALL assemble the canonical `SupportPlatform` graph without error, since every capability it
@@ -399,11 +422,7 @@ only a synthetic stand-in — exercises capability-identity routing across a sub
 The runtime SHALL execute a node that references another graph (a sub-graph) by assembling and running the
 referenced graph as a nested unit. It SHALL bind the handles the parent provisioned for that node to the
 sub-graph's capability parameters position-by-position, deliver the parent's data signal to the sub-graph's
-boundary input, run the sub-graph, and return its terminal output as the node's output. A distinct capability
-instance routed to the node (via graph-source `capability_identities`) SHALL be the instance the sub-graph's
-internal nodes use. The runtime SHALL NOT let one sub-graph node's handles or node-local state be visible to a
-sibling sub-graph node, and SHALL raise a clear error rather than recurse without bound on a self-referential
-sub-graph.
+boundary input, run the sub-graph, and return its terminal output as the node's output.
 
 #### Scenario: A parent executes through a sub-graph node
 - **WHEN** a graph is executed whose node references another graph as a sub-graph
@@ -422,6 +441,17 @@ sub-graph.
 #### Scenario: A self-referential sub-graph is rejected
 - **WHEN** a sub-graph references itself transitively
 - **THEN** execution raises a clear error rather than recursing without bound
+
+#### Scenario: The routed instance is the one the sub-graph uses
+- **WHEN** a distinct capability instance is routed to a sub-graph node through the graph source
+- **THEN** A distinct capability instance routed to the node (via graph-source `capability_identities`) SHALL
+  be the instance the sub-graph's internal nodes use.
+
+#### Scenario: Sibling state stays private and recursion is bounded
+- **WHEN** a graph contains sibling sub-graph nodes, or a sub-graph that references itself
+- **THEN** The runtime SHALL NOT let one sub-graph node's handles or node-local state be visible to a
+  sibling sub-graph node, and SHALL raise a clear error rather than recurse without bound on a
+  self-referential sub-graph.
 
 ### Requirement: A sub-graph's boundary output is delivered as the parent node's output
 For a sub-graph with a single boundary output type, the runtime SHALL deliver that output value as the parent
@@ -491,7 +521,7 @@ Cross-graph validation SHALL check the output side of a sub-graph node's signatu
 
 ### Requirement: The runtime emits a structured execution trace
 
-Every graph execution SHALL produce a machine-readable trace recording, in execution order for each node run: the node name, the enforcement tier that ran it, the trust labels of its input and output values, and each capability crossing (the WIT interface crossed and the capability instance name). Sub-graph executions SHALL appear as nested traces under their sub-graph node. The trace format SHALL be pinned by a committed JSON Schema, and trace structure SHALL be deterministic across repeated runs of the same graph and input — timing data, if recorded, is an optional field excluded from structural comparison.
+Every graph execution SHALL produce a machine-readable trace recording, in execution order for each node run: the node name, the enforcement tier that ran it, the trust labels of its input and output values, and each capability crossing (the WIT interface crossed and the capability instance name). Sub-graph executions SHALL appear as nested traces under their sub-graph node.
 
 #### Scenario: A run yields a schema-valid trace
 
@@ -513,14 +543,15 @@ Every graph execution SHALL produce a machine-readable trace recording, in execu
 - **WHEN** the same graph is executed twice with the same input
 - **THEN** the two traces are structurally identical once optional timing fields are excluded
 
+#### Scenario: The trace format is pinned and its structure deterministic
+
+- **WHEN** any graph execution produces a trace
+- **THEN** The trace format SHALL be pinned by a committed JSON Schema, and trace structure SHALL be deterministic across repeated runs of the same graph and input — timing data, if recorded, is an optional field excluded from structural comparison.
+
 ### Requirement: Provisioned authority is bounded by the assembly's scope
 An assembled graph SHALL support use as a scope. On exit from that scope, every capability instance
 the assembly provisioned as revocable SHALL be severed, so that authority granted for a run does not
-outlive the run without the host taking a deliberate step to extend it. Severing on scope exit SHALL
-be idempotent and SHALL leave the assembly usable for inspection.
-
-Assemblies used without a scope SHALL behave exactly as before, so the guarantee is opt-in at the
-call site and no existing caller changes behaviour.
+outlive the run without the host taking a deliberate step to extend it.
 
 The guarantee SHALL be documented as reaching only instances provisioned revocable: an instance
 provisioned bare has no caretaker to sever and outlives the scope.
@@ -537,21 +568,21 @@ provisioned bare has no caretaker to sever and outlives the scope.
 - **WHEN** a graph is assembled without using it as a scope
 - **THEN** every capability instance behaves exactly as it did before this change
 
+#### Scenario: Severing is idempotent and leaves the assembly inspectable
+- **WHEN** a scoped assembly's scope exits, possibly more than once, and the assembly is inspected afterwards
+- **THEN** Severing on scope exit SHALL be idempotent and SHALL leave the assembly usable for inspection.
+
+#### Scenario: The scope guarantee is opt-in at the call site
+- **WHEN** an existing caller assembles a graph without using it as a scope
+- **THEN** Assemblies used without a scope SHALL behave exactly as before, so the guarantee is opt-in at the
+  call site and no existing caller changes behaviour.
+
 ### Requirement: The trace records crossings per call and derives the deduplicated view
 An execution trace SHALL record each capability crossing a node makes as an ordered, undeduplicated
 entry identifying the interface crossed, the capability instance it landed on, the operation invoked,
 and its position in the node's call sequence. The deduplicated `(interface, instance)` view SHALL be
 **derived** from those entries by projection rather than recorded separately, so the two views cannot
 disagree.
-
-The per-call layer SHALL be excluded from structural comparison between enforcement tiers, because the
-tiers legitimately differ in call count and operation naming; the derived view SHALL remain
-tier-comparable, and the existing structural-equality property SHALL continue to hold as a property of
-the projection.
-
-The per-call layer SHALL be documented as confined-tier-authoritative and host-tier-advisory: on the
-host tier it is exactly as circumventable as every other host-tier guarantee, and SHALL NOT be
-presented as stronger evidence than the deduplicated view it projects to.
 
 #### Scenario: The deduplicated view is a projection of the per-call layer
 - **WHEN** a node crosses one capability instance several times in a run
@@ -563,15 +594,25 @@ presented as stronger evidence than the deduplicated view it projects to.
 - **THEN** the derived deduplicated views are structurally equal once the tier field is set aside
 - **AND** the per-call layers may differ, and that difference does not fail the comparison
 
+#### Scenario: Only the derived view is compared across tiers
+- **WHEN** traces from different enforcement tiers are compared structurally
+- **THEN** The per-call layer SHALL be excluded from structural comparison between enforcement tiers,
+  because the tiers legitimately differ in call count and operation naming; the derived view SHALL remain
+  tier-comparable, and the existing structural-equality property SHALL continue to hold as a property of
+  the projection.
+
+#### Scenario: The per-call layer is host-tier advisory
+- **WHEN** the per-call layer is documented or cited as evidence
+- **THEN** The per-call layer SHALL be documented as confined-tier-authoritative and host-tier-advisory: on
+  the host tier it is exactly as circumventable as every other host-tier guarantee, and SHALL NOT be
+  presented as stronger evidence than the deduplicated view it projects to.
+
 ### Requirement: A run binds a principal, and only declared nodes may rebind it
 An assembled graph SHALL support binding a principal representing the authenticated party on whose
 behalf the run executes. A node MAY declare that it binds a principal; such a node SHALL be the only kind licensed to
 rebind the acting principal for the work downstream of it, mirroring the discipline by which only a
 declared discharger may raise trust. A graph assembled without a principal SHALL behave exactly as it
 did before this capability existed.
-
-The validator SHALL reject a node that declares principal binding while holding no capabilities, since
-a binder with no authority to scope is a declaration with no meaning.
 
 #### Scenario: A run without a principal is unchanged
 - **WHEN** a graph is assembled without binding a principal
@@ -581,11 +622,15 @@ a binder with no authority to scope is a declaration with no meaning.
 - **WHEN** a node that does not declare principal binding attempts to act as a different principal
 - **THEN** the attempt fails rather than silently widening authority
 
+#### Scenario: A binder holding no capabilities is rejected
+- **WHEN** a node declares principal binding while holding no capabilities
+- **THEN** The validator SHALL reject a node that declares principal binding while holding no capabilities,
+  since a binder with no authority to scope is a declaration with no meaning.
+
 ### Requirement: Capability crossings record the acting principal
 Every recorded capability crossing SHALL carry, where a run binds a principal, the principal on whose
 authority it was made, together with the chain of parties acting on that principal's behalf, so that
-delegation is visible in the trace rather than inferred. Sub-graph runs SHALL record it at every
-altitude.
+delegation is visible in the trace rather than inferred.
 
 This SHALL make the confused-deputy property checkable: no crossing anywhere in a run SHALL record a
 principal outside the scope bound at entry unless it passed through a node declared to bind one.
@@ -596,22 +641,16 @@ principal outside the scope bound at entry unless it passed through a node decla
   implemented)
 - **AND** a crossing recording a principal outside that scope, absent a declared binder, is detectable
 
+#### Scenario: Sub-graph crossings carry the principal too
+- **WHEN** a run that binds a principal executes through sub-graph nodes, at any depth
+- **THEN** Sub-graph runs SHALL record it at every altitude.
+
 ### Requirement: Nodes may carry checkable pre- and postconditions
 A node SHALL be able to declare preconditions over its inputs and postconditions over its outputs,
 expressed as conjunctions of predicates over field paths of its already-declared types. The predicate
 vocabulary SHALL be closed — comparisons, membership in a declared variant set, and field presence — with no
 quantification, recursion, or embedded code, so that a contract remains checkable without a solver and
 without a new dependency.
-
-The runtime SHALL evaluate preconditions before invoking a node body and postconditions after, and a
-violation SHALL carry **blame**: a failed precondition attributes fault to the upstream wiring, a
-failed postcondition to the node body.
-
-A malformed contract SHALL be rejected by the graph validator, and a contract referencing a field the
-node's value type does not carry SHALL be rejected at assembly, so an unevaluatable contract fails
-before execution rather than during it. The split reflects what each layer can know: the validator is
-dependency-free and has no field schema for a declared type name, so it checks that a predicate parses;
-assembly, which holds the value classes, checks that the paths resolve.
 
 #### Scenario: A precondition violation blames upstream
 - **WHEN** a node receives an input violating its declared precondition
@@ -629,15 +668,25 @@ assembly, which holds the value classes, checks that the paths resolve.
 - **WHEN** a contract references a field the node's value type does not carry
 - **THEN** assembly fails rather than the run failing part-way through
 
+#### Scenario: Contracts are evaluated around the body, and a violation carries blame
+- **WHEN** a node that declares a contract is invoked
+- **THEN** The runtime SHALL evaluate preconditions before invoking a node body and postconditions after,
+  and a violation SHALL carry **blame**: a failed precondition attributes fault to the upstream wiring, a
+  failed postcondition to the node body.
+
+#### Scenario: An unevaluatable contract fails before execution
+- **WHEN** a contract is malformed, or references a field the node's value type does not carry
+- **THEN** A malformed contract SHALL be rejected by the graph validator, and a contract referencing a field
+  the node's value type does not carry SHALL be rejected at assembly, so an unevaluatable contract fails
+  before execution rather than during it.
+- **AND** The split reflects what each layer can know: the validator is dependency-free and has no field
+  schema for a declared type name, so it checks that a predicate parses; assembly, which holds the value
+  classes, checks that the paths resolve.
+
 ### Requirement: Clock, outbound HTTP, and notification are typed capability kinds
 The runtime SHALL model access to the current time, to outbound HTTP, and to a notification channel as
 declared capability kinds with typed interfaces, so that a node holding none of them cannot read a
-clock, reach a network host, or notify anyone. Each SHALL be expressed as a WIT interface on the
-confined tier, and a node's permitted import set SHALL be derived from its `with` clause for these
-kinds by the same mechanism that derives it for existing kinds, with no special case.
-
-An outbound HTTP capability SHALL carry the set of hosts it may reach, and a node holding it SHALL NOT
-be able to reach a host outside that set.
+clock, reach a network host, or notify anyone.
 
 #### Scenario: A node without a clock cannot read the time
 - **WHEN** a confined node that does not declare a clock capability is built
@@ -651,15 +700,22 @@ be able to reach a host outside that set.
 - **WHEN** a node holding an allowlisted HTTP capability attempts a request to a host not in the list
 - **THEN** the attempt is refused
 
+#### Scenario: The new kinds derive their import sets with no special case
+- **WHEN** a confined node declares a clock, outbound HTTP, or notification capability
+- **THEN** Each SHALL be expressed as a WIT interface on the confined tier, and a node's permitted import
+  set SHALL be derived from its `with` clause for these kinds by the same mechanism that derives it for
+  existing kinds, with no special case.
+
+#### Scenario: An HTTP capability carries its allowlist
+- **WHEN** a node is granted an outbound HTTP capability
+- **THEN** An outbound HTTP capability SHALL carry the set of hosts it may reach, and a node holding it SHALL
+  NOT be able to reach a host outside that set.
+
 ### Requirement: The confined tier instantiates reliably on a loaded machine
 The confined tier SHALL size its engine for many short-lived stores rather than for a few long-lived
 guests, so that instantiating a node does not reserve address space out of proportion to what a node
 body uses. The runtime creates a fresh store per node invocation, so a per-store reservation sized for
 a server is paid on every crossing into the tier and fails when the host is under memory pressure.
-
-The reservation SHALL NOT become a correctness limit: a guest that outgrows it SHALL have its memory
-reallocated rather than trapping. The benchmark SHALL build its engine from the same configuration as
-the runtime, so the tier is measured as it is run.
 
 #### Scenario: A node instantiates on a loaded machine
 - **WHEN** the host is under enough memory pressure that a multi-gigabyte reservation would be refused
@@ -672,6 +728,16 @@ the runtime, so the tier is measured as it is run.
 #### Scenario: The benchmark measures the configured tier
 - **WHEN** the overhead benchmark runs
 - **THEN** its engine carries the same configuration the runtime uses
+
+#### Scenario: The reservation is not a correctness limit
+- **WHEN** a guest outgrows the engine's configured reservation
+- **THEN** The reservation SHALL NOT become a correctness limit: a guest that outgrows it SHALL have its
+  memory reallocated rather than trapping.
+
+#### Scenario: The benchmark builds its engine from the runtime's configuration
+- **WHEN** the overhead benchmark builds its engine
+- **THEN** The benchmark SHALL build its engine from the same configuration as the runtime, so the tier is
+  measured as it is run.
 
 ### Requirement: A host resource failure is reported distinctly from an ungranted capability
 The confined tier SHALL distinguish an instantiation that failed because the host could not allocate
@@ -692,13 +758,7 @@ exhausted host is a finding about the machine.
 The runtime SHALL, when assembling a graph, validate it together with every canonical graph it
 reaches through sub-graph nodes, transitively, so that the cross-graph analyses (signature
 matching, capability narrowing, and the boundary-output check) run before execution and not only
-when graphs are validated as a batch at build. It SHALL also validate a parent together with a
-sub-graph a caller's resolver supplied before running it, SHALL refuse a resolved sub-graph whose
-name differs from its node's, and SHALL reject a graph containing a node of its own name and a batch
-in which two graphs share a name, since graphs are resolved by name and each collision would skip
-the cross-graph checks. A sub-graph node's `requires` contract SHALL be checked as a leaf's is. A graph validated alone leaves the cross-graph layer
-silent, and a runtime that executes a composition the validator rejects makes "rejected before
-anything runs" false for composed systems. Capability narrowing is checked here and SHALL NOT be
+when graphs are validated as a batch at build. Capability narrowing is checked here and SHALL NOT be
 described as enforced: the parent's wider handle is routed to the child unattenuated.
 
 #### Scenario: A composition the cross-graph checks reject does not assemble
@@ -716,13 +776,27 @@ described as enforced: the parent's wider handle is routed to the child unattenu
   another name
 - **THEN** the composition is rejected before the sub-graph runs
 
+#### Scenario: Resolver-supplied sub-graphs and name collisions are checked
+- **WHEN** a caller's resolver supplies a sub-graph, or a graph or batch reuses a name
+- **THEN** It SHALL also validate a parent together with a sub-graph a caller's resolver supplied before
+  running it, SHALL refuse a resolved sub-graph whose name differs from its node's, and SHALL reject a graph
+  containing a node of its own name and a batch in which two graphs share a name, since graphs are resolved
+  by name and each collision would skip the cross-graph checks.
+
+#### Scenario: A sub-graph node's precondition is checked
+- **WHEN** a sub-graph node declares a `requires` contract
+- **THEN** A sub-graph node's `requires` contract SHALL be checked as a leaf's is.
+
+#### Scenario: Validating a graph alone is not enough for a composition
+- **WHEN** a graph that contains sub-graph nodes is validated alone
+- **THEN** A graph validated alone leaves the cross-graph layer silent, and a runtime that executes a
+  composition the validator rejects makes "rejected before anything runs" false for composed systems.
+
 ### Requirement: Capabilities are provisioned, never carried as data
 The validator SHALL reject a capability type in any data position — a boundary parameter not declared
 as a capability, a node's data input, or anywhere in a node's output, including under a type
 constructor or in a sum variant — since a handle passed along an edge is the reference passing the
-graph gives up to keep its authority topology statically analysable. It SHALL reject an entry in a
-graph's `capabilities` that is not a capability kind. A contract's field paths SHALL begin each segment
-with a letter, so no path reaches a private or dunder attribute of the host language.
+graph gives up to keep its authority topology statically analysable.
 
 #### Scenario: A handle on an edge is rejected
 - **WHEN** a node emits its handle, bare or wrapped, and a downstream node receives it on an edge
@@ -731,3 +805,12 @@ with a letter, so no path reaches a private or dunder attribute of the host lang
 #### Scenario: A contract cannot reflect into the host
 - **WHEN** a contract names a path beginning with an underscore, such as `__class__`
 - **THEN** it is outside the contract vocabulary and rejected before anything runs
+
+#### Scenario: A non-capability entry in a graph's capabilities is rejected
+- **WHEN** a graph's `capabilities` lists an entry that is not a capability kind
+- **THEN** It SHALL reject an entry in a graph's `capabilities` that is not a capability kind.
+
+#### Scenario: Contract field paths begin each segment with a letter
+- **WHEN** a contract names a field path
+- **THEN** A contract's field paths SHALL begin each segment with a letter, so no path reaches a private or
+  dunder attribute of the host language.
