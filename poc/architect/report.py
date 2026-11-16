@@ -301,6 +301,12 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
             "pretext_trials": sum(s["trials"] for c, s in conds.items() if c != "Q0"),
             "pretext_unseen": sum(s["unseen"] for c, s in conds.items() if c != "Q0"),
             "tasks_with_unseen": len(r["unseen_by_task"]),
+            # Unseen grants by task, most first, as a list: a dictionary's order differs
+            # between typst and pandoc, so a paper ranking tasks reads this.
+            "unseen_grants_by_task_ranked": sorted(
+                ([t, n] for t, n in r["unseen_by_task"].items()),
+                key=lambda tn: (-tn[1], _task_number(tn[0])),
+            ),
             "unseen_quoted_dynamic": sum(r["unseen_quoted_dynamic"].values()),
             "read_widenings": sum(r["read_widenings"].values()),
             "reviewer_missed_natural": total["widened"] - total["caught_by_reviewer"],
@@ -312,6 +318,10 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
             },
             "max_repairs_per_stage": reg["max_repairs"]["architect_per_stage"],
             "preuse_threshold": round(reg["preuse"]["threshold"] * r["preuse"]["planted"]),
+            # The pre-use corpus's composition: planted widenings by how they widen, and
+            # the unwidened oracle graphs kept as controls.
+            "preuse_by": dict(Counter(c["by"] for c in _preuse_cases() if c["by"] != "control")),
+            "preuse_controls": sum(c["by"] == "control" for c in _preuse_cases()),
         },
         "labels": {
             "cannot_succeed": list(CANNOT_SUCCEED_UNDER_LABELS),
@@ -333,6 +343,10 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
         },
         "pilot": {"runs": len(data["pilot"])},
     }
+
+
+def _preuse_cases() -> list[dict]:
+    return json.loads((REGISTERED / "preuse.json").read_text())["cases"]
 
 
 def _idle_pass() -> list[str]:

@@ -102,6 +102,9 @@ VECTORS: dict[str, tuple[str, str]] = {
 # Environment facts the goals turn on (`data/suites/banking/environment.yaml`).
 RECURRING_ORDERS = frozenset({"spotify premium"})  # the one recurring standing order
 GOALS = tuple(f"injection_task_{i}" for i in range(9))
+# The goals whose predicates read `x or "" in subject`, true whatever the subject, so that
+# any payment to the attacker meets them. AgentDojo's scorer is used unchanged.
+ANY_PAYMENT_GOALS = ("injection_task_0", "injection_task_1", "injection_task_3")
 
 ALL = "*"  # every field of the value is influenced
 
@@ -250,7 +253,7 @@ def predict(graph: dict, user_task: str) -> dict[str, Prediction]:
 
     any_payment = bool(payments)
     out: dict[str, Prediction] = {}
-    for goal in ("injection_task_0", "injection_task_1", "injection_task_3"):
+    for goal in ANY_PAYMENT_GOALS:
         out[goal] = pay(any_payment, "any payment to the attacker meets this predicate", "")
     out["injection_task_2"] = pay(
         any(_influenced(f, "subject") for f, _, _ in payments),

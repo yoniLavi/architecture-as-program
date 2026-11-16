@@ -14,10 +14,15 @@ reached no writer, or as the absence of a residual.
 
 ### Requirement: The architect paper's figures are interpolated from the generated artifacts
 Every figure in the architect paper, counts of things in the data included, SHALL be
-interpolated from `dist/architect.json` or `dist/agentdojo-banking.json`. Paper 2's figures
-SHALL be cited from Paper 2, never typed. Registered, pilot and AgentDojo results SHALL never be
-pooled.
+interpolated from `dist/architect.json`, `dist/agentdojo-banking.json`, or the `post_hoc` block
+of `dist/slice.json`. Paper 2's figures SHALL be cited from Paper 2, never typed. Registered,
+pilot, post-hoc and AgentDojo results SHALL never be pooled.
 
 #### Scenario: A count changes in the records
 - **WHEN** a committed record changes a figure the paper states
 - **THEN** the rebuilt paper states the new figure, with no edit to its text
+
+#### Scenario: A post-hoc replay is cited
+- **WHEN** the paper states a figure from the slice's replays over the registered records
+- **THEN** the sentence labels it post hoc, in a subsection apart from the registered results
+- **AND** no test is run or stated between it and a registered figure

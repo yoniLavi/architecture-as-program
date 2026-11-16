@@ -180,9 +180,10 @@ def test_the_seeded_pins_cover_the_design_section_of_paper_2():
 
 
 def test_pins_live_only_in_living_papers():
-    """The frozen paper is guarded by the freeze, never by a pin; Paper 3 has its own."""
+    """The frozen paper is guarded by the freeze, never by a pin; Papers 3 and 4 have
+    their own."""
     papers = {pin[0] for pin in check_hedges.PINS}
-    assert papers == {check_hedges.PAPER2, check_hedges.PAPER3}
+    assert papers == {check_hedges.PAPER2, check_hedges.PAPER3, check_hedges.PAPER4}
 
 
 def test_tier_restricted_properties_are_pinned_on_both_paragraphs(sources):

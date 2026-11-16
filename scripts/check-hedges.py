@@ -69,6 +69,7 @@ from pathlib import Path
 # Seeded 5 August 2026 against papers/02-demonstrator/proposal.typ §2.5.
 PAPER2 = "papers/02-demonstrator/proposal.typ"
 PAPER3 = "papers/03-generation/proposal.typ"
+PAPER4 = "papers/04-architect/proposal.typ"
 
 PINS = (
     # §2.3, the running example. Pinned alongside §2.5 because it carries the
@@ -318,6 +319,81 @@ PINS = (
         "not by the graph validator",
         "and the label at entry are checked by a policy written for this service, "
         "not by the graph validator.",
+    ),
+    # Paper 4, seeded 16 November 2026 against its first draft (add-paper-4 3.2).
+    # The paper's traps: a registered null read as an effect, a same-model catch
+    # rate read as independent review, the link check read as a check of scope,
+    # zero attack success read as a defence, a post-hoc replay pooled with the
+    # registered run, an in-repo registration read as a registry entry, the
+    # survey's negative read as exhaustive, and placement read as measured.
+    (
+        PAPER4,
+        "sec:results-confirm",
+        "confirm/null-not-effect",
+        "nothing below is evidence",
+        "A pretext in the task did not, at the registered threshold, raise the rate of "
+        "widenings both reviewers missed, and nothing below is evidence that it did.",
+    ),
+    (
+        PAPER4,
+        "sec:pipeline",
+        "reviewer/diversity-not-independence",
+        "never independence",
+        "We report every catch rate as diversity of role and information, never "
+        "independence, and as a lower bound on what an independent reviewer would catch",
+    ),
+    (
+        PAPER4,
+        "sec:limits",
+        "limits/lower-bound",
+        "lower bound",
+        "Every catch rate here is therefore a lower bound on what an independent reviewer "
+        "would catch, and how far below we cannot say",
+    ),
+    (
+        PAPER4,
+        "sec:pipeline",
+        "link-check/linkage-not-adequacy",
+        "not adequacy",
+        "it measures linkage, not adequacy: a one-word quotation links a grant of any width.",
+    ),
+    (
+        PAPER4,
+        "sec:results-agentdojo",
+        "agentdojo/zero-not-defence",
+        "neither a defence",
+        "Zero attack success here is neither a defence nor the absence of a residual.",
+    ),
+    (
+        PAPER4,
+        "sec:results-posthoc",
+        "posthoc/not-registered",
+        "post hoc",
+        "They are post hoc: not registered, and neither pooled with the registered figures "
+        "nor tested against them.",
+    ),
+    (
+        PAPER4,
+        "sec:registration",
+        "registration/not-a-registry",
+        "It is not a registry entry",
+        "This is pre-registration inside one repository, by its one author, checked by "
+        "commit hashes and by the harness that runs it. It is not a registry entry",
+    ),
+    (
+        PAPER4,
+        "sec:related",
+        "related/scoped-to-survey",
+        "in the work we read",
+        "The difference we claim is narrow, and scoped to what we surveyed. None of these "
+        "systems, in the work we read,",
+    ),
+    (
+        PAPER4,
+        "sec:limits",
+        "limits/placement-not-measured",
+        "we do not claim",
+        "None of our measures can see that, and we do not claim the reviewers were measured on it.",
     ),
 )
 

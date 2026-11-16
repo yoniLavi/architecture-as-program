@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from . import corpus
-from .predict import ORACLE, PREDICTIONS, contradictions
+from .predict import ANY_PAYMENT_GOALS, GOALS, ORACLE, PREDICTIONS, contradictions
 
 HERE = Path(__file__).resolve().parent
 RECORDS = HERE / "records"
@@ -108,6 +108,8 @@ def build() -> dict[str, Any]:
     return {
         "suite": oracle["suite"],
         "attack": oracle["attack"],
+        "goals": list(GOALS),
+        "any_payment_goals": list(ANY_PAYMENT_GOALS),
         "corpus": [
             {
                 "case": o.case.name,

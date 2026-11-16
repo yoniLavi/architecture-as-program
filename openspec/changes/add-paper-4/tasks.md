@@ -39,8 +39,12 @@ Every session working on this change first checks the feed recorder (standing ta
       `json("/dist/slice.json")` for its `post_hoc` block only
 - [x] 2.2 `Makefile` targets for Paper 4, and its citable PDF name
       (`lavi-2026-reviewed-before-it-runs.pdf`)
-- [ ] 2.3 The survey's entries in `citations.bib`, each checked against its source, and a
-      Paper 3 entry with its DOI (`lavi_granted_2026`)
+- [x] 2.3 The survey's entries in `citations.bib`, each checked against its source, and a
+      Paper 3 entry with its DOI (`lavi_granted_2026`). Checked 16 November 2026: ACE
+      (NDSS 2026), Conseca (HotOS '25), Kim et al. (ICML 2025) and CoT Red-Handed
+      (NeurIPS 2025) are peer-reviewed, not arXiv-only as the survey had them; Kolluri's
+      autonomy definition is quoted from its abstract; Panickssery's correlation is from
+      fine-tuning. Only the entries the paper cites were added (Ye et al., PlanGuard not)
 - [x] 2.4 If question 4 is (b): the replays' keys in `dist/slice.json` given a `display`
       block, kept apart from the registered figures and labelled post hoc: `post_hoc`,
       with its own `label` and `display`. The scope-binding replay counts grants (61),
@@ -49,9 +53,13 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 3. Drafting
 
-- [ ] 3.1 §§1–9 to the budget, figures interpolated, the null first
-- [ ] 3.2 Hedge pins for Paper 4 in `scripts/check-hedges.py`
-- [ ] 3.3 A test pinning the keys Paper 4 reads
+- [x] 3.1 §§1–9 to the budget, figures interpolated, the null first (first draft,
+      16 November 2026, ~6,000 words of text; the slice's replays in their own post-hoc
+      subsection, §5.3)
+- [x] 3.2 Hedge pins for Paper 4 in `scripts/check-hedges.py` (nine)
+- [x] 3.3 A test pinning the keys Paper 4 reads (`tests/test_paper4_figures_pinned.py`:
+      the whole architect artifact, the banking and slice subtrees it reads, and a check
+      that the source reads nothing outside them)
 
 ## 4. Review
 
