@@ -171,11 +171,13 @@ toy is built around the answer.
 
 ## 8. Live operation
 
-- [ ] 8.1 The author starts the service (launchd or cron, the author's act)
+- 8.1 *(untracked: moved, 16 November 2026, at the author's decision, to
+  `openspec/changes/operate-feed-triage`, task 1.1.)* The author starts the service (launchd
+  or cron, the author's act)
 - [x] 8.2 `poc/serve.py --report`: runs, failures, items seen, digests written, model calls,
       drawn from `var/runs/`; summarised into `dist/evaluation-feed.md` from a committed export
-- [ ] 8.3 After two weeks: an operations summary committed (failures by class, any trace
-      anomalies)
+- 8.3 *(untracked: moved, 16 November 2026, to `operate-feed-triage`, task 1.2.)* After two
+  weeks: an operations summary committed (failures by class, any trace anomalies)
 
 ## 9. Attenuation at the routing point (held until Paper 2 publishes; it published 29 October 2026)
 
@@ -196,8 +198,12 @@ toy is built around the answer.
       3 or 4 figure moved. The `route_tool_into_inference_slot` corpus note in
       `poc/evaluate.py` still says "checked, not enforced"; it is pinned Paper 2 output, left
       for 9.2.
-- [ ] 9.2 Paper 2 v1.1: the routed-scope qualifier dropped where it no longer holds; task 0.1's
-      pin updated deliberately; hedge pins checked
+- 9.2 *(untracked: set aside by the author, 16 November 2026: "I don't see any clear
+  benefit". Paper 2 v1.0 understates the artifact here, saying narrowing at a boundary is
+  checked, not enforced. That is the conservative direction, and enforcement can be reported
+  as new in a later paper. Not carried into any change.)* Paper 2 v1.1: the routed-scope
+  qualifier dropped where it no longer holds; task 0.1's pin updated deliberately; hedge
+  pins checked
 
 ## 10. Records
 
@@ -205,7 +211,7 @@ toy is built around the answer.
 - [x] 10.2 `AGENTS.md` tooling section: state, real HTTP, driver, map, join, CLI backend,
       generation harness; test count
 - [x] 10.3 Spec deltas reconciled with what was built; `openspec validate --strict`
-- [ ] 10.4 At archive (added 16 November 2026 by `update-openspec-to-2`): if this change is
+- [x] 10.4 At archive (added 16 November 2026 by `update-openspec-to-2`): if this change is
       the first to create `feed-triage-service` or `node-generation`, write each new spec's
       Purpose in the archive commit, since the placeholder `openspec archive` writes fails
       strict validation, and run `make spec-check` before and after
