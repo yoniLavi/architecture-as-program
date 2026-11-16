@@ -47,7 +47,13 @@ Either the body, or a request for authority.
 {"escalate": {"capability": "<the capability the node needs, as a type such as Payments<['<payee>'], '<cap>'>>", "because": "<why the role needs it, in a sentence>"}}
 ```
 
-The architect decides on a request. If it is granted, the graph is changed and reviewed again before anything runs, and you are asked again with the new grant.
+A `Payments` request may also carry a `bind`, which narrows the grant to values from the node's own inputs, as `inN.<field>` paths: input 1 above is `in0`. With it, the node could pay only that payee, at most that amount, that many times:
+
+```json
+{"escalate": {"capability": "Payments<[any], '<cap>'>", "bind": {"payee": "in0.<field>", "amount": "in0.<field>", "uses": 1}, "because": "<why the role needs it, in a sentence>"}}
+```
+
+The architect decides on a request. If it is granted, the graph is changed and reviewed again before anything runs, and you are asked again with the new grant. A grant wider than the request is refused.
 
 ## The crate you are completing
 

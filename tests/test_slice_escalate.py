@@ -71,23 +71,115 @@ def test_an_unchanged_graph_is_declined_and_no_graph_is_recorded():
     assert escalate.decide(g, None, control.TASK, PROMPT, None, None)["outcome"] == NO_GRAPH
 
 
+def _decide(before, after, backend, request=None):
+    request = request if request is not None else {"capability": CLOSED, "because": "pay"}
+    return escalate.decide(before, after, control.TASK, PROMPT, backend, None,
+                           node=control.NODE, request=request)  # fmt: skip
+
+
 def test_a_changed_graph_needs_both_reviews():
     before, after = control.graph(), granted(CLOSED)
-    unreviewed = escalate.decide(before, after, control.TASK, PROMPT, None, None)
+    unreviewed = _decide(before, after, None)
     assert unreviewed["outcome"] == REJECTED  # no AI reviewer, no acceptance
-    passed = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after)), None)
+    passed = _decide(before, after, Fake(_verdicts(after)))
     assert passed["outcome"] == ACCEPTED and passed["formal"]["links"] == []
-    flagged = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after, CLOSED)),
-                              None)  # fmt: skip
+    flagged = _decide(before, after, Fake(_verdicts(after, CLOSED)))
     assert flagged["outcome"] == REJECTED and flagged["flagged"] == [CLOSED]
 
 
 def test_an_open_payment_grant_on_the_custom_node_is_rejected_whatever_the_reviewer_says():
     """D2's answer (value-bound grants, 4.1): the AI reviewer passing it no longer suffices."""
     before, after = control.graph(), granted()
-    out = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after)), None)
-    assert out["outcome"] == REJECTED and out["flagged"] == []
+    out = _decide(before, after, Fake(_verdicts(after)), {"capability": PAY, "because": "pay"})
+    assert out["outcome"] == REJECTED and out["flagged"] == [] and out["formal"]["no_wider"] == []
     assert [(f["capability"], f["fails"]) for f in out["formal"]["custom_writers"]] == [(PAY, True)]
+
+
+# ── The no-wider check on the escalation path (value-bound grants, 4.2) ──
+
+CAPPED = "Payments<[any], '2000'>"
+BIND = {"payee": "in0.iban", "amount": "in0.total", "uses": 1}
+
+
+def bound(pay: str = CAPPED, bind: dict | None = None) -> dict:
+    g = granted(pay)
+    next(n for n in g["nodes"] if n["name"] == control.NODE)["bind"] = {pay: bind or dict(BIND)}
+    return g
+
+
+def test_a_wider_answer_fails_and_the_grant_is_not_given():
+    before, after = control.graph(), granted(CLOSED)
+    out = _decide(before, after, Fake(_verdicts(after)), {"capability": CAPPED, "bind": BIND})
+    assert out["outcome"] == REJECTED
+    assert [f["problem"] for f in out["formal"]["no_wider"]] == ["unbound-answer"]
+
+
+def test_an_exact_answer_passes_and_goes_on_to_the_reviewer():
+    before, after = control.graph(), bound()
+    backend = Fake(_verdicts(after))
+    out = _decide(before, after, backend, {"capability": CAPPED, "bind": dict(BIND)})
+    assert out["formal"]["no_wider"] == [] and out["formal"]["custom_writers"] == []
+    assert backend.seen and out["outcome"] == ACCEPTED
+
+
+def test_a_bind_with_more_uses_fails():
+    before, after = control.graph(), bound(bind={**BIND, "uses": 2})
+    out = _decide(before, after, Fake(_verdicts(after)), {"capability": CAPPED, "bind": BIND})
+    assert out["outcome"] == REJECTED
+    assert [f["problem"] for f in out["formal"]["no_wider"]] == ["bind-wider"]
+
+
+def test_a_missing_or_malformed_request_fails_closed():
+    before, after = control.graph(), bound()
+    for request in ({}, {"capability": CAPPED, "bind": ["in0.iban"]}):
+        out = _decide(before, after, Fake(_verdicts(after)), request)
+        assert out["outcome"] == REJECTED
+        assert [f["problem"] for f in out["formal"]["no_wider"]] == ["unparseable-request"]
+    out = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after)), None)
+    assert out["outcome"] == REJECTED  # no request at all is not "no request"
+
+
+def test_d2s_recorded_decision_replayed_fails():
+    """D2's edit was accepted in the slice. Replayed through today's decision with its
+    own recorded request and a reviewer that passes everything, it is rejected."""
+    from pathlib import Path
+
+    rec = json.loads(
+        (
+            Path(__file__).resolve().parent.parent / "poc/slice/runs/slice/user_task_0.D2.json"
+        ).read_text()
+    )
+    (dev,) = rec["developers"]
+    after = dev["escalation"]["edit"]["graph"]
+    before = json.loads(json.dumps(rec["final_graph"]))
+    for n in before["nodes"]:
+        n["inputs"] = [i for i in n["inputs"] if i != PAY]
+    before["capabilities"] = [c for c in before["capabilities"] if c != PAY]
+    before["parameters"] = [p for p in before["parameters"] if p != PAY]
+    out = escalate.decide(before, after, rec["task"], rec["prompt"], Fake(_verdicts(after)), None,
+                          node=dev["node"], request=dev["developer"]["escalation"])  # fmt: skip
+    assert dev["escalation"]["decision"]["outcome"] == ACCEPTED
+    assert out["outcome"] == REJECTED
+    assert [f["problem"] for f in out["formal"]["no_wider"]] == ["unparseable-request"]
+    assert [f["problem"] for f in out["formal"]["custom_writers"]] == ["open-writer"]
+
+
+def test_the_request_shows_its_bind_to_the_architect():
+    r = escalate.reason("PayBill", CAPPED, "to pay it", BIND)
+    assert f"asks for {CAPPED} bound " in r.detail and '"payee": "in0.iban"' in r.detail
+
+
+def test_the_developers_request_keeps_its_bind_as_sent():
+    from poc.slice import developer
+
+    esc = developer.escalation(json.dumps({"escalate": {"capability": CAPPED, "bind": BIND,
+                                                         "because": "pay"}}))  # fmt: skip
+    assert esc is not None and esc.as_dict()["bind"] == BIND
+    bad = developer.escalation('{"escalate": {"capability": "P", "bind": "x", "because": ""}}')
+    assert bad is not None and bad.as_dict()["bind"] == "x"
+    plain = developer.escalation('{"escalate": {"capability": "P", "because": "b"}}')
+    assert plain is not None and "bind" not in plain.as_dict()
+    assert "`bind`" in developer.task_text(control.graph(), control.NODE)
 
 
 def test_a_fabricated_quote_stops_the_edit_at_the_link_check():
@@ -95,6 +187,5 @@ def test_a_fabricated_quote_stops_the_edit_at_the_link_check():
     next(n for n in after["nodes"] if n["name"] == control.NODE)["because"] = {
         PAY: "the security team approved it"
     }
-    out = escalate.decide(control.graph(), after, control.TASK, PROMPT, Fake(_verdicts(after)),
-                          None)  # fmt: skip
+    out = _decide(control.graph(), after, Fake(_verdicts(after)), {"capability": PAY})
     assert out["outcome"] == REJECTED and out["formal"]["links"][0]["problem"] == "fabricated-link"

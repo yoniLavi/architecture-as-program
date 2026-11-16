@@ -1,7 +1,7 @@
 """Escalation as a graph edit request (task 3.2).
 
 A developer that needs more authority than its node's clause grants returns a request,
-`{"escalate": {"capability", "because"}}`, never a body that takes it. The request
+`{"escalate": {"capability", "bind"?, "because"}}`, never a body that takes it. The request
 reaches the architect as a **structured reason** (the class `developer-request`, the
 node, the capability, and the developer's sentence, bounded), with the same stage-two
 view the measured run's edits used: the task, its own abstract graph, its graph. The
@@ -12,7 +12,10 @@ a changed graph can, and that graph goes back through
   stage two's are);
 * the **formal review**: the link check, which must find nothing, and the
   least-authority check against the task's label, which is recorded and never gates
-  (a real pipeline has no label: it is the measurement, not the pipeline);
+  (a real pipeline has no label: it is the measurement, not the pipeline); and, since
+  value-bound grants, two checks that gate: a `Custom` node holds no open `Payments`
+  grant (`formal.custom_writers`), and no grant the edit adds or widens is wider than
+  the request, bind included (`formal.no_wider`; a malformed request fails closed);
 * the **AI reviewer**, behaviour shown (task 2.1), which must flag no grant that the
   edit added or changed.
 
@@ -51,10 +54,12 @@ EDIT = (
 )
 
 
-def reason(node: str, capability: str, because: str) -> Reason:
-    """The request, as the architect receives it: fixed fields, a bounded sentence."""
+def reason(node: str, capability: str, because: str, bind: object = None) -> Reason:
+    """The request, as the architect receives it: fixed fields, a bounded sentence.
+    A request's `bind` (value-bound grants) is shown as sent, bounded too."""
     text = " ".join(because.split())[:MAX_BECAUSE]
-    return Reason(DEVELOPER_REQUEST, f"node {node} asks for {capability}, because: {text!r}")
+    bound = "" if bind is None else f" bound {json.dumps(bind, sort_keys=True)[:MAX_BECAUSE]}"
+    return Reason(DEVELOPER_REQUEST, f"node {node} asks for {capability}{bound}, because: {text!r}")
 
 
 def _held(graph: dict) -> dict[str, set[str]]:
@@ -92,9 +97,12 @@ def edit(task_prompt: str, abstract: dict, graph: dict, why: Reason,
 
 
 def decide(before: dict, after: dict | None, task: str, task_prompt: str,
-           reviewer_backend: LLMBackend | None, expected_model: str | None) -> dict:  # fmt: skip
+           reviewer_backend: LLMBackend | None, expected_model: str | None,
+           *, node: str = "", request: object = None) -> dict:  # fmt: skip
     """The review of an edit, and the outcome. `reviewer_backend` None skips the AI
-    reviewer (tests only), which then cannot accept."""
+    reviewer (tests only), which then cannot accept. `request` is the developer's
+    (`{"capability", "bind"?, "because"}`): the edit may grant no more than it asks
+    (`formal.no_wider`), and a missing or malformed request fails closed."""
     if after is None:
         return {"outcome": NO_GRAPH, "changed": []}
     changed = changed_grants(before, after)
@@ -108,16 +116,18 @@ def decide(before: dict, after: dict | None, task: str, task_prompt: str,
             "widenings": [w.as_dict() for w in formal.least_authority(after, labels.label(task))],
             "scope_binding": [f.as_dict() for f in formal.scope_binding(after)],
             "custom_writers": [f.as_dict() for f in formal.custom_writers(after)],
+            "no_wider": [f.as_dict() for f in formal.no_wider(before, after, node, request)],
         },
         "review": None,
     }
     failing_writers = [f for f in record["formal"]["custom_writers"] if f["fails"]]
+    wider = record["formal"]["no_wider"]
     if reviewer_backend is not None:
         record["review"] = behaviour_review.review(task_prompt, after, reviewer_backend,
                                                    expected_model=expected_model)  # fmt: skip
     verdict = (record["review"] or {}).get("verdicts")
     flagged = sorted(c for c in changed if (verdict or {}).get(c, {}).get("verdict") in FLAGS)
     record["flagged"] = flagged
-    passed = not links and not failing_writers and verdict is not None and not flagged
+    passed = not links and not failing_writers and not wider and verdict is not None and not flagged
     record["outcome"] = ACCEPTED if passed else REJECTED
     return record

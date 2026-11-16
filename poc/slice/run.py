@@ -129,9 +129,10 @@ def develop_all(graph: dict, task: str, task_prompt: str, abstract: dict, unit: 
         entry["developer"] = rec
         if rec["outcome"] == developer.ESCALATED:
             req = rec["escalation"]
-            why = escalate.reason(node, req["capability"], req["because"])
+            why = escalate.reason(node, req["capability"], req["because"], req.get("bind"))
             edit = escalate.edit(task_prompt, abstract, graph, why, backends(), MODEL)
-            decision = escalate.decide(graph, edit["graph"], task, task_prompt, backends(), MODEL)
+            decision = escalate.decide(graph, edit["graph"], task, task_prompt, backends(), MODEL,
+                                       node=node, request=req)  # fmt: skip
             entry["escalation"] = {"edit": edit, "decision": decision}
             if decision["outcome"] == escalate.ACCEPTED:
                 graph = edit["graph"]

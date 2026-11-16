@@ -57,7 +57,7 @@ Every session working on this change first checks the feed recorder (standing ta
       (does not fail) an unnarrowed `ScheduledPayments` or `UserProfile`, as 0.1 decided. Verify: tests for the spec's scenarios, plus a replay over the slice's
       records in which D2's final graph fails and no other unit does. `make architect` and its
       pins are unchanged
-- [ ] 4.2 The escalation request gains an optional `bind`, and the no-wider check is applied
+- [x] 4.2 The escalation request gains an optional `bind`, and the no-wider check is applied
       in `poc/slice/escalate.py`. An unparseable request fails closed. Verify: tests for a
       wider answer (fails), an exact answer (passes), a bind with more uses (fails), and D2's
       recorded decision replayed (fails)
