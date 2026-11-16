@@ -37,7 +37,7 @@ Every session working on this change first checks the feed recorder (standing ta
       one facade per item under `each`, and fail the run on a path that does not resolve or
       has the wrong type. Verify: runtime tests for each case, including that no payment is
       made on a failed resolution
-- [ ] 2.3 Both tiers. A hand-written hostile body holding a bound grant pays another payee,
+- [x] 2.3 Both tiers. A hand-written hostile body holding a bound grant pays another payee,
       and then pays twice, on the host tier and as a confined component (crate under
       `poc/sandbox/rust/`, built with `make wasm`, committing only the new component). Verify:
       the crossing refuses both on both tiers, and the component's imports equal its derived
