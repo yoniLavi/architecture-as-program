@@ -93,7 +93,9 @@ mid-run stops the run first; it resumes from its recorded trials.
 
 ## 3 (continued). Replays
 
-- [ ] 3.3 Replay the archive on the stub (both tiers) and on each Claude model (confined tier
+- 3.3 *(untracked: moved, 16 November 2026, at the author's decision, to
+  `openspec/changes/operate-feed-triage`, task 2.1, with the recorder (0.3) as its standing
+  task. The stub part below stays this change's record.)* Replay the archive on the stub (both tiers) and on each Claude model (confined tier
       only), at low priority; commit the exports. Model replays are trials on the same subscription and wait for 1.7 to
       finish. **Stub part done 28 Oct 2026 on the first 21 ticks** (21 h, 99.9% covered, no
       failed fetch): host and confined agree exactly (285 triaged, 169 kept, 16 publishing
@@ -118,9 +120,12 @@ Reading and writing a short document; touches no code, so it may run alongside 1
 
 ## 5. Records
 
-- [ ] 5.1 `docs/ROADMAP.md` and `AGENTS.md` updated per phase
+- [x] 5.1 `docs/ROADMAP.md` and `AGENTS.md` updated per phase (the ROADMAP's 27 October
+      entry and later ones; AGENTS.md's "Strengthening the generation evidence" section, its
+      pointer updated at archive)
 - [x] 5.2 Spec deltas reconciled with what was built; `openspec validate --strict`
-- [ ] 5.3 At archive (added 16 November 2026 by `update-openspec-to-2`): if this change is
+- [x] 5.3 At archive (16 November 2026: not the first; `build-feed-triage-and-generation-experiment`
+      created both capabilities and wrote their Purposes) (added 16 November 2026 by `update-openspec-to-2`): if this change is
       the first to create `feed-triage-service` or `node-generation`, write each new spec's
       Purpose in the archive commit, since the placeholder `openspec archive` writes fails
       strict validation, and run `make spec-check` before and after
