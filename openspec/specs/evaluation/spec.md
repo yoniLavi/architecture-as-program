@@ -12,10 +12,17 @@ corpus cannot be read as a soundness proof.
 The repository SHALL produce, as a build output, a reproducible evaluation artifact that consolidates the
 demonstrator's evidence: the accept/reject verdicts of the graph-mutation corpus, the capability-boundary
 overhead measurements, and the prompt-injection attenuation outcome across the host and sandbox enforcement
-tiers. The artifact SHALL be generated from the existing corpus, benchmark, and demonstration rather than
-hand-maintained, so its contents cannot drift from the code that produces them. The artifact SHALL state that
-the corpus is curated and illustrative and SHALL report both tiers honestly, so it cannot be read as a
-soundness proof or a stronger guarantee than the demonstrator provides.
+tiers.
+
+#### Scenario: The artifact is generated rather than hand-maintained
+- **WHEN** the artifact's contents are produced
+- **THEN** The artifact SHALL be generated from the existing corpus, benchmark, and demonstration rather than
+  hand-maintained, so its contents cannot drift from the code that produces them.
+
+#### Scenario: The artifact bounds what it shows
+- **WHEN** the artifact reports the corpus and the two tiers
+- **THEN** The artifact SHALL state that the corpus is curated and illustrative and SHALL report both tiers
+  honestly, so it cannot be read as a soundness proof or a stronger guarantee than the demonstrator provides.
 
 #### Scenario: The evaluation artifact is generated on build
 - **WHEN** the build runs
@@ -39,7 +46,12 @@ merely reporting a snapshot.
 
 ### Requirement: The evaluation artifact includes canonical execution traces
 
-The evaluation harness SHALL emit execution traces of the prompt-injection scenario on both enforcement tiers as part of its `dist/` outputs, and SHALL pin structural properties of those traces as regression guards in the established pinned-verdict style: at minimum, that the untrusted taint reaches the tool-capable node through a permitted field (the free-text residual) on the confined tier, and that the discharge node is the sole point where trust is raised. A divergence SHALL fail the build rather than rewrite the artifact.
+The evaluation harness SHALL emit execution traces of the prompt-injection scenario on both enforcement tiers as part of its `dist/` outputs, and SHALL pin structural properties of those traces as regression guards in the established pinned-verdict style: at minimum, that the untrusted taint reaches the tool-capable node through a permitted field (the free-text residual) on the confined tier, and that the discharge node is the sole point where trust is raised.
+
+#### Scenario: A divergent trace property fails the build
+
+- **WHEN** a pinned structural property of an emitted trace diverges
+- **THEN** A divergence SHALL fail the build rather than rewrite the artifact.
 
 #### Scenario: Canonical traces are emitted on build
 
@@ -85,23 +97,29 @@ the evaluation artifact when a measurement falls outside it, rather than emittin
 stated magnitude contradicts. Because the excursions this guards against are transient, the harness
 SHALL re-measure before treating one as real, and SHALL fail only on a sustained excursion.
 
-The band SHALL be enforced where the artifact is written and not inside the run itself. The evaluation's
-other pins guard properties of the code, which must hold wherever it runs; this one guards a measurement,
-whose usability is a fact about the machine that took it, and a caller that publishes no figure SHALL NOT
-be failed by a loaded machine.
+#### Scenario: The band is enforced where the artifact is written
+- **WHEN** a run measures the per-crossing cost
+- **THEN** The band SHALL be enforced where the artifact is written and not inside the run itself.
+- **AND** The evaluation's other pins guard properties of the code, which must hold wherever it runs; this
+  one guards a measurement, whose usability is a fact about the machine that took it, and a caller that
+  publishes no figure SHALL NOT be failed by a loaded machine.
 
-The band's ceiling SHALL be a decade boundary, so that no measurement the band admits names a magnitude
-above the one the papers state. The band admits the upper half of the decade below as well, so the papers SHALL
-interpolate whichever magnitude a run names rather than state one in their own hand.
+#### Scenario: The band's ceiling is a decade boundary
+- **WHEN** the band is pinned
+- **THEN** The band's ceiling SHALL be a decade boundary, so that no measurement the band admits names a
+  magnitude above the one the papers state.
+- **AND** The band admits the upper half of the decade below as well, so the papers SHALL interpolate
+  whichever magnitude a run names rather than state one in their own hand.
 
-The overhead SHALL be measured in CPU time, not wall-clock time: the CPU time of the measuring
-thread for every call into a component, and the CPU time of the whole process for compilation,
-which wasmtime spreads over worker threads. The machine that builds the corpus is shared and never
-idle, and wall-clock time charges the time a measurement spent waiting for a core to whatever it
-measured (decided 29 October 2026, when a build on a loaded machine read 83µs for a crossing that
-reads ~25µs on a quiet one; thread CPU time on the same machine read ~50µs). CPU time does not
-remove the slowdown of running on a contended core, so the band stays, and the artifact and the
-papers SHALL name the clock.
+#### Scenario: The overhead is measured in CPU time
+- **WHEN** the per-crossing cost and the compilation cost are measured
+- **THEN** The overhead SHALL be measured in CPU time, not wall-clock time: the CPU time of the measuring
+  thread for every call into a component, and the CPU time of the whole process for compilation, which
+  wasmtime spreads over worker threads.
+- **AND** The machine that builds the corpus is shared and never idle, and wall-clock time charges the time
+  a measurement spent waiting for a core to whatever it measured.
+- **AND** CPU time does not remove the slowdown of running on a contended core, so the band stays, and the
+  artifact and the papers SHALL name the clock.
 
 #### Scenario: The benchmark runs on a loaded machine
 - **WHEN** the overhead is measured while other work competes for the cores
@@ -146,9 +164,13 @@ figure is, so it SHALL NOT be maintained by hand in a paper while the figure bes
 The evaluation harness SHALL hold at least one real, built component that imports an interface
 its node's `with` clause does not grant against that clause, through the same derivation code
 path as the agreeing rows, and SHALL pin both that it is caught and the interface it is caught
-for. A gate that is only ever shown agreeing is indistinguishable from one that cannot fail, so
-the failing direction SHALL have evidence from a real binary in the artifact and not only from a
-constructed fixture in the test suite.
+for.
+
+#### Scenario: The failing direction has evidence in the artifact
+- **WHEN** a reader consults the evaluation artifact for the derivation gate
+- **THEN** A gate that is only ever shown agreeing is indistinguishable from one that cannot fail, so
+  the failing direction SHALL have evidence from a real binary in the artifact and not only from a
+  constructed fixture in the test suite.
 
 #### Scenario: The negative control is caught
 - **WHEN** the evaluation harness runs
@@ -165,24 +187,48 @@ The evaluation harness SHALL compute each reported outcome from the run, tier, a
 attributes it to, and not from a separate probe. It SHALL count a denial as evidence only when the denial's
 detail is the discriminating one, the reason that could not appear had the attempt reached the host. An
 outcome that could not have read otherwise on the machine that built it is not evidence, and SHALL fail the
-build rather than be reported as a denial. Specifically:
-- the prompt-injection refusal SHALL be read from a run of the reported graph on the reported tiers, with a
-  model that demands the out-of-scope tool, and SHALL be pinned on each tier;
-- each host-tier escape SHALL be an attempt the harness performs, not a literal;
-- a confined filesystem or socket denial SHALL count only when the guest reports the operation unsupported,
-  and an environment denial only while the harness has set the variable being read;
-- an ungranted-capability denial SHALL count only for the capability failure, never for a resource failure,
-  and only when it names the interface the component was built to over-grant; an off-allowlist denial only
-  when it names the allowlist and the host;
-- the injection refusal SHALL carry each tier's own reason (the host handle's scope check; the confined
-  guest's report), so that a widened scope, which fails for another reason, is reported;
-- the tier table SHALL be pinned in the build: a confined escape, or a host cell that stops escaping, fails
-  it;
-- the ambient-import figures SHALL be computed against each node's own `with` clause;
-- each reason class SHALL be identified by its own check's message, and a case SHALL pin the class that
-  must be *present* among its rejection's classes, so a second check firing on the same graph cannot mask
-  a first that stopped firing (the sink rule once satisfied the lattice's signature, and the lattice could
-  be removed with every laundering case still green).
+build rather than be reported as a denial.
+
+#### Scenario: The injection refusal is read from the reported run
+- **WHEN** the harness reports the prompt-injection refusal
+- **THEN** the prompt-injection refusal SHALL be read from a run of the reported graph on the reported tiers,
+  with a model that demands the out-of-scope tool, and SHALL be pinned on each tier;
+
+#### Scenario: A host-tier escape is performed
+- **WHEN** the harness reports a host-tier escape
+- **THEN** each host-tier escape SHALL be an attempt the harness performs, not a literal;
+
+#### Scenario: A confined denial counts only with its discriminating detail
+- **WHEN** the harness reports a confined filesystem, socket or environment denial
+- **THEN** a confined filesystem or socket denial SHALL count only when the guest reports the operation
+  unsupported, and an environment denial only while the harness has set the variable being read;
+
+#### Scenario: A capability denial counts only for the capability failure
+- **WHEN** the harness reports an ungranted-capability or off-allowlist denial
+- **THEN** an ungranted-capability denial SHALL count only for the capability failure, never for a resource
+  failure, and only when it names the interface the component was built to over-grant; an off-allowlist
+  denial only when it names the allowlist and the host;
+
+#### Scenario: The injection refusal carries each tier's own reason
+- **WHEN** the harness reports the prompt-injection refusal on each tier
+- **THEN** the injection refusal SHALL carry each tier's own reason (the host handle's scope check; the
+  confined guest's report), so that a widened scope, which fails for another reason, is reported;
+
+#### Scenario: The tier table is pinned
+- **WHEN** the build renders the tier table
+- **THEN** the tier table SHALL be pinned in the build: a confined escape, or a host cell that stops
+  escaping, fails it;
+
+#### Scenario: Ambient imports are judged per node
+- **WHEN** the harness computes the ambient-import figures
+- **THEN** the ambient-import figures SHALL be computed against each node's own `with` clause;
+
+#### Scenario: A reason class is pinned as present
+- **WHEN** a corpus case pins the reason class it must be caught by
+- **THEN** each reason class SHALL be identified by its own check's message, and a case SHALL pin the class
+  that must be *present* among its rejection's classes, so a second check firing on the same graph cannot
+  mask a first that stopped firing (the sink rule once satisfied the lattice's signature, and the lattice
+  could be removed with every laundering case still green).
 
 #### Scenario: A denial for the wrong reason fails the build
 - **WHEN** a confined escape probe is denied with a detail other than its discriminating one (for example,
