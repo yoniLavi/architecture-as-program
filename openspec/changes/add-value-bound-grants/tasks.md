@@ -7,10 +7,10 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 0. Approval
 
-- [ ] 0.1 **The author approves this proposal** and answers the three open questions in
-      `design.md`: the optional escalation re-run, a cap or an exact amount, and the
-      `Custom` rule's reach. Record the date and the answers in `design.md`. Verify:
-      `openspec validate add-value-bound-grants --strict` passes after the edit
+- [x] 0.1 **The author approves this proposal** and answers the three open questions in
+      `design.md` (16 November 2026: every recommendation taken. The escalation re-run 5.3
+      goes ahead, the bound amount is a cap, and the `Custom` rule fails `Payments` only
+      and reports the other writer kinds). Recorded in `design.md`
 
 ## 1. Declaring and checking a bind
 
@@ -54,8 +54,7 @@ Every session working on this change first checks the feed recorder (standing ta
 
 - [ ] 4.1 The `Custom`-writer rule in `poc/architect/formal.py`, as a separate function run by
       the slice path only. It fails an open `Payments` grant on a `Custom` node, and reports
-      (does not fail) an unnarrowed `ScheduledPayments` or `UserProfile`, unless 0.1 says
-      otherwise. Verify: tests for the spec's scenarios, plus a replay over the slice's
+      (does not fail) an unnarrowed `ScheduledPayments` or `UserProfile`, as 0.1 decided. Verify: tests for the spec's scenarios, plus a replay over the slice's
       records in which D2's final graph fails and no other unit does. `make architect` and its
       pins are unchanged
 - [ ] 4.2 The escalation request gains an optional `bind`, and the no-wider check is applied
@@ -76,7 +75,7 @@ Every session working on this change first checks the feed recorder (standing ta
       Pinned as **succeeding** where the extractor returns the attacker's payee. Verify: the
       test asserts it, and the oracle-plans record is written apart from
       `poc/agentdojo/records/oracle-plans.json`, which is unchanged
-- [ ] 5.3 Only if 0.1 approves it: re-run D2's escalation once on the subscription (Haiku,
+- [ ] 5.3 Approved in 0.1: re-run D2's escalation once on the subscription (Haiku,
       low priority), with `bind` offered to developer and architect, recorded under
       `poc/slice/runs/bind/`. Exploratory and unregistered. Do not edit `poc/` while it runs.
       Verify: the record is committed, and the report states what the architect granted

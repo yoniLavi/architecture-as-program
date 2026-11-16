@@ -1,7 +1,7 @@
 # Value-bound grants: "this payee, this amount, once known"
 
-> **Status: proposed, not approved (16 November 2026).** Nothing is implemented until the
-> author approves the change (task 0.1). The author settled the four design questions on
+> **Status: approved by the author, 16 November 2026** (task 0.1; every recommendation
+> taken, including the three open questions in `design.md`). The author settled the four design questions on
 > 16 November 2026 (`docs/value-bound-grants-design-questions.md`). Each took the
 > recommendation, and `design.md` records them.
 

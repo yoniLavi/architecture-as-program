@@ -12,7 +12,7 @@ mechanism below is built on it.
 annotation; Q2 untrusted sources allowed and labelled, with an enforced `trusted` modifier;
 Q4 `Payments` only; Q5 the `Custom`-writer rule, the no-wider escalation check and the
 placement verdict on the human page, with contracts kept out). The change that follows is
-`openspec/changes/add-value-bound-grants`, which is proposed and not yet approved.
+`openspec/changes/add-value-bound-grants`, approved by the author on 16 November 2026.
 
 ## The case
 

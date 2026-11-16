@@ -135,7 +135,11 @@ Additive. A graph without a bind behaves exactly as before. Nothing is pushed or
 
 ## Open Questions
 
-The author answers these before approval (task 0.1):
+**Answered by the author, 16 November 2026 (task 0.1): every recommendation taken.** D2's
+escalation is re-run once (task 5.3); the bound amount is a cap; the `Custom` rule fails
+`Payments` only and reports `ScheduledPayments` and `UserProfile`.
+
+The questions as put:
 1. **Re-run the slice's escalation once**, with `bind` offered to the developer and the
    architect, on the subscription: Haiku, a handful of calls, exploratory and unregistered.
    Or leave the evidence fully deterministic? *Recommended: one re-run of D2's escalation.*
