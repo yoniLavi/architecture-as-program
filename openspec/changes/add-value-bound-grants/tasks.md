@@ -67,7 +67,7 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 5. The limits, pinned
 
-- [ ] 5.1 D1 replayed as a limit: the committed wrong-account body's graph, with `SendMoney`
+- [x] 5.1 D1 replayed as a limit: the committed wrong-account body's graph, with `SendMoney`
       bound to `ParseBill`'s output. Pinned as **succeeding** (the truncated IBAN is paid).
       Verify: the test asserts the payment is made
 - [ ] 5.2 The injection residual: an oracle graph for banking task 0 with an `Extract` →
