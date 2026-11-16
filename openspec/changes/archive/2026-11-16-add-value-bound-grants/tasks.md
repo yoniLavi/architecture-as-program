@@ -85,8 +85,8 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 6. Close
 
-- [ ] 6.1 `make build` and `make spec-check` pass, with the poc and agentdojo groups, and the
+- [x] 6.1 `make build` and `make spec-check` pass, with the poc and agentdojo groups, and the
       Paper 2, 3 and 4 figure pins are unchanged. Verify: the commands' output, and a
       `git diff --stat` over `tests/*pin*.json` that shows no change
-- [ ] 6.2 Archive the change. Write the `value-bound-grants` spec's Purpose in the archive
+- [x] 6.2 Archive the change. Write the `value-bound-grants` spec's Purpose in the archive
       commit. Verify: `openspec validate --archived` passes
