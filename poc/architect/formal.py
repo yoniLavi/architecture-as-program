@@ -35,7 +35,17 @@ from type_parser import (
     TString,
     is_assignable,
     parse_type,
+    payments_scope,
+    profile_fields,
+    scheduled_scope,
 )
+
+# The banking kinds' scope readers: a request whose scope none can read fails closed.
+_SCOPES = {
+    "Payments": payments_scope,
+    "ScheduledPayments": scheduled_scope,
+    "UserProfile": profile_fields,
+}
 
 MISSING_LINK = "missing-link"
 FABRICATED_LINK = "fabricated-link"
@@ -179,6 +189,151 @@ def scope_binding(graph: dict, task_prompt: str | None = None) -> list[ScopeFind
             for problem, element in literal_scope(cap):
                 if not bound(problem, element, text):
                     found.append(ScopeFinding(node["name"], cap, problem, element, quote))
+    return found
+
+
+# ── Writer grants on developer code (value-bound grants, the slice only) ──
+#
+# The slice's D2: the architect granted `Payments<[any], uncapped>` to a `Custom`
+# node, developer-written code that both read the bill and paid, and every check
+# passed it. This rule fails that: a `Custom` node may hold `Payments` only with
+# literal payees and a cap, or with a bind of both payee and amount. A
+# `ScheduledPayments` or `UserProfile` grant on a `Custom` node is reported, never
+# failed: neither kind is bindable yet, and the author decided (task 0.1 of
+# `add-value-bound-grants`) to rule on them when they are. A library writer is
+# outside the rule: its body is the library's, and its grant is left to the other
+# checks. The registered run's review never calls this; the slice path does.
+
+OPEN_WRITER = "open-writer"  # fails
+CUSTOM_WRITER = "custom-writer"  # reported only
+
+CUSTOM_REPORTED_KINDS = ("ScheduledPayments", "UserProfile")
+
+
+@dataclass(frozen=True)
+class CustomWriterFinding:
+    node: str
+    capability: str
+    problem: str  # OPEN_WRITER | CUSTOM_WRITER
+    fails: bool
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+def _payments_closed(cap: str) -> bool:
+    """Literal payees only, and a cap."""
+    scope = payments_scope(parse_type(cap))
+    return scope is not None and not scope.dynamic and scope.cap is not None
+
+
+def custom_writers(graph: dict) -> list[CustomWriterFinding]:
+    """Every writer grant a `Custom` node holds that this rule fails or reports."""
+    caps = set(graph.get("capabilities", []))
+    found: list[CustomWriterFinding] = []
+    for node in graph.get("nodes", []):
+        if node.get("uses") != "Custom":
+            continue
+        binds = node.get("bind") if isinstance(node.get("bind"), dict) else {}
+        for cap in (i for i in node.get("inputs", []) if i in caps):
+            k = kind(cap)
+            if k == "Payments":
+                spec = binds.get(cap) if isinstance(binds.get(cap), dict) else {}
+                bound = "payee" in spec and "amount" in spec
+                if not (bound or _payments_closed(cap)):
+                    found.append(CustomWriterFinding(node["name"], cap, OPEN_WRITER, True))
+            elif k in CUSTOM_REPORTED_KINDS:
+                found.append(CustomWriterFinding(node["name"], cap, CUSTOM_WRITER, False))
+    return found
+
+
+# ── An accepted escalation grants no more than was asked (the slice only) ──
+#
+# The developer's request may carry a bind (`developer.escalation`). For every grant
+# the architect's edit adds or widens on some node, the check requires that grant to
+# be assignable to the request (`is_assignable(requested, granted)`: no wider), and,
+# where the request is bound, a bind on the granted grant with every bound field at
+# the same path, a subset of the request's fields at most, and no more uses. A
+# request that does not parse fails closed; it never passes as "no request".
+
+UNPARSEABLE_REQUEST = "unparseable-request"
+WIDER_THAN_ASKED = "wider-than-asked"
+UNBOUND_ANSWER = "unbound-answer"
+BIND_WIDER = "bind-wider"
+
+
+@dataclass(frozen=True)
+class EscalationFinding:
+    node: str
+    capability: str
+    problem: str
+    detail: str
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+def _bind_no_wider(asked: dict, given: object) -> str | None:
+    """Why the bind `given` is wider than `asked`, or None."""
+    if not isinstance(given, dict):
+        return "the request is bound and the grant is not"
+    asked_fields = {f: asked[f] for f in ("payee", "amount") if f in asked}
+    given_fields = {f: given[f] for f in ("payee", "amount") if f in given}
+    # Every field the request binds must be bound in the answer, at the same path.
+    for f, path in asked_fields.items():
+        if given_fields.get(f) != path:
+            return f"the request binds {f}={path}; the grant binds {f}={given_fields.get(f)}"
+    for f, path in given_fields.items():
+        if f not in asked_fields:
+            return f"the grant binds {f}={path}, which the request does not ask for"
+    asked_uses, given_uses = asked.get("uses", 1), given.get("uses")
+    if not isinstance(given_uses, int) or isinstance(given_uses, bool):
+        return f"the grant's uses {given_uses!r} is not an integer"
+    if isinstance(asked_uses, int) and given_uses > asked_uses:
+        return f"the grant allows {given_uses} uses; the request asked for {asked_uses}"
+    return None
+
+
+def no_wider(before: dict, after: dict, node: str, request: object) -> list[EscalationFinding]:
+    """Every grant the edit adds or widens on any node that is wider than `request`
+    (`{"capability", "bind"?, "because"}` as the developer sent it)."""
+    capability = request.get("capability") if isinstance(request, dict) else None
+    asked_bind = request.get("bind") if isinstance(request, dict) else None
+    try:
+        asked = parse_type(capability) if isinstance(capability, str) else None
+    except Exception:
+        asked = None
+    if asked is not None and _SCOPES.get(kind(capability), lambda _t: True)(asked) is None:
+        asked = None  # a banking kind whose scope no narrowing rule can read (D2's own)
+    if asked is None or (asked_bind is not None and not isinstance(asked_bind, dict)):
+        return [EscalationFinding(node, str(capability), UNPARSEABLE_REQUEST,
+                                  "the request does not parse; it fails closed")]  # fmt: skip
+    caps_before = set(before.get("capabilities", []))
+    held_before = {
+        n["name"]: {i: (n.get("bind") or {}).get(i) for i in n["inputs"] if i in caps_before}
+        for n in before.get("nodes", [])
+    }
+    caps = set(after.get("capabilities", []))
+    found: list[EscalationFinding] = []
+    for n in after.get("nodes", []):
+        binds = n.get("bind") if isinstance(n.get("bind"), dict) else {}
+        old = held_before.get(n["name"], {})
+        for cap in (i for i in n.get("inputs", []) if i in caps):
+            if cap in old and old[cap] == binds.get(cap):
+                continue  # held, and bound, as before the edit: not this escalation's answer
+            try:
+                granted = parse_type(cap)
+            except Exception:
+                granted = None
+            if granted is None or not is_assignable(asked, granted):
+                found.append(EscalationFinding(n["name"], cap, WIDER_THAN_ASKED,
+                                               f"not within the request {capability}"))  # fmt: skip
+                continue
+            if asked_bind is not None:
+                why = _bind_no_wider(asked_bind, binds.get(cap))
+                if why is not None:
+                    problem = UNBOUND_ANSWER if cap not in binds else BIND_WIDER
+                    found.append(EscalationFinding(n["name"], cap, problem, why))
     return found
 
 

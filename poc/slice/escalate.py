@@ -107,15 +107,17 @@ def decide(before: dict, after: dict | None, task: str, task_prompt: str,
             "links": links,
             "widenings": [w.as_dict() for w in formal.least_authority(after, labels.label(task))],
             "scope_binding": [f.as_dict() for f in formal.scope_binding(after)],
+            "custom_writers": [f.as_dict() for f in formal.custom_writers(after)],
         },
         "review": None,
     }
+    failing_writers = [f for f in record["formal"]["custom_writers"] if f["fails"]]
     if reviewer_backend is not None:
         record["review"] = behaviour_review.review(task_prompt, after, reviewer_backend,
                                                    expected_model=expected_model)  # fmt: skip
     verdict = (record["review"] or {}).get("verdicts")
     flagged = sorted(c for c in changed if (verdict or {}).get(c, {}).get("verdict") in FLAGS)
     record["flagged"] = flagged
-    passed = not links and verdict is not None and not flagged
+    passed = not links and not failing_writers and verdict is not None and not flagged
     record["outcome"] = ACCEPTED if passed else REJECTED
     return record

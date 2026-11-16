@@ -52,7 +52,7 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 4. The formal rules and the placement verdict
 
-- [ ] 4.1 The `Custom`-writer rule in `poc/architect/formal.py`, as a separate function run by
+- [x] 4.1 The `Custom`-writer rule in `poc/architect/formal.py`, as a separate function run by
       the slice path only. It fails an open `Payments` grant on a `Custom` node, and reports
       (does not fail) an unnarrowed `ScheduledPayments` or `UserProfile`, as 0.1 decided. Verify: tests for the spec's scenarios, plus a replay over the slice's
       records in which D2's final graph fails and no other unit does. `make architect` and its

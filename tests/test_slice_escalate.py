@@ -23,12 +23,18 @@ class Fake:
         return SimpleNamespace(text=self.replies.pop(0))
 
 
-def granted() -> dict:
-    """The control graph with the custom node now holding the payment grant."""
+CLOSED = "Payments<['UK12345678901234567890'], '98.70'>"
+
+
+def granted(pay: str = PAY) -> dict:
+    """The control graph with the custom node now holding a payment grant."""
     g = control.graph()
     node = next(n for n in g["nodes"] if n["name"] == control.NODE)
-    node["inputs"].append(PAY)
-    node["because"] = {PAY: "pay the bill"}
+    node["inputs"].append(pay)
+    if pay not in g["capabilities"]:
+        g["capabilities"].append(pay)
+        g["parameters"].append(pay)
+    node["because"] = {pay: "pay the bill"}
     for n in g["nodes"]:
         if n["name"] in ("ReadBill", "PayBill", "Confirm"):
             held = [i for i in n["inputs"] if i in g["capabilities"]]
@@ -66,14 +72,22 @@ def test_an_unchanged_graph_is_declined_and_no_graph_is_recorded():
 
 
 def test_a_changed_graph_needs_both_reviews():
-    before, after = control.graph(), granted()
+    before, after = control.graph(), granted(CLOSED)
     unreviewed = escalate.decide(before, after, control.TASK, PROMPT, None, None)
     assert unreviewed["outcome"] == REJECTED  # no AI reviewer, no acceptance
     passed = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after)), None)
     assert passed["outcome"] == ACCEPTED and passed["formal"]["links"] == []
-    flagged = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after, PAY)),
+    flagged = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after, CLOSED)),
                               None)  # fmt: skip
-    assert flagged["outcome"] == REJECTED and flagged["flagged"] == [PAY]
+    assert flagged["outcome"] == REJECTED and flagged["flagged"] == [CLOSED]
+
+
+def test_an_open_payment_grant_on_the_custom_node_is_rejected_whatever_the_reviewer_says():
+    """D2's answer (value-bound grants, 4.1): the AI reviewer passing it no longer suffices."""
+    before, after = control.graph(), granted()
+    out = escalate.decide(before, after, control.TASK, PROMPT, Fake(_verdicts(after)), None)
+    assert out["outcome"] == REJECTED and out["flagged"] == []
+    assert [(f["capability"], f["fails"]) for f in out["formal"]["custom_writers"]] == [(PAY, True)]
 
 
 def test_a_fabricated_quote_stops_the_edit_at_the_link_check():

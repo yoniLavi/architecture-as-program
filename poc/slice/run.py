@@ -81,6 +81,7 @@ def formal_review(graph: dict, task: str, task_prompt: str) -> dict:
         "links": [f.as_dict() for f in formal.link_check(graph, task_prompt)],
         "widenings": [w.as_dict() for w in formal.least_authority(graph, labels.label(task))],
         "scope_binding": [f.as_dict() for f in formal.scope_binding(graph)],
+        "custom_writers": [f.as_dict() for f in formal.custom_writers(graph)],
     }
 
 
