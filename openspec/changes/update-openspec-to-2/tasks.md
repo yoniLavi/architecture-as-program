@@ -1,0 +1,81 @@
+# Tasks
+
+Before any edit, check `git status`, and that no generation, architect or baseline run is in
+progress. This change edits nothing under `poc/`, `scripts/` (but for one new script) or
+`graphs/`, so the feed recorder may keep running.
+
+## 0. Approval
+
+- [ ] 0.1 **The author approves this proposal** and answers `design.md`'s open questions
+      (in place or by delta; whether the check gates commits; the script's fate; history
+      sentences)
+
+## 1. The instruction files
+
+- [ ] 1.1 Record the starting point in the commit message: `openspec --version`,
+      `openspec doctor`, and the totals of `openspec validate --all --strict` and
+      `--archived`
+- [ ] 1.2 `openspec update --force`. Read the whole diff before staging anything
+- [ ] 1.3 Check by hand (design, decision 5): `CLAUDE.md` is still a symlink to `AGENTS.md`;
+      the managed block is written once; the repository's own text in `AGENTS.md` is
+      byte-identical outside the block
+- [ ] 1.4 `openspec/config.yaml`, so that `openspec doctor` reports the root healthy
+- [ ] 1.5 Carry over what `openspec/AGENTS.md` held and the 2.0 skills do not: strict
+      validation before approval, and no implementation before approval. Into `AGENTS.md`,
+      "Spec-driven development"
+- [ ] 1.6 Repoint every reference to `openspec/AGENTS.md` and to the `/openspec:*` commands:
+      `AGENTS.md`, `METHODOLOGY.md`, `openspec/project.md`, `README.md`, `papers/README.md`.
+      Archived changes are history and are left as written. Frozen and published papers are
+      not touched
+- [ ] 1.7 `make build` green. Commit
+
+## 2. The standing specs
+
+One spec per commit. For each: restructure, run the comparison script, read the diff with
+`--color-moved`, run `openspec validate <spec> --type spec --strict`, and list in the commit
+message every sentence that left a requirement without arriving in a scenario.
+
+- [ ] 2.1 `scripts/check-spec-restructure.py` and its test: a dropped normative sentence
+      fails; a moved one passes; a reworded one fails
+- [ ] 2.2 `architect-pipeline`: 2 requirements, and its Purpose
+- [ ] 2.3 `trust-typing`: 4 requirements, and its Purpose
+- [ ] 2.4 `evaluation`: 5 requirements
+- [ ] 2.5 `paper-corpus`: 9 requirements. The two that `add-paper-3` added on 16 November
+      are among them
+- [ ] 2.6 `signal-graph-runtime`: 17 requirements
+- [ ] 2.7 `graph-inspector`: its Purpose
+- [ ] 2.8 `openspec validate --specs --strict`: 7 of 7 pass
+
+## 3. The archive, and the check
+
+- [ ] 3.1 `2026-07-14-add-signal-graph-runtime` and
+      `2026-08-01-update-papers-after-corpus-review`: read each unticked task, and annotate it
+      with a dated note saying what became of it. Tick it only if the work was in fact done
+      later, with the commit named
+- [ ] 3.2 `make spec-check`: `openspec validate --all --strict` and
+      `openspec validate --archived`, failing on either. Listed in `AGENTS.md` under Build as
+      opt-in
+- [ ] 3.3 `make spec-check` green
+
+## 4. The open changes
+
+- [ ] 4.1 Re-validate each with `--strict` after phase 1 and again after phase 2:
+      `add-paper-4`, `add-vertical-slice`, `strengthen-generation-evidence`,
+      `build-feed-triage-and-generation-experiment`. If 2.0 wants a different shape for a
+      change in flight, report it and leave the change alone
+- [ ] 4.2 `add-vertical-slice`, `strengthen-generation-evidence` and
+      `build-feed-triage-and-generation-experiment` each add a new capability. Add to each
+      one's archive task: write the new spec's Purpose in the same commit, and run
+      `make spec-check`
+- [ ] 4.3 Any added requirement in an open change that is over 500 characters is restructured
+      by the same rules, so that it does not fail the standing spec at archive
+- [ ] 4.4 Repoint any reference in an open change's `tasks.md` to `openspec/AGENTS.md` or an
+      `/openspec:*` command
+
+## 5. Close
+
+- [ ] 5.1 `AGENTS.md` (the OpenSpec section, Key files, Build) and `METHODOLOGY.md` describe
+      the 2.0 layout and the check
+- [ ] 5.2 Delete or keep the comparison script, as the author decided
+- [ ] 5.3 `make build` and `make spec-check` green. Archive, and write `spec-workflow`'s
+      Purpose in the same commit
