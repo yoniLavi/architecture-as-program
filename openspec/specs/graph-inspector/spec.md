@@ -1,7 +1,10 @@
 # graph-inspector Specification
 
 ## Purpose
-TBD - created by archiving change add-graph-inspector-ui. Update Purpose after archive.
+The graph inspector: a web view, outside the corpus build, that renders the canonical graph
+sources unmodified, runs them server-side through the same runtime the tests use, and overlays
+the returned trace (tiers, trust labels, capability crossings). It keeps no representation of a
+graph of its own.
 ## Requirements
 ### Requirement: The inspector renders the canonical graph sources
 

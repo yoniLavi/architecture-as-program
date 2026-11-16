@@ -1,7 +1,11 @@
 # architect-pipeline Specification
 
 ## Purpose
-TBD - created by archiving change add-architect-and-reviewers. Update Purpose after archive.
+The architect and its reviewers: a model that writes a signal graph from a natural-language task
+without seeing tool output, a formal review that checks each grant's quoted justification and
+compares the graph with registered least-authority labels, an isolated reviewer tested before
+use, authority that changes only through the graph, and the registration and spending rules
+under which any of it is measured.
 
 ## Requirements
 
@@ -39,15 +43,18 @@ reported as a widening.
 ### Requirement: The reviewer is isolated and tested before use
 The independent reviewer SHALL see only the prompt and a canonicalised graph for its primary
 verdict, and SHALL give a structured verdict for every grant. A second verdict, given the
-architect's rationales, SHALL be reported apart. Before a measured run, the reviewer SHALL pass
-a pre-use test on a pinned corpus of hand-widened graphs, at a threshold fixed in the
-registration, or the run SHALL be refused. Its model SHALL be chosen by a rule fixed in
-advance, and every catch rate SHALL be reported with how similar the reviewer's and the
-architect's models are.
+architect's rationales, SHALL be reported apart.
 
 #### Scenario: The reviewer misses too many planted widenings
 - **WHEN** the reviewer's catch rate on the pre-use corpus is below the registered threshold
 - **THEN** the measured run does not start
+- **AND** Before a measured run, the reviewer SHALL pass a pre-use test on a pinned corpus of
+  hand-widened graphs, at a threshold fixed in the registration, or the run SHALL be refused.
+
+#### Scenario: The reviewer's model, and its catch rates
+- **WHEN** a reviewer is chosen for a measured run, and its catch rates are reported
+- **THEN** Its model SHALL be chosen by a rule fixed in advance, and every catch rate SHALL be
+  reported with how similar the reviewer's and the architect's models are.
 
 #### Scenario: Same-family review
 - **WHEN** the architect and the reviewer are from the same model family
@@ -70,13 +77,20 @@ The pretexts, the two channels (the Product Owner's prompt, and a document the a
 given), the cells, the models by full identifier, the task hashes, the primary outcome (a
 widening that the least-authority check flags and that neither the link check nor the
 reviewer catches), and one confirmatory test SHALL be
-committed before any trial, and approved by the author. The harness SHALL refuse a run whose
-registration, tasks or imported tree have changed since. Registered and exploratory results
-SHALL never be pooled.
+committed before any trial, and approved by the author.
 
 #### Scenario: The registration is edited after trials began
 - **WHEN** the registration file differs from its committed version
 - **THEN** the harness refuses to run
+
+#### Scenario: The registration, the tasks or the tree changed
+- **WHEN** a run is started after any registered input has changed
+- **THEN** The harness SHALL refuse a run whose registration, tasks or imported tree have changed
+  since.
+
+#### Scenario: Registered and exploratory results
+- **WHEN** a report gives registered and exploratory results
+- **THEN** Registered and exploratory results SHALL never be pooled.
 
 ### Requirement: Paid model calls are gated and recorded
 A model backend that costs money beyond the subscription SHALL refuse to run unless a committed
