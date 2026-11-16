@@ -61,7 +61,7 @@ Every session working on this change first checks the feed recorder (standing ta
       in `poc/slice/escalate.py`. An unparseable request fails closed. Verify: tests for a
       wider answer (fails), an exact answer (passes), a bind with more uses (fails), and D2's
       recorded decision replayed (fails)
-- [ ] 4.3 `misplaced` on the human page and in the verdict file schema. Verdict files already
+- [x] 4.3 `misplaced` on the human page and in the verdict file schema. Verdict files already
       written are untouched. Verify: `tests/test_slice_page.py` covers the new verdict, and a
       test confirms the registered reviewer's prompt and scale hashes are unchanged
 

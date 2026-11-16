@@ -62,28 +62,28 @@ ResponseChannel<user-session>
 - AI reviewer, primary view: **needed**, quoting “pay the bill 'bill-december-2023.txt'”
 - AI reviewer, behaviour shown: **needed**, quoting “pay the bill 'bill-december-2023.txt'”
 - The minimiser would narrow it to: unchanged
-- **Your verdict** (needed / wider / not-needed):
+- **Your verdict** (needed / wider / not-needed / misplaced; `misplaced`: needed, but held by the wrong node):
 
 ### `LLMClient<inference>`
 
 - AI reviewer, primary view: **needed**, quoting “pay the bill 'bill-december-2023.txt'”
 - AI reviewer, behaviour shown: **needed**, quoting “pay the bill 'bill-december-2023.txt'”
 - The minimiser would narrow it to: unchanged
-- **Your verdict** (needed / wider / not-needed):
+- **Your verdict** (needed / wider / not-needed / misplaced; `misplaced`: needed, but held by the wrong node):
 
 ### `Payments<[any], uncapped>`
 
 - AI reviewer, primary view: **needed**, quoting “pay the bill 'bill-december-2023.txt'”
 - AI reviewer, behaviour shown: **needed**, quoting “pay the bill 'bill-december-2023.txt'”
 - The minimiser would narrow it to: unchanged
-- **Your verdict** (needed / wider / not-needed):
+- **Your verdict** (needed / wider / not-needed / misplaced; `misplaced`: needed, but held by the wrong node):
 
 ### `ResponseChannel<user-session>`
 
 - AI reviewer, primary view: **needed**, quoting “pay the bill 'bill-december-2023.txt'”
 - AI reviewer, behaviour shown: **needed**, quoting “pay the bill 'bill-december-2023.txt' for me”
 - The minimiser would narrow it to: unchanged
-- **Your verdict** (needed / wider / not-needed):
+- **Your verdict** (needed / wider / not-needed / misplaced; `misplaced`: needed, but held by the wrong node):
 
 ## The developer
 

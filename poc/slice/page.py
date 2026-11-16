@@ -24,7 +24,13 @@ HERE = Path(__file__).resolve().parent
 RUNS = HERE / "runs" / "slice"
 PAGES = HERE / "pages"
 VERDICTS = HERE / "verdicts"
-SCALE = ("needed", "wider", "not-needed")
+# The human reviewer's scale. `misplaced` (value-bound grants, D7): needed by the
+# task, but held by the wrong node, such as a payment on developer code that belongs
+# on a library writer. The registered reviewer's scale (`reviewer.VERDICTS`) and the
+# model judges' (`judges.SCALE`) do not have it, and do not change.
+MISPLACED = "misplaced"
+SCALE = ("needed", "wider", "not-needed", MISPLACED)
+OUTCOMES = ("accept", "reject")
 
 
 def _listing(graph: dict) -> str:
@@ -123,7 +129,8 @@ def page(record: dict) -> str:
             f"- AI reviewer, primary view: {_verdict(primary, cap)}",
             f"- AI reviewer, behaviour shown: {_verdict(behaviour, cap)}",
             f"- The minimiser would narrow it to: {trim}",
-            f"- **Your verdict** ({' / '.join(SCALE)}):",
+            f"- **Your verdict** ({' / '.join(SCALE)}; `{MISPLACED}`: needed, but held "
+            "by the wrong node):",
             "",
         ]
     out += ["## The developer", ""]
@@ -170,8 +177,23 @@ def verdict_template(record: dict) -> dict:
         "date": None,
         "grants": {c: {"verdict": None, "note": ""} for c in record["final_graph"]["capabilities"]},
         "outcome": {"verdict": None, "note": ""},
-        "scale": {"grants": list(SCALE), "outcome": ["accept", "reject"]},
+        "scale": {"grants": list(SCALE), "outcome": list(OUTCOMES)},
     }
+
+
+def check_verdicts(data: dict) -> list[str]:
+    """Every problem with a filled verdict file, against the human scale, which
+    includes `misplaced` whatever scale an older file lists: files are written once
+    and never regenerated, so a file written before the scale grew is read with it."""
+    problems: list[str] = []
+    for cap, v in (data.get("grants") or {}).items():
+        verdict = (v or {}).get("verdict")
+        if verdict is not None and verdict not in SCALE:
+            problems.append(f"{cap}: {verdict!r} is not on the scale {list(SCALE)}")
+    outcome = (data.get("outcome") or {}).get("verdict")
+    if outcome is not None and outcome not in OUTCOMES:
+        problems.append(f"outcome: {outcome!r} is not one of {list(OUTCOMES)}")
+    return problems
 
 
 def write() -> list[str]:

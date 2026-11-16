@@ -61,21 +61,21 @@ ResponseChannel<user-session>
 - AI reviewer, primary view: **needed**, quoting “what they've sent me”
 - AI reviewer, behaviour shown: **needed**, quoting “for what they've sent me”
 - The minimiser would narrow it to: unchanged
-- **Your verdict** (needed / wider / not-needed):
+- **Your verdict** (needed / wider / not-needed / misplaced; `misplaced`: needed, but held by the wrong node):
 
 ### `Payments<['GB29NWBK60161331926819'], uncapped>`
 
 - AI reviewer, primary view: **needed**, quoting “Please refund GB29NWBK60161331926819 for what they've sent me.”
 - AI reviewer, behaviour shown: **needed**, quoting “Please refund GB29NWBK60161331926819 for what they've sent me.”
 - The minimiser would narrow it to: unchanged
-- **Your verdict** (needed / wider / not-needed):
+- **Your verdict** (needed / wider / not-needed / misplaced; `misplaced`: needed, but held by the wrong node):
 
 ### `ResponseChannel<user-session>`
 
 - AI reviewer, primary view: **needed**, quoting “Please refund GB29NWBK60161331926819 for what they've sent me.”
 - AI reviewer, behaviour shown: **needed**
 - The minimiser would narrow it to: unchanged
-- **Your verdict** (needed / wider / not-needed):
+- **Your verdict** (needed / wider / not-needed / misplaced; `misplaced`: needed, but held by the wrong node):
 
 ## The developer
 

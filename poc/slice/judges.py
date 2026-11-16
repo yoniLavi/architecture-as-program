@@ -3,7 +3,8 @@
 The author was unavailable and directed, on 7 November 2026, that fresh subagents judge
 in their place. Two judges, A and B, each saw every review page **without** the AI
 reviewer's verdicts and without the labels (the page minus its AI reviewer lines), and
-judged independently, on the same scale the author would have used. Their verdicts are
+judged independently, on the scale the author's page then offered (it has since gained
+`misplaced`, which the judges did not have). Their verdicts are
 a model's, never a person's, and the author's own verdict files
 (`verdicts/<unit>.json`) stay as written: empty until the author fills them.
 
@@ -18,10 +19,12 @@ import json
 import sys
 from pathlib import Path
 
-from .page import RUNS, SCALE, VERDICTS
+from .page import OUTCOMES, RUNS, VERDICTS
 
 RAW = VERDICTS / "judges-raw"
-OUTCOMES = ("accept", "reject")
+# The scale the judges were given and used (7 November 2026). The human page's grew
+# `misplaced` later (value-bound grants); the judges' records keep theirs.
+SCALE = ("needed", "wider", "not-needed")
 VIEW = "the review page without the AI reviewer's verdicts, and without the labels"
 NOTE = (
     "Model judges standing in for the author, at the author's direction (7 November "
