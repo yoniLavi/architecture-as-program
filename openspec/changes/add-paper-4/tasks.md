@@ -34,9 +34,11 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 2. Corpus plumbing
 
-- [ ] 2.1 `papers/04-architect/proposal.typ`: a title block with no DOI, section labels, and
-      `json("/dist/architect.json")`, `json("/dist/agentdojo-banking.json")`
-- [ ] 2.2 `Makefile` targets for Paper 4, and its citable PDF name
+- [x] 2.1 `papers/04-architect/proposal.typ`: a title block with no DOI, section labels, and
+      `json("/dist/architect.json")`, `json("/dist/agentdojo-banking.json")`, and
+      `json("/dist/slice.json")` for its `post_hoc` block only
+- [x] 2.2 `Makefile` targets for Paper 4, and its citable PDF name
+      (`lavi-2026-reviewed-before-it-runs.pdf`)
 - [ ] 2.3 The survey's entries in `citations.bib`, each checked against its source, and a
       Paper 3 entry with its DOI (`lavi_granted_2026`)
 - [x] 2.4 If question 4 is (b): the replays' keys in `dist/slice.json` given a `display`
