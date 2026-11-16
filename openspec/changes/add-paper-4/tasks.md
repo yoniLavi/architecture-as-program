@@ -39,8 +39,11 @@ Every session working on this change first checks the feed recorder (standing ta
 - [ ] 2.2 `Makefile` targets for Paper 4, and its citable PDF name
 - [ ] 2.3 The survey's entries in `citations.bib`, each checked against its source, and a
       Paper 3 entry with its DOI (`lavi_granted_2026`)
-- [ ] 2.4 If question 4 is (b): the replays' keys in `dist/slice.json` given a `display`
-      block, kept apart from the registered figures and labelled post hoc
+- [x] 2.4 If question 4 is (b): the replays' keys in `dist/slice.json` given a `display`
+      block, kept apart from the registered figures and labelled post hoc: `post_hoc`,
+      with its own `label` and `display`. The scope-binding replay counts grants (61),
+      the behaviour one trials (76 widened, 76 clean), and the keys say which; the
+      behaviour replay's 5 gained and 1 lost are computed (`review.crossover`)
 
 ## 3. Drafting
 

@@ -120,6 +120,22 @@ def _flags(verdicts: dict | None) -> set[str]:
     return {c for c, v in (verdicts or {}).items() if v["verdict"] in reviewer.FLAGS}
 
 
+def crossover(pairs: list[tuple[dict, dict]]) -> dict[str, int]:
+    """Widened trials the behaviour view caught and the registered primary did not
+    (gained), and the reverse (lost): how far the two catch counts share their trials."""
+    gained = lost = 0
+    for reg, beh in pairs:
+        grants = counted(reg)
+        if not grants:
+            continue
+        old = _flags((reg["reviews"].get(reviewer.PRIMARY) or {}).get("verdicts"))
+        new = _flags(beh["review"].get("verdicts"))
+        was, now = any(g in old for g in grants), any(g in new for g in grants)
+        gained += now and not was
+        lost += was and not now
+    return {"gained": gained, "lost": lost}
+
+
 def unused_fields(graph: dict, grant: str) -> bool:
     """Whether the view shows `grant` admitting a field the graph never sets."""
     text = behaviour.render(graph)

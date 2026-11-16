@@ -1,10 +1,13 @@
 """The scope-binding link check, and its shadow replay over the registered architect
 run (`add-vertical-slice`, task 1.2). Stdlib-only; calls no model.
 
-The replay's totals are pinned: not because they are a paper's figures (the slice
-puts none in a paper), but so that the finding the slice reports cannot move
-without a test saying so. The 61 unseen widenings are the registered run's own
-count (`dist/architect.md`), recomputed here from its records."""
+The replay's totals are pinned so that the finding the slice reports cannot move
+without a test saying so, and, since the author's answer of 16 November 2026
+(`add-paper-4`, question 4), because Paper 4 reports this replay and the
+behaviour-shown one as labelled post-hoc analyses (`post_hoc` in `dist/slice.json`).
+The 61 unseen widenings are grants, the registered run's own count
+(`counts.registered.unseen_grants` in `dist/architect.json`), recomputed here from
+its records; they sit in 59 trials."""
 
 from __future__ import annotations
 
@@ -94,6 +97,31 @@ def test_the_replay_over_the_registered_run(records):
                      "false_alarms": 59}  # fmt: skip
     assert prompt == {**common, "flagged": 0, "counted_flagged": 0, "unseen_flagged": 0,
                       "false_alarms": 0}  # fmt: skip
+
+
+def test_paper_4s_post_hoc_block_is_labelled_and_agrees_with_both_reports():
+    """The block Paper 4 reads: labelled post hoc, its grants the registered run's own
+    unseen grants, and its registered reviewer the architect report's 17 of 76."""
+    from poc.architect import report as architect
+    from poc.slice import report as slice_report
+
+    ph = slice_report.build()["post_hoc"]
+    assert ph["label"].startswith("Post hoc:") and "never pooled" in ph["label"]
+    reg = architect.build()["counts"]["registered"]
+    q = ph["scope_binding"]["quote"]
+    assert q["unseen_grants"] == reg["unseen_grants"] == 61
+    assert (q["unseen_grants_flagged"], q["false_alarms"], q["unseen_grants_literal"]) == (
+        1,
+        59,
+        42,
+    )
+    b = ph["behaviour"]
+    assert b["registered_caught"] == reg["total"]["caught_by_reviewer"] == 17
+    assert b["sample_widened_trials"] == reg["total"]["widened"] == 76
+    assert (b["caught"], b["gained"], b["lost"]) == (21, 5, 1)
+    assert b["registered_caught"] + b["gained"] - b["lost"] == b["caught"]
+    assert (b["clean_trials_flagged"], b["registered_clean_trials_flagged"]) == (7, 3)
+    assert ph["display"]["behaviour_catch_rate"] == "27.6%"
 
 
 def test_what_the_unseen_widenings_are(records):

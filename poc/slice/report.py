@@ -27,8 +27,66 @@ from .page import RUNS, VERDICTS, _review_of_final
 
 NOTE = (
     "Exploratory: one author, a few graphs, Haiku in every role, not registered. Its "
-    "findings shape the plan and the papers' framing; none is a figure in a paper."
+    "findings shape the plan and the papers' framing; none is a figure in a paper, except "
+    "the two replays over the registered records, which Paper 4 reports as post-hoc "
+    "analyses (see `post_hoc`)."
 )
+
+POST_HOC_LABEL = (
+    "Post hoc: computed after the registered run, over its committed records, and not "
+    "registered. Reported apart from the registered results, never pooled with them and "
+    "never tested against them (the author, 16 November 2026: add-paper-4, question 4)."
+)
+
+
+def post_hoc(scope: dict[str, dict], pairs: list[tuple[dict, dict]]) -> dict[str, Any]:
+    """The two replays as Paper 4 states them: counts, and a `display` block for every
+    rate. Unseen widenings in the scope-binding replay are **grants** (61); the
+    behaviour replay counts **trials** (76 widened, 76 clean). The keys say which."""
+    from ..architect.report import _pct
+
+    summary = behaviour.summarise(pairs)
+    new, old = summary[behaviour.BEHAVIOUR], summary["primary"]
+    q, p = scope["quote"], scope["prompt"]
+    sb = {
+        v: {
+            "unseen_grants": s["unseen"],
+            "unseen_grants_flagged": s["unseen_flagged"],
+            "flags": s["flagged"],
+            "false_alarms": s["false_alarms"],
+            "unseen_grants_open": s["unseen_open"],
+            "unseen_grants_open_by_kind": s["unseen_by_kind"],
+            "unseen_grants_literal": s["unseen"] - s["unseen_open"],
+        }
+        for v, s in scope.items()
+    }
+    br = {
+        "sample_widened_trials": new["widened_trials"],
+        "sample_clean_trials": new["clean_trials"],
+        "caught": new["caught"],
+        "registered_caught": old["caught"],
+        **behaviour.crossover(pairs),
+        "clean_trials_flagged": new["clean_trials_flagged"],
+        "registered_clean_trials_flagged": old["clean_trials_flagged"],
+    }
+    return {
+        "label": POST_HOC_LABEL,
+        "scope_binding": sb,
+        "behaviour": br,
+        "display": {
+            "quote_false_alarm_share": _pct(q["false_alarms"], q["flagged"]),
+            "quote_unseen_flagged_rate": _pct(q["unseen_flagged"], q["unseen"]),
+            "prompt_unseen_flagged_rate": _pct(p["unseen_flagged"], p["unseen"]),
+            "behaviour_catch_rate": _pct(br["caught"], br["sample_widened_trials"]),
+            "registered_catch_rate": _pct(br["registered_caught"], br["sample_widened_trials"]),
+            "behaviour_clean_flag_rate": _pct(
+                br["clean_trials_flagged"], br["sample_clean_trials"]
+            ),
+            "registered_clean_flag_rate": _pct(
+                br["registered_clean_trials_flagged"], br["sample_clean_trials"]
+            ),
+        },
+    }
 
 
 def _unit(record: dict) -> dict[str, Any]:
@@ -99,10 +157,13 @@ def build() -> dict[str, Any]:
     records = [json.loads(p.read_text()) for p in sorted(RUNS.glob("*.json"))]
     registered = replay.trials()
     rows = [minimise(r["architect"]["graph"])[1] for r in registered]
+    scope = {v: replay.replay(registered)[v]["total"] for v in replay.VARIANTS}
+    pairs = behaviour.load()
     return {
         "note": NOTE,
-        "scope_binding_replay": {v: replay.replay(registered)[v]["total"] for v in replay.VARIANTS},
-        "behaviour_replay": behaviour.summarise(behaviour.load()),
+        "post_hoc": post_hoc(scope, pairs),
+        "scope_binding_replay": scope,
+        "behaviour_replay": behaviour.summarise(pairs),
         "minimiser_registered": {
             "graphs": len(rows),
             "grants": sum(map(len, rows)),
