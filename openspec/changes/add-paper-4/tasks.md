@@ -63,6 +63,12 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 4. Review
 
-- [ ] 4.1 A full critical review, with the result applied
+- [x] 4.1 A full critical review, with the result applied (16 November 2026: 5 blocking,
+      18 should-fix, 18 minor, each checked against the records before it was applied.
+      The pilot history was corrected: a fourth change, never piloted. Hand-typed outcomes
+      are now computed or asserted. The Q0 spelling slip and its post-hoc p are stated, by
+      the author's decision (`design.md`). New report keys: within-label false alarms per
+      view, effect-class planted widenings, target kind, failed-but-scored runs. Two hedge
+      pins were re-seeded where the lower bound became a stated expectation)
 - [ ] 4.2 **The author's read**
 - [ ] 4.3 `papers/README.md`, `AGENTS.md`, `docs/ROADMAP.md`; `openspec validate --strict`

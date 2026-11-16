@@ -339,16 +339,15 @@ PINS = (
         "sec:pipeline",
         "reviewer/diversity-not-independence",
         "never independence",
-        "We report every catch rate as diversity of role and information, never "
-        "independence, and as a lower bound on what an independent reviewer would catch",
+        "We report every catch rate as diversity of role and information, never independence",
     ),
     (
         PAPER4,
         "sec:limits",
         "limits/lower-bound",
-        "lower bound",
-        "Every catch rate here is therefore a lower bound on what an independent reviewer "
-        "would catch, and how far below we cannot say",
+        "likely lower bound",
+        "we read every catch rate here as a likely lower bound. Neither the direction nor "
+        "the size is measured",
     ),
     (
         PAPER4,

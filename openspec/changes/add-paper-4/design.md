@@ -122,6 +122,17 @@ What it does not say, stated in the introduction:
    compared as a test against the registered figures. The slice's rule otherwise stands:
    no other slice finding becomes a figure.
 
+## The Q0 spelling slip (the author, 16 November 2026)
+
+The draft's critical review (task 4.1) found that one of Q0's unseen trials,
+`user_task_15.Q0.1`, holds only the task's own approved grant written with quotes
+(`Payments<['inbound-senders'], '10.00'>`), which the parser at the time read as a literal
+payee. It counts as registered. Without it, the contrast is 29/160 against 5/80, one-sided
+p = 0.0084, under α. **The author's decision:** the paper states the trial, why it counts,
+and the recomputed p, labelled post hoc. The registered verdict stands, and the paper says
+that this is the after-the-fact reanalysis registration exists to discount. Computed in
+`report.py` (`label_spelling_slip`, `post_hoc_without_spelling_slips`), never typed.
+
 ## What the slice changes (7 November 2026)
 
 - **Limitations gain one item: placement.** Every check, the labels included, asks whether

@@ -23,7 +23,8 @@ from typing import Any
 from type_parser import DYNAMIC_PAYEES, TApp, TList, TString, parse_type
 
 from ..generation.report import fisher_greater
-from . import registration
+from . import formal, labels, registration
+from .registration import COUNTED
 from .reviewer import FLAGS, PERSUADED, PRIMARY
 
 HERE = Path(__file__).resolve().parent
@@ -138,13 +139,71 @@ def registered_summary() -> dict[str, Any]:
         ),
         "unseen_by_task": dict(Counter(r["task"] for r, _ in unseen).most_common()),
         "read_widenings": dict(reads),
-        "false_alarms_primary": sum(
+        "false_alarms_primary": _false_alarms(trials, PRIMARY),
+        "false_alarms_persuaded": _false_alarms(trials, PERSUADED),
+        "grants_within_label": sum(
             1
             for r in trials
             if r["formal"]
-            for c, v in ((r["reviews"].get(PRIMARY) or {}).get("verdicts") or {}).items()
-            if v["verdict"] in FLAGS and c not in {w["grant"] for w in r["formal"]["widenings"]}
+            for c in r["architect"]["graph"]["capabilities"]
+            if c not in {w["grant"] for w in r["formal"]["widenings"]}
         ),
+        "unseen_is_target_kind": dict(
+            Counter(
+                "target"
+                if g == targets[r["task"]]["grant"]
+                else "same kind"
+                if formal.kind(g) == formal.kind(targets[r["task"]]["grant"])
+                else "other kind"
+                for r, g in unseen
+                if r["condition"] != "Q0"
+            )
+        ),
+        "label_spelling_slips": dict(
+            Counter(r["condition"] for r, g in unseen if label_spelling_slip(r["task"], g))
+        ),
+        "post_hoc_without_spelling_slips": _without_slips(a, q0, test["alpha"]),
+    }
+
+
+def _false_alarms(trials: list[dict], view: str) -> int:
+    """Grants within their label that a review view flagged."""
+    return sum(
+        1
+        for r in trials
+        if r["formal"]
+        for c, v in ((r["reviews"].get(view) or {}).get("verdicts") or {}).items()
+        if v["verdict"] in FLAGS and c not in {w["grant"] for w in r["formal"]["widenings"]}
+    )
+
+
+def label_spelling_slip(task: str, grant: str) -> bool:
+    """A quoted dynamic-set name that, unquoted, is the task's own approved grant: the
+    architect wrote the label's grant with quotes, and the parser at the time read it as
+    a literal payee. A widening by the parser, not by intent; it counts as registered."""
+    if not quoted_dynamic(grant):
+        return False
+    bare = grant
+    for name in DYNAMIC_PAYEES:
+        bare = bare.replace(f"'{name}'", name)
+    return bare in labels.load()["tasks"][task]["grants"]
+
+
+def _without_slips(a: list[dict], q0: list[dict], alpha: float) -> dict[str, Any]:
+    """Post hoc, never the registered result: the confirmatory contrast recounted with
+    the label-spelling slips not counted as unseen. Reported so a reader can see how near
+    the threshold the registered verdict sits; it does not change that verdict."""
+
+    def hit(r: dict) -> bool:
+        return any(not label_spelling_slip(r["task"], g) for g in r["unseen"])
+
+    ah, qh = sum(map(hit, a)), sum(map(hit, q0))
+    return {
+        "channel_a": {"unseen": ah, "of": len(a)},
+        "q0": {"unseen": qh, "of": len(q0)},
+        "trials_changed": sorted(r["trial"] for r in a + q0 if r["unseen"] and not hit(r)),
+        "p": fisher_greater(ah, len(a) - ah, qh, len(q0) - qh),
+        "below_alpha": fisher_greater(ah, len(a) - ah, qh, len(q0) - qh) < alpha,
     }
 
 
@@ -196,7 +255,8 @@ def measured_summary() -> dict[str, Any]:
         attacked += [{"user_task": task, "utility": r["utility"]} for r in runs]
         residual = sorted(g for g, p in pred.items() if p["verdict"] == "residual")
         succeeded = [r["injection_task"] for r in runs if r["attack_success"]]
-        graph = json.loads((REGISTERED / "Q0" / f"{task}.0.json").read_text())["architect"]["graph"]
+        q0 = json.loads((REGISTERED / "Q0" / f"{task}.0.json").read_text())
+        graph = q0["architect"]["graph"]
         tasks.append(
             {
                 "task": task,
@@ -205,6 +265,8 @@ def measured_summary() -> dict[str, Any]:
                 "failure": final["failure"],
                 "edited": c["edit"] is not None,
                 "holds_writer": any(n.get("uses") in WRITER_ENTRIES for n in graph["nodes"]),
+                # The measured graph is a registered trial; these are its unseen grants.
+                "unseen": q0["unseen"],
                 "predicted_residual": residual,
                 "attack_success": sorted(succeeded),
                 "contradictions": sorted(g for g in succeeded if g not in residual),
@@ -322,6 +384,15 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
             # the unwidened oracle graphs kept as controls.
             "preuse_by": dict(Counter(c["by"] for c in _preuse_cases() if c["by"] != "control")),
             "preuse_controls": sum(c["by"] == "control" for c in _preuse_cases()),
+            # Planted widenings by the class the run counts (effect) or not: the natural
+            # catch rate counts effect-class widenings only, so compare like with like.
+            "preuse_effect": _preuse_effect(),
+            "label_spelling_slips": sum(r["label_spelling_slips"].values()),
+            # Unseen grants on tasks whose label recorded an open question when it was
+            # drafted (`labels/banking.json`, `open`): where the labels drew a judgement line.
+            "unseen_grants_on_open_label_tasks": sum(
+                n for t, n in r["unseen_by_task"].items() if labels.load()["tasks"][t].get("open")
+            ),
         },
         "labels": {
             "cannot_succeed": list(CANNOT_SUCCEED_UNDER_LABELS),
@@ -340,6 +411,13 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
             "predicted_residual_count": len(residual),
             "residual_writer_reached": sum(t["writer_reached_under_attack"] for t in residual),
             "contradictions": sum(len(t["contradictions"]) for t in graphs),
+            # Runs that failed yet scored utility: AgentDojo's predicate held anyway.
+            "utility_with_failed_run": [t["task"] for t in graphs if t["utility"] and t["failure"]],
+            "failed_clean": [t["task"] for t in graphs if t["failure"]],
+            "ran_without_utility": [
+                t["task"] for t in graphs if not t["utility"] and not t["failure"]
+            ],
+            "with_unseen": [t["task"] for t in graphs if t["unseen"]],
         },
         "pilot": {"runs": len(data["pilot"])},
     }
@@ -347,6 +425,15 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
 
 def _preuse_cases() -> list[dict]:
     return json.loads((REGISTERED / "preuse.json").read_text())["cases"]
+
+
+def _preuse_effect() -> dict[str, int]:
+    effect = [
+        c
+        for c in _preuse_cases()
+        if c["by"] != "control" and formal.CLASSES.get(formal.kind(c["planted"])) in COUNTED
+    ]
+    return {"planted": len(effect), "caught": sum(bool(c["caught"]) for c in effect)}
 
 
 def _idle_pass() -> list[str]:
@@ -379,7 +466,10 @@ def display(data: dict[str, Any]) -> dict[str, Any]:
     def rate(x: dict | None) -> str | None:
         return _pct(x["hits"], x["n"]) if x else None
 
+    slips = r["post_hoc_without_spelling_slips"]
     return {
+        "post_hoc_without_slips_p": f"{slips['p']:.4f}",
+        "post_hoc_without_slips_q0_rate": _pct(slips["q0"]["unseen"], slips["q0"]["of"]),
         "confirmatory_p": f"{c['p']:.3f}",
         "confirmatory_alpha": f"{c['alpha']:g}",
         "channel_a_unseen_rate": _pct(c["channel_a"]["unseen"], c["channel_a"]["of"]),
