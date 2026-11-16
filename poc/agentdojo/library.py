@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from type_parser import TApp, TName, TSum, parse_type, strip_trust, unparse
@@ -78,6 +78,9 @@ class Entry:
     scope: str | None = None  # a reader's DBHandle scope; "file:" means any one file
     params: Mapping[str, str] = field(default_factory=dict)  # name → what it holds
     may_discharge: bool = False
+    # Offered a `bind` on its `Payments` grant. Never set in `CATALOGUE`, whose text
+    # the registered architect run hashed; only `SLICE_CATALOGUE` offers it.
+    bindable: bool = False
 
 
 def _reader(name: str, scope: str, output: str, doc: str) -> Entry:
@@ -179,7 +182,13 @@ CUSTOM_ENTRY = Entry(
     params={"role": "what the node does, for the developer, in a sentence or two",
             "fields": "field name → type (omit when the output is a writer's record)"},
 )  # fmt: skip
-SLICE_CATALOGUE: dict[str, Entry] = {**CATALOGUE, CUSTOM_ENTRY.name: CUSTOM_ENTRY}
+# The entries that may hold a `Payments` grant, offered a `bind` in the slice's text
+# (value-bound grants). The registered `CATALOGUE` is untouched.
+_BINDABLE_ENTRIES = ("SendMoney", "ScheduleTransaction", CUSTOM_ENTRY.name)
+SLICE_CATALOGUE: dict[str, Entry] = {
+    name: replace(e, bindable=True) if name in _BINDABLE_ENTRIES else e
+    for name, e in {**CATALOGUE, CUSTOM_ENTRY.name: CUSTOM_ENTRY}.items()
+}
 _READER_SCOPES = frozenset(e.scope for e in CATALOGUE.values() if e.family == READER)
 
 # ── Paths and the expression language ───────────────────────────────
@@ -393,6 +402,88 @@ def check_graph(graph: dict, catalogue: Mapping[str, Entry] = CATALOGUE) -> list
             if any(_untrusted(unparse(v)) != _untrusted(data[0]) for v in variants):
                 errors.append(f"{where} must keep its input's trust label on its output")
         errors.extend(f"{where}: {e}" for e in _check_params(entry, n, len(data)))
+        if "bind" in n:
+            errors.extend(f"{where}: {e}" for e in _check_bind_fields(graph, n, data))
+    return errors
+
+
+# ── A bind's field types (value-bound grants, task 1.3) ─────────────
+#
+# The validator checks a bind's structure and knows types by name only. Here the
+# record schemas are known, so each bound path is checked against the record its
+# input carries: the field exists, a payee is a string, an amount a number. An
+# input whose record is not known (a selector's port, a `Compose` outside
+# `RECORDS`) is left to the run, which fails on a path that does not resolve.
+
+
+def _record_by_name(type_str: str) -> dict[str, str] | None:
+    from ..architect.mapping import SHAPES  # mapping imports this module
+
+    name = strip_output(type_str)
+    return RECORDS.get(name) or SHAPES.get(name)
+
+
+def _produced_schema(node: dict) -> dict[str, str] | None:
+    """The record a node emits, where its parameters say: an `Extract`'s or a
+    custom node's `fields`, or a named record."""
+    uses = node.get("uses")
+    if uses == "Extract" and isinstance(node.get("params", {}).get("fields"), dict):
+        return {k: str(v) for k, v in node["params"]["fields"].items()}
+    if uses == "Custom":
+        return custom_schema(node) or None
+    return _record_by_name(node["output"])
+
+
+def input_schema(graph: dict, node: dict, position: int, data: list[str]) -> dict[str, str] | None:
+    """The record schema of `node`'s data input `position`, if known: by its type's
+    name, else from every edge feeding that position, if they agree."""
+    known = _record_by_name(data[position])
+    if known is not None:
+        return known
+    nodes = {n.get("name"): n for n in graph.get("nodes", [])}
+    schemas = []
+    for e in graph.get("data_edges", []):
+        if e.get("to") != node.get("name") or e.get("to_input", 0) != position:
+            continue
+        source = nodes.get(e.get("from"))  # a ported edge names `Node.port`: unknown
+        schemas.append(_produced_schema(source) if source is not None else None)
+    if schemas and all(s is not None and s == schemas[0] for s in schemas):
+        return schemas[0]
+    return None
+
+
+def _check_bind_fields(graph: dict, node: dict, data: list[str]) -> list[str]:
+    from graph_validator import BIND_PATH, BINDABLE
+
+    errors: list[str] = []
+    binds = node.get("bind")
+    if not isinstance(binds, dict):
+        return errors  # the validator's to report
+    for grant, spec in binds.items():
+        fields = BINDABLE.get(_kind(grant)) if grant in node["inputs"] else None
+        if fields is None or not isinstance(spec, dict):
+            continue  # the validator's to report
+        for fname, wanted in fields.items():
+            p = spec.get(fname)
+            m = BIND_PATH.fullmatch(p) if isinstance(p, str) else None
+            if m is None or int(m.group(1)) >= len(data):
+                continue  # the validator's to report
+            schema = input_schema(graph, node, int(m.group(1)), data)
+            if schema is None:
+                continue
+            parts = [s for s in m.group(2).split(".") if s]
+            at = f"bind on {grant!r}: {fname} path {p!r}"
+            if not parts:
+                errors.append(f"{at} names the whole record, not a field of it")
+            elif parts[0] not in schema:
+                errors.append(f"{at} names field {parts[0]!r}, which the input lacks")
+            elif len(parts) > 1:
+                errors.append(f"{at} reads into field {parts[0]!r}, which is not a record")
+            elif schema[parts[0]].rstrip("?") != wanted:
+                errors.append(
+                    f"{at} names field {parts[0]!r}, a {schema[parts[0]].rstrip('?')}; "
+                    f"{'an' if fname[0] in 'aeiou' else 'a'} {fname} must be a {wanted}"
+                )
     return errors
 
 

@@ -22,7 +22,7 @@ Every session working on this change first checks the feed recorder (standing ta
 - [x] 1.2 Trust labels for binds, per variant, and enforcement of a claimed `trusted`.
       Verify: tests for an untrusted payee (accepted, labelled), a false `trusted` claim
       (rejected), and a sum input with one untrusted variant (labelled `untrusted`)
-- [ ] 1.3 The library's field-type check for binds against record schemas (`Extract`
+- [x] 1.3 The library's field-type check for binds against record schemas (`Extract`
       `fields`, `Custom` `fields`, `RECORDS`), and `bind` offered in `SLICE_CATALOGUE`'s
       text only. Verify: a test that a payee bound to a number fails, and the existing test
       that the registered `CATALOGUE` text is unchanged still passes

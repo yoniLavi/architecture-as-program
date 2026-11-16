@@ -74,6 +74,18 @@ _FAMILY_NOTE = {
 }
 
 
+# Shown only beside an entry `SLICE_CATALOGUE` marks bindable (value-bound grants);
+# no entry of the registered `CATALOGUE` is, so the hashed text does not move.
+BIND_NOTE = (
+    "Its `Payments` grant may carry a `bind`, a node field beside `params` that narrows "
+    "the grant to values from the node's own inputs: "
+    '`"bind": {"<the grant, exactly as written>": {"payee": "in0.<field>", '
+    '"amount": "in0.<field>", "uses": 1}}`. The node can then pay only that payee, at '
+    "most that amount, that many times; the grant's type stays the upper bound. "
+    "`payee` and `amount` are each optional, `uses` is not."
+)
+
+
 def _shape(fields: dict[str, str]) -> str:
     return "{" + ", ".join(f"{k}: {v}" for k, v in fields.items()) + "}"
 
@@ -96,6 +108,8 @@ def catalogue(entries: Mapping[str, Entry] = CATALOGUE) -> str:
             line += " " + _FAMILY_NOTE.get(e.name, _FAMILY_NOTE[e.family])
         if e.params:
             line += " Parameters: " + "; ".join(f"`{k}`: {v}" for k, v in e.params.items()) + "."
+        if e.bindable:
+            line += " " + BIND_NOTE
         lines.append(line)
     lines += ["", "Data shapes (field: type):", ""]
     lines += [f"- `{name}` {_shape(fields)}" for name, fields in SHAPES.items()]
