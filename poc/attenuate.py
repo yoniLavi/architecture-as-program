@@ -37,9 +37,11 @@ A handle routed at exactly its declared type passes through untouched.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from decimal import Decimal
 from typing import Any
 
 from type_parser import (
+    PaymentsScope,
     TApp,
     TName,
     TString,
@@ -51,7 +53,7 @@ from type_parser import (
     scheduled_scope,
 )
 
-from .handles import InferenceLLM, _http_hosts, _llm_tools
+from .handles import CapabilityError, InferenceLLM, _http_hosts, _llm_tools
 
 
 class AttenuationError(RuntimeError):
@@ -263,6 +265,111 @@ class ProfileFacade(_Facade):
 
     def update(self, *, within: tuple = (), **changes: Any) -> Any:
         return self._inner.update(within=(self._fields, *within), **changes)  # type: ignore[attr-defined]
+
+
+# ── A grant bound to run-time values (value-bound grants) ───────────
+#
+# A node's `bind` narrows a `Payments` grant it holds to values its own inputs
+# carry: a payee, an amount, a number of uses. The runtime resolves the paths when
+# the node activates, and wraps the handle it routed in a `BoundPaymentsFacade`.
+# The bound is a `PaymentsScope` passed down as `within`, so the handle checks it
+# exactly as it checks a routing-point facade's; the static type stays the upper
+# bound, because the handle still checks its own scope. The bound amount is a cap
+# (design D4): a payment may not exceed it. The facade sits outermost, so it
+# composes with any routing-point narrowing beneath it.
+
+
+class BindError(RuntimeError):
+    """A bind's value is not one a bound scope can hold."""
+
+
+def bound_scope(static: Any, payee: object = None, amount: object = None) -> Any:
+    """`static` (a `PaymentsScope`) narrowed to `payee` and `amount` where given.
+    With no payee bound, the static payees are kept; with no amount, the static cap.
+    Both are values from a node's input, so their types are checked here too."""
+    literal, dynamic, cap = static.literal, static.dynamic, static.cap
+    if payee is not None:
+        if not isinstance(payee, str) or not payee:
+            raise BindError(f"a bound payee must be a non-empty string, not {payee!r}")
+        literal, dynamic = frozenset({payee}), frozenset()
+    if amount is not None:
+        if isinstance(amount, bool) or not isinstance(amount, int | float) or amount <= 0:
+            raise BindError(f"a bound amount must be a positive number, not {amount!r}")
+        cap = Decimal(str(amount))
+    return PaymentsScope(literal, dynamic, cap, static.recurring)
+
+
+class _BoundFacade(_ScopedFacade):
+    """A `Payments` handle bound for one activation: the bound scope passed down as
+    `within`, and `uses` payments at most. Only a call that returns spends a use: a
+    call refused by a scope (`CapabilityError`), by the bank (`BankError`) or failing
+    any other way spends none."""
+
+    __slots__ = ("_left",)
+
+    def __init__(self, inner: object, scope: Any, uses: int):
+        super().__init__(inner, scope)
+        if isinstance(uses, bool) or not isinstance(uses, int) or uses < 1:
+            raise BindError(f"`uses` must be a positive integer, not {uses!r}")
+        object.__setattr__(self, "_left", [uses])
+
+    @property
+    def uses_left(self) -> int:
+        return self._left[0]  # type: ignore[attr-defined]
+
+    def _spend(self, call: Callable[[], Any]) -> Any:
+        if self._left[0] < 1:  # type: ignore[attr-defined]
+            raise CapabilityError("the bound grant is spent: no uses are left")
+        result = call()
+        self._left[0] -= 1  # type: ignore[attr-defined]
+        return result
+
+
+class BoundPaymentsFacade(_BoundFacade):
+    """`Payments<…>` bound: `send` only."""
+
+    __slots__ = ()
+
+    def send(
+        self, recipient: str, amount: float, subject: str, date: str, *, within: tuple = ()
+    ) -> Any:
+        return self._spend(
+            lambda: self._inner.send(  # type: ignore[attr-defined]
+                recipient, amount, subject, date, within=(self._scope, *within)
+            )
+        )
+
+
+class BoundRecurringPaymentsFacade(_BoundFacade):
+    """`Payments<…, recurring>` bound: `schedule` only."""
+
+    __slots__ = ()
+
+    def schedule(
+        self,
+        recipient: str,
+        amount: float,
+        subject: str,
+        date: str,
+        recurring: bool,
+        *,
+        within: tuple = (),
+    ) -> Any:
+        return self._spend(
+            lambda: self._inner.schedule(  # type: ignore[attr-defined]
+                recipient, amount, subject, date, recurring, within=(self._scope, *within)
+            )
+        )
+
+
+def bind(handle: object, grant: str, payee: object = None, amount: object = None,
+         uses: int = 1) -> _BoundFacade:  # fmt: skip
+    """`handle`, held as `grant`, bound to `payee`, `amount` and `uses`."""
+    scope = payments_scope(parse_type(grant))
+    if scope is None:
+        raise BindError(f"{grant!r} is not a bindable grant")
+    cls = BoundRecurringPaymentsFacade if scope.recurring else BoundPaymentsFacade
+    return cls(handle, bound_scope(scope, payee, amount), uses)
 
 
 # ── Choosing a facade ───────────────────────────────────────────────

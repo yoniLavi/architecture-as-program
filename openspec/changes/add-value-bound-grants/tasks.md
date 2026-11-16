@@ -29,7 +29,7 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 2. Enforcing a bind
 
-- [ ] 2.1 `BoundPaymentsFacade` in `poc/attenuate.py`: the bound scope passed down as
+- [x] 2.1 `BoundPaymentsFacade` in `poc/attenuate.py`: the bound scope passed down as
       `within`, and a use counter that only successful calls spend. Verify: unit tests in
       `tests/test_poc_attenuation.py` for another payee, an amount over the bound, a second
       call, a refused call that spends nothing, and a bind beneath a routing-point facade

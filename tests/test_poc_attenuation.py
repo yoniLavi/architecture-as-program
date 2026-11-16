@@ -702,3 +702,170 @@ def test_a_read_state_facade_is_not_a_read_write_handle():
     facade = attenuate(inner, "StateHandle<'seen', read-write>", "StateHandle<'seen', read>")
     assert not isinstance(facade, ReadWriteStateHandle | ReadStateHandle)
     assert facade.name == "seen"
+
+
+# ── A grant bound to run-time values (value-bound grants, task 2.1) ──────────
+
+
+def _payments(grant: str, bank: MemoryBank):
+    from type_parser import parse_type, payments_scope
+
+    from poc.bank import PaymentsHandle, RecurringPaymentsHandle
+
+    scope = payments_scope(parse_type(grant))
+    cls = RecurringPaymentsHandle if scope.recurring else PaymentsHandle
+    return cls(scope, bank)
+
+
+def test_a_bound_grant_pays_its_payee_once_up_to_its_amount():
+    from poc.attenuate import bind
+
+    bank = MemoryBank()
+    grant = "Payments<[any], '2000'>"
+    pay = bind(_payments(grant, bank), grant, payee="GB1", amount=120.0, uses=1)
+    pay.send("GB1", 120.0, "bill", "2026-01-02")
+    assert [w[1]["recipient"] for w in bank.writes] == ["GB1"]
+
+
+def test_a_bound_grant_refuses_another_payee():
+    from poc.attenuate import bind
+
+    bank = MemoryBank()
+    grant = "Payments<[any], '2000'>"
+    pay = bind(_payments(grant, bank), grant, payee="GB1", amount=120.0, uses=1)
+    _refused(CapabilityError, "outside the handle's payees")(
+        lambda: pay.send("GB2", 1.0, "x", "2026-01-02")
+    )
+    assert bank.writes == []
+
+
+def test_a_bound_grant_refuses_an_amount_over_the_bound():
+    from poc.attenuate import bind
+
+    bank = MemoryBank()
+    grant = "Payments<[any], '2000'>"
+    pay = bind(_payments(grant, bank), grant, payee="GB1", amount=120.0, uses=1)
+    _refused(CapabilityError, "exceeds the handle's cap of 120")(
+        lambda: pay.send("GB1", 120.01, "x", "2026-01-02")
+    )
+    # The bound amount is a cap (design D4): less is allowed.
+    pay.send("GB1", 100.0, "part", "2026-01-02")
+    assert [w[1]["amount"] for w in bank.writes] == [100.0]
+
+
+def test_a_second_payment_is_refused_once_the_uses_are_spent():
+    from poc.attenuate import bind
+
+    bank = MemoryBank()
+    grant = "Payments<[any], uncapped>"
+    pay = bind(_payments(grant, bank), grant, payee="GB1", amount=50.0, uses=1)
+    pay.send("GB1", 50.0, "bill", "2026-01-02")
+    assert pay.uses_left == 0
+    _refused(CapabilityError, "spent")(lambda: pay.send("GB1", 50.0, "again", "2026-01-02"))
+    assert len(bank.writes) == 1
+
+
+def test_a_refused_call_spends_no_use():
+    from poc.attenuate import bind
+    from poc.bank import BankError
+
+    bank = MemoryBank()
+    grant = "Payments<[any], uncapped>"
+    pay = bind(_payments(grant, bank), grant, payee="GB1", amount=50.0, uses=1)
+    _refused(CapabilityError, "outside")(lambda: pay.send("GB2", 50.0, "x", "2026-01-02"))
+    _refused(CapabilityError, "exceeds")(lambda: pay.send("GB1", 51.0, "x", "2026-01-02"))
+    assert pay.uses_left == 1
+
+    # A refusal by the bank itself spends none either.
+    class Refusing(MemoryBank):
+        def send_money(self, *a, **k):
+            raise BankError("insufficient funds")
+
+    refusing = bind(_payments(grant, Refusing()), grant, payee="GB1", amount=50.0, uses=1)
+    _refused(BankError, "insufficient")(lambda: refusing.send("GB1", 5.0, "x", "2026-01-02"))
+    assert refusing.uses_left == 1
+    pay.send("GB1", 50.0, "bill", "2026-01-02")
+    assert pay.uses_left == 0
+
+
+def test_a_bound_payee_outside_the_static_payees_is_refused():
+    """The static type stays the upper bound: a bind only narrows."""
+    from poc.attenuate import bind
+
+    bank = MemoryBank()
+    grant = "Payments<['GB1'], '100'>"
+    pay = bind(_payments(grant, bank), grant, payee="GB9", amount=500.0, uses=1)
+    _refused(CapabilityError, "outside the handle's payees")(
+        lambda: pay.send("GB9", 5.0, "x", "2026-01-02")
+    )
+    over = bind(_payments(grant, bank), grant, payee="GB1", amount=500.0, uses=1)
+    _refused(CapabilityError, "cap of 100")(lambda: over.send("GB1", 200.0, "x", "2026-01-02"))
+    assert bank.writes == []
+
+
+def test_unbound_fields_keep_the_static_bound():
+    from poc.attenuate import bind
+
+    bank = MemoryBank()
+    grant = "Payments<['GB1', 'GB2'], '100'>"
+    payee_only = bind(_payments(grant, bank), grant, payee="GB2", uses=2)
+    _refused(CapabilityError, "cap of 100")(
+        lambda: payee_only.send("GB2", 150.0, "x", "2026-01-02")
+    )
+    amount_only = bind(_payments(grant, bank), grant, amount=10.0, uses=3)
+    amount_only.send("GB1", 10.0, "a", "2026-01-02")
+    amount_only.send("GB2", 10.0, "b", "2026-01-02")
+    _refused(CapabilityError, "outside")(lambda: amount_only.send("GB3", 1.0, "c", "2026-01-02"))
+
+
+def test_a_recurring_grant_binds_its_schedule():
+    from poc.attenuate import BoundRecurringPaymentsFacade, bind
+
+    bank = MemoryBank()
+    grant = "Payments<[any], uncapped, recurring>"
+    sched = bind(_payments(grant, bank), grant, payee="GB1", amount=9.0, uses=1)
+    assert isinstance(sched, BoundRecurringPaymentsFacade) and not hasattr(sched, "send")
+    _refused(CapabilityError, "outside")(lambda: sched.schedule("GB2", 9.0, "x", "d", True))
+    sched.schedule("GB1", 9.0, "spotify", "2026-01-02", True)
+    _refused(CapabilityError, "spent")(lambda: sched.schedule("GB1", 9.0, "x", "d", True))
+    assert len(bank.writes) == 1
+
+
+@pytest.mark.parametrize(
+    ("payee", "amount", "uses"),
+    [(5, None, 1), ("", None, 1), (None, "lots", 1), (None, -1, 1), (None, True, 1),
+     ("GB1", 1.0, 0), ("GB1", 1.0, True)],
+)  # fmt: skip
+def test_a_value_no_bound_scope_can_hold_is_refused(payee, amount, uses):
+    from poc.attenuate import BindError, bind
+
+    grant = "Payments<[any], uncapped>"
+    with pytest.raises(BindError):
+        bind(_payments(grant, MemoryBank()), grant, payee=payee, amount=amount, uses=uses)
+
+
+def test_a_bind_beneath_a_routing_point_facade_composes():
+    """A sub-graph's narrowing and a bind compose through `within`: the bind sits
+    outermost, and each bound only narrows."""
+    from poc.attenuate import attenuate, bind
+
+    bank = MemoryBank()
+    wide, narrow = "Payments<['GB1', 'GB2'], '100'>", "Payments<['GB1', 'GB2'], '50'>"
+    routed = attenuate(_payments(wide, bank), wide, narrow)
+    pay = bind(routed, narrow, payee="GB2", amount=80.0, uses=1)
+    # The bound amount (80) is over the routed cap (50): the routing point still refuses.
+    _refused(CapabilityError, "cap of 50")(lambda: pay.send("GB2", 60.0, "x", "2026-01-02"))
+    _refused(CapabilityError, "outside")(lambda: pay.send("GB1", 10.0, "x", "2026-01-02"))
+    assert pay.uses_left == 1
+    pay.send("GB2", 40.0, "ok", "2026-01-02")
+    assert [w[1]["recipient"] for w in bank.writes] == ["GB2"]
+
+
+def test_the_bound_facade_exposes_no_route_to_the_handle_behind_it():
+    from poc.attenuate import bind
+
+    grant = "Payments<[any], uncapped>"
+    pay = bind(_payments(grant, MemoryBank()), grant, payee="GB1", amount=1.0, uses=1)
+    assert not hasattr(pay, "__dict__") and not hasattr(pay, "schedule")
+    with pytest.raises(AttributeError):
+        pay._left = [99]  # type: ignore[attr-defined]
