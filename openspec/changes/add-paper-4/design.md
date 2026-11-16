@@ -133,6 +133,12 @@ and the recomputed p, labelled post hoc. The registered verdict stands, and the 
 that this is the after-the-fact reanalysis registration exists to discount. Computed in
 `report.py` (`label_spelling_slip`, `post_hoc_without_spelling_slips`), never typed.
 
+**No replication (the author, 16 November 2026).** A rerun with the parser fix was weighed
+and declined. A test rerun because p sat near α cannot rescue the original, and one at the
+registered size would have about even power (41–53% at the observed rates). The paper
+states what the run found, the slip and the threshold included, and the programme moves on.
+Do not propose a replication of this run for its own sake.
+
 ## What the slice changes (7 November 2026)
 
 - **Limitations gain one item: placement.** Every check, the labels included, asks whether
