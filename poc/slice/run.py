@@ -272,6 +272,17 @@ def abstract_of(graph: dict) -> dict:
 
 HAND_BUILT = ("D1", "D2")
 
+# Value-bound grants, task 5.3 (approved in its 0.1): D2 once more, with `bind` offered
+# to the developer (its prompt) and to the architect (`SLICE_CATALOGUE`'s text), and
+# the two new formal rules gating the edit. Exploratory and unregistered: one run,
+# recorded apart from the slice's, never pooled with it.
+BIND_RUNS = HERE / "runs" / "bind"
+BIND_RERUN = "user_task_0.D2"
+BIND_STUBS = [
+    "value-bound grants 5.3: D2 re-run once, bind offered to developer and architect",
+    "exploratory and unregistered: one run, never pooled with runs/slice/",
+]
+
 
 def run_hand_built(name: str, backends: Backends) -> dict:
     task = "user_task_0"
@@ -293,6 +304,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="poc.slice.run")
     parser.add_argument("--no-nice", action="store_true")
     parser.add_argument("--tasks", nargs="*", default=list(TASKS))
+    parser.add_argument("--bind-rerun", action="store_true",
+                        help="value-bound grants 5.3: D2 once, into runs/bind/")  # fmt: skip
     args = parser.parse_args(argv)
     priority = lower_priority(not args.no_nice)
     if dirty():
@@ -302,12 +315,23 @@ def main(argv: list[str] | None = None) -> int:
     if not (control.passed and control.run and control.run.get("utility")):
         print(f"refused: the hand-written control failed: {control.as_dict()}")
         return EXIT_REFUSED
-    RUNS.mkdir(parents=True, exist_ok=True)
-    units = [(f"{t}.{c}", lambda b, t=t, c=c: run_unit(t, c, b))
-             for t in args.tasks for c in CONDITIONS]  # fmt: skip
-    units += [(f"user_task_0.{h}", lambda b, h=h: run_hand_built(h, b)) for h in HAND_BUILT]
+    if args.bind_rerun:
+        root = BIND_RUNS
+
+        def rerun(b: Backends) -> dict:
+            record = run_hand_built("D2", b)
+            record["stubs"] = BIND_STUBS + record["stubs"]
+            return record
+
+        units = [(BIND_RERUN, rerun)]
+    else:
+        root = RUNS
+        units = [(f"{t}.{c}", lambda b, t=t, c=c: run_unit(t, c, b))
+                 for t in args.tasks for c in CONDITIONS]  # fmt: skip
+        units += [(f"user_task_0.{h}", lambda b, h=h: run_hand_built(h, b)) for h in HAND_BUILT]
+    root.mkdir(parents=True, exist_ok=True)
     for name, run in units:
-        path = RUNS / f"{name}.json"
+        path = root / f"{name}.json"
         if path.exists():
             continue
         if dirty():
