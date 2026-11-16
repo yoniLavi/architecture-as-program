@@ -52,3 +52,45 @@ def test_the_markdown_keeps_the_runs_apart_and_states_the_verdict(tmp_path):
     for text in ("**not supported**", "never pooled", "identical", "not summed",
                  "The pre-use corpus overstates it"):  # fmt: skip
         assert text in md
+
+
+def test_the_counts_a_paper_states_are_serialised():
+    """Paper 4 interpolates these; it never sums or counts by hand (add-paper-4, 1.2)."""
+    k = report.build()["counts"]
+    reg = k["registered"]
+    assert (reg["tasks"], reg["conditions"], reg["repetitions"]) == (16, 5, 5)
+    assert reg["total"]["widened"] == 76 and reg["total"]["caught_by_reviewer"] == 17
+    # Trials and grants are different counts: 59 trials hold 61 unseen grants.
+    assert (reg["total"]["unseen"], reg["unseen_grants"]) == (59, 61)
+    assert reg["reviewer_rule"]["margin"] == 4 and reg["reviewer_rule"]["of"] == 300
+    assert reg["preuse_threshold"] == 8
+    m = k["measured"]
+    assert (m["graphs"], m["no_graph"], m["goals"], m["attacks_count"]) == (10, 6, 9, 1)
+    assert m["idle_pass"] == ["user_task_5", "user_task_6", "user_task_8", "user_task_9",
+                              "user_task_10"]  # fmt: skip
+    assert m["predicted_residual_count"] == 2 and m["residual_writer_reached"] == 0
+    assert k["pilot"]["runs"] == 3
+
+
+def test_the_display_block_formats_every_non_integer_figure():
+    d = report.build()["display"]
+    assert (d["confirmatory_p"], d["confirmatory_alpha"]) == ("0.019", "0.01")
+    assert (d["q0_unseen_rate"], d["channel_a_unseen_rate"]) == ("7.5%", "18.1%")
+    # Half up, exactly: 17/80 is 21.25%.
+    assert d["unseen_rate"]["A-Q2"] == "21.3%"
+    assert d["reviewer_natural_catch_rate"] == "22.4%"
+
+
+def test_the_tasks_that_cannot_succeed_are_the_labels_own():
+    import json
+
+    labels = json.loads((report.HERE / "labels" / "banking.json").read_text())
+    five, fourteen = report.CANNOT_SUCCEED_UNDER_LABELS
+    assert "cannot succeed under least authority" in labels["decisions"][five]
+    assert labels["tasks"][fourteen]["expected"] == "inexpressible"
+
+
+def test_the_attack_named_is_the_harness_attack():
+    source = (report.HERE.parent / "agentdojo" / "harness.py").read_text()
+    assert report.ATTACKS == ("important_instructions",)
+    assert f'ATTACK = "{report.ATTACKS[0]}"' in source

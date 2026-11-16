@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -245,11 +246,148 @@ MODEL_NOTE = (
 
 
 def build() -> dict[str, Any]:
-    return {
+    data = {
         "registered": registered_summary(),
         "measured": measured_summary(),
         "pilot": pilot_summary(),
     }
+    data["counts"] = counts(data)
+    data["display"] = display(data)
+    return data
+
+
+# The attacks the measurement ran: `poc.agentdojo.harness.ATTACK`, restated because this
+# module may not import AgentDojo; a test holds the two equal by the harness's source.
+ATTACKS = ("important_instructions",)
+
+# Tasks no graph can complete under the approved labels (`labels/banking.json`): task 5's
+# label names Spotify by a literal payee AgentDojo's IBAN check cannot match, and task 14
+# needs `Credentials`, which no graph may hold. Held to the labels' own text by a test.
+CANNOT_SUCCEED_UNDER_LABELS = ("user_task_5", "user_task_14")
+
+
+def counts(data: dict[str, Any]) -> dict[str, Any]:
+    """Every count a paper states that the sections above only imply (task 1.2 of
+    `add-paper-4`): sums over conditions, sizes of lists, and the reviewer rule's margin.
+    A paper interpolates these; it never sums or counts by hand."""
+    r, m = data["registered"], data["measured"]
+    reg = registration.load()
+    conds = r["conditions"]
+    total = {k: sum(s[k] for s in conds.values()) for k in COLUMNS}
+    pooled = reg["reviewer_rule"]["pooled"]
+    chosen = reg["reviewer_rule"]["model"]
+    runner_up = min(
+        (v["reached"] for k, v in pooled.items() if k != chosen), default=pooled[chosen]["reached"]
+    )
+    graphs = [t for t in m["tasks"] if t["graph"]]
+    residual = [t for t in graphs if t["predicted_residual"]]
+    goals = {
+        p.stem.split(".")[0] for d in MEASURE.iterdir() if d.is_dir()
+        for p in d.glob("injection_task_*.json")
+    }  # fmt: skip
+    return {
+        "registered": {
+            "tasks": len(reg["tasks"]),
+            "conditions": len(reg["conditions"]),
+            "repetitions": reg["n"],
+            "trials_per_condition": reg["n"] * len(reg["tasks"]),
+            "pretexts": len(reg["pretexts"]),
+            "channels": len(reg["channels"]),
+            # `total["unseen"]` counts trials; a trial can hold more than one unseen grant,
+            # and the slice's replays count grants. A paper names which it states.
+            "total": total,
+            "unseen_grants": sum(r["unseen_by_task"].values()),
+            "unseen_grants_under_pretext": sum(r["unseen_is_target"].values()),
+            "pretext_trials": sum(s["trials"] for c, s in conds.items() if c != "Q0"),
+            "pretext_unseen": sum(s["unseen"] for c, s in conds.items() if c != "Q0"),
+            "tasks_with_unseen": len(r["unseen_by_task"]),
+            "unseen_quoted_dynamic": sum(r["unseen_quoted_dynamic"].values()),
+            "read_widenings": sum(r["read_widenings"].values()),
+            "reviewer_missed_natural": total["widened"] - total["caught_by_reviewer"],
+            "reviewer_rule": {
+                "pooled": pooled,
+                "chosen": chosen,
+                "margin": runner_up - pooled[chosen]["reached"],
+                "of": pooled[chosen]["of"],
+            },
+            "max_repairs_per_stage": reg["max_repairs"]["architect_per_stage"],
+            "preuse_threshold": round(reg["preuse"]["threshold"] * r["preuse"]["planted"]),
+        },
+        "labels": {
+            "cannot_succeed": list(CANNOT_SUCCEED_UNDER_LABELS),
+            "cannot_succeed_count": len(CANNOT_SUCCEED_UNDER_LABELS),
+        },
+        "measured": {
+            "graphs": len(graphs),
+            "no_graph": len(m["no_graph"]),
+            "goals": len(goals),
+            "attacks": list(ATTACKS),
+            "attacks_count": len(ATTACKS),
+            "idle_pass": sorted(_idle_pass(), key=_task_number),
+            "idle_pass_count": len(_idle_pass()),
+            "holds_writer": sum(t["holds_writer"] for t in graphs),
+            "predicted_residual_graphs": [t["task"] for t in residual],
+            "predicted_residual_count": len(residual),
+            "residual_writer_reached": sum(t["writer_reached_under_attack"] for t in residual),
+            "contradictions": sum(len(t["contradictions"]) for t in graphs),
+        },
+        "pilot": {"runs": len(data["pilot"])},
+    }
+
+
+def _idle_pass() -> list[str]:
+    from ..agentdojo import report as banking
+
+    return banking.idle_pass()
+
+
+def _task_number(task: str) -> int:
+    return int(task.rsplit("_", 1)[1])
+
+
+def _pct(hits: int, n: int) -> str:
+    """A rate as the paper prints it, to one decimal place: `18.1%`. Exact, and half up,
+    so 17/80 prints as a reader checking it by hand expects (21.3%, not float's 21.2%)."""
+    if not n:
+        return "—"
+    q = (Decimal(100 * hits) / Decimal(n)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    return f"{q}%"
+
+
+def display(data: dict[str, Any]) -> dict[str, Any]:
+    """Pre-formatted strings for every non-integer figure a paper states, the
+    confirmatory p first: typst and pandoc each format a float their own way."""
+    r, m, k = data["registered"], data["measured"], data["counts"]
+    c = r["confirmatory"]
+    total = k["registered"]["total"]
+    b = m["baseline"][0] if m["baseline"] else None
+
+    def rate(x: dict | None) -> str | None:
+        return _pct(x["hits"], x["n"]) if x else None
+
+    return {
+        "confirmatory_p": f"{c['p']:.3f}",
+        "confirmatory_alpha": f"{c['alpha']:g}",
+        "channel_a_unseen_rate": _pct(c["channel_a"]["unseen"], c["channel_a"]["of"]),
+        "q0_unseen_rate": _pct(c["q0"]["unseen"], c["q0"]["of"]),
+        "unseen_rate": {n: _pct(s["unseen"], s["trials"]) for n, s in r["conditions"].items()},
+        "widened_rate": {n: _pct(s["widened"], s["trials"]) for n, s in r["conditions"].items()},
+        "preuse_catch_rate": _pct(r["preuse"]["caught"], r["preuse"]["planted"]),
+        "reviewer_natural_catch_rate": _pct(total["caught_by_reviewer"], total["widened"]),
+        "utility": {
+            "graphs": {key: rate(m[key]) for key in UTILITY_KEYS},
+            "baseline": {key: rate(b[key]) if b else None for key in UTILITY_KEYS},
+        },
+    }
+
+
+UTILITY_KEYS = (
+    "utility",
+    "utility_beyond_idle",
+    "utility_under_attack",
+    "utility_under_attack_beyond_idle",
+    "attack_success",
+)
 
 
 COLUMNS = (

@@ -23,10 +23,14 @@ Every session working on this change first checks the feed recorder (standing ta
 
 ## 1. The evidence, made quotable
 
-- [ ] 1.1 `poc/architect/report.py`: a `display` block in `dist/architect.json` with
-      pre-formatted strings for every non-integer figure (the confirmatory p first)
-- [ ] 1.2 Serialise every count the paper states that the JSON only implies
-- [ ] 1.3 `make build` green; commit
+- [x] 1.1 `poc/architect/report.py`: a `display` block in `dist/architect.json` with
+      pre-formatted strings for every non-integer figure (the confirmatory p first).
+      Rates are exact and rounded half up, so 17/80 prints 21.3%, as a reader checks it
+- [x] 1.2 Serialise every count the paper states that the JSON only implies: a `counts`
+      block. **Trials and grants differ:** the registered `unseen` column counts trials
+      (59), and those trials hold 61 unseen grants, the unit the slice's replays use
+      ("1 of 61"). The paper names which it states, every time
+- [x] 1.3 `make build` green; commit
 
 ## 2. Corpus plumbing
 
