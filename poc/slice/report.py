@@ -9,7 +9,8 @@ It gathers, by step:
 * step 6's minimiser over the registered graphs (4.1);
 * the slice's own units (5.1), each step's outcome;
 * steps 7 and 8, the author's verdicts beside the AI reviewer's and the labels', grant
-  by grant, once the author has filled them (4.3); until then, marked pending.
+  by grant. The author waived them (16 November 2026, task 4.3), so the column reads
+  waived; the model judges' verdicts stand beside it under their own label.
 """
 
 from __future__ import annotations
@@ -173,7 +174,7 @@ def build() -> dict[str, Any]:
     }  # fmt: skip
 
 
-def _cell(v: object, missing: str = "pending") -> str:
+def _cell(v: object, missing: str = "waived") -> str:
     return missing if v is None else str(v)
 
 
@@ -234,7 +235,8 @@ def markdown(data: dict[str, Any]) -> str:
         "Each judge saw every review page **without** the AI reviewer's verdicts and "
         "without the labels, and judged independently of the other. Their verdicts are a "
         "different model's (Opus; Haiku held every other role), never a person's, and "
-        "the author's column stays empty until the author fills it.",
+        "the author's column is empty: the author waived the human review (16 November "
+        "2026), so no verdict there is the author's.",
         "",
     ]
     if len(names) > 1:

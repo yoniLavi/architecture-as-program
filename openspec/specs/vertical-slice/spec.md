@@ -1,4 +1,12 @@
-## ADDED Requirements
+# vertical-slice Specification
+
+## Purpose
+A thin, exploratory run of all eight steps of the north star on a few banking tasks: prompt,
+architect, formal review, AI reviewer, developer, minimisation, the owner's evaluation and the
+architecture review. It records every step whole, so its findings can validate or reject the
+plan before more is built on it. It is not registered and is not a paper's evidence.
+
+## Requirements
 
 ### Requirement: The slice runs every step of the north star and records each
 The repository SHALL run, on a small set of banking tasks, all eight steps of the north star:
@@ -24,10 +32,15 @@ authority.
 - **AND** any wider grant appears only as an escalation, which is reviewed again
 
 ### Requirement: Human verdicts are recorded beside the automated ones
-The author's verdicts on each final graph, per grant and on the outcome, SHALL be recorded in
-committed files beside the AI reviewer's verdicts and the labels. They SHALL be reported as one
-person's judgement, never as a study.
+Each final graph SHALL have a committed verdict file for a human reviewer, per grant and on the
+outcome, beside the AI reviewer's verdicts and the labels. Any verdicts recorded SHALL be
+reported as one reviewer's judgement, never as a study. A model judge standing in for the human
+SHALL be recorded apart and labelled as a model, never as the human's verdict.
 
 #### Scenario: The author flags a grant the AI reviewer passed
 - **WHEN** the author's verdict on a grant differs from the AI reviewer's
 - **THEN** the report shows both, and the labels' verdict, side by side
+
+#### Scenario: The human review is waived
+- **WHEN** the author waives the human review and model judges have judged the pages
+- **THEN** the human verdict files stay unfilled, and the report gives the judges' verdicts under their own label

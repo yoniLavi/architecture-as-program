@@ -103,7 +103,11 @@ nothing a run imports while it runs.
       both AI reviewer views and the minimiser, the developer, and the outcome. **It never
       shows the labels**, which are the measurement. A verdict file is written once and
       never regenerated
-- [ ] 4.3 **The author's verdicts**, steps 7 and 8. **Deviation (7 November 2026):** the
+- [x] 4.3 **Waived by the author, 16 November 2026** ("I waive the human review"). The
+      author's verdict files stay unfilled, the report's author column reads `waived`, and
+      the judges' verdicts below are the slice's only steps-7-and-8 record, labelled as
+      model judges. The spec's requirement was reworded before archive to say so.
+      **The author's verdicts**, steps 7 and 8. **Deviation (7 November 2026):** the
       author was unavailable and directed, "please use fresh subagents as judges when
       needed". Two fresh Opus subagents (A, B) judged every page in its place,
       independently, each seeing the page **without** the AI reviewer's verdicts and
@@ -166,6 +170,6 @@ nothing a run imports while it runs.
 
 ## 6. Archive
 
-- [ ] 6.1 At archive (added 16 November 2026 by `update-openspec-to-2`): write the Purpose of
+- [x] 6.1 At archive (added 16 November 2026 by `update-openspec-to-2`): write the Purpose of
       the new `vertical-slice` spec in the archive commit, since the placeholder `openspec
       archive` writes fails strict validation, and run `make spec-check` before and after
