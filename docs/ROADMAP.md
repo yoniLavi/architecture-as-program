@@ -45,6 +45,27 @@ The back half (steps 5–6: decomposition, escalation as a graph change, minimis
 likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
 Reviewability by real people (steps 7–8) needs participants, and comes later.
 
+## 16 November 2026: the open changes, consolidated
+
+At the author's direction, three long-open changes were archived on 16 November 2026. Each
+had stayed open only for work that waits on time or on the author. Older entries below
+name them by their old paths; they now live under
+`openspec/changes/archive/2026-11-16-<name>/`.
+- **`build-feed-triage-and-generation-experiment`.** Live operation (8.1 and 8.3) moved to
+  `openspec/changes/operate-feed-triage`. Paper 2 v1.1 (9.2) was **set aside by the
+  author**. v1.0's "narrowing is checked, not enforced" understates the artifact, which is
+  the conservative direction, and a later paper can report enforcement as new.
+- **`strengthen-generation-evidence`.** The model replays (3.3) and the recorder's standing
+  check (0.3) moved to `operate-feed-triage`.
+- **`add-vertical-slice`.** The author **waived the human review** (4.3). The two model
+  judges' verdicts are the slice's only record of steps 7 and 8, labelled as model judges.
+  The report's author column reads `waived`.
+
+Still open: `add-paper-4`, which waits for the author's read as a later checkpoint;
+`add-split-escalation`, which is approved; and `operate-feed-triage`. The
+`feed-triage-service`, `node-generation` and `vertical-slice` capabilities are now in
+`openspec/specs/`.
+
 ## 16 November 2026: value-bound grants, what a bind buys and what it does not
 
 `openspec/changes/add-value-bound-grants` answers the slice's first finding: a grant can

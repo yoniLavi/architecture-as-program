@@ -78,8 +78,8 @@ chooses.
   their own change;
 - bindable kinds other than `Payments`;
 - re-running the slice's six architect units or D1;
-- any paper edit, including Paper 2 v1.1 (task 9.2 of
-  `build-feed-triage-and-generation-experiment`), and any move of Paper 4 toward review;
+- any paper edit (Paper 2 v1.1 was set aside by the author on 16 November 2026), and any
+  move of Paper 4 toward review;
 - a registered experiment, and any paid spend.
 
 ## Capabilities

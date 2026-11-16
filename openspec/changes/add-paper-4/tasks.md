@@ -1,7 +1,8 @@
 # Tasks
 
-Every session working on this change first checks the feed recorder (standing task 0.3 of
-`strengthen-generation-evidence`) and `git status`.
+Every session working on this change first checks the feed recorder (standing task 0.2 of
+`operate-feed-triage`, formerly 0.3 of the archived `strengthen-generation-evidence`) and
+`git status`.
 
 ## 0. Approval
 

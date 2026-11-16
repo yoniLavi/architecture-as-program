@@ -1,7 +1,7 @@
 # Tasks
 
-Every session working on this change first checks the feed recorder (standing task 0.3 of
-`strengthen-generation-evidence`; `pgrep -fl poc.feeds.archive`, never a second one) and
+Every session working on this change first checks the feed recorder (standing task 0.2 of
+`operate-feed-triage`; `pgrep -fl poc.feeds.archive`, never a second one) and
 `git status`. No test touches the system `git`. `scripts/` is not edited. The Paper 2, 3
 and 4 figure pins (`tests/test_paper{2,3,4}_figures_pinned.py`) stay green without
 re-seeding throughout. Do not edit `poc/`, `scripts/` or `graphs/` while the re-run (4.x)
