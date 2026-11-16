@@ -6,9 +6,11 @@ progress. This change edits nothing under `poc/`, `scripts/` (but for one new sc
 
 ## 0. Approval
 
-- [ ] 0.1 **The author approves this proposal** and answers `design.md`'s open questions
+- [x] 0.1 **The author approves this proposal** and answers `design.md`'s open questions
       (in place or by delta; whether the check gates commits; the script's fate; history
-      sentences)
+      sentences). Approved 16 November 2026; answers recorded in `design.md`. Q2 was
+      answered against the proposal: the check gates commits, and `make ui-check` joins
+      pre-commit too (tasks 3.2a, 3.2b)
 
 ## 1. The instruction files
 
@@ -53,8 +55,13 @@ message every sentence that left a requirement without arriving in a scenario.
       with a dated note saying what became of it. Tick it only if the work was in fact done
       later, with the commit named
 - [ ] 3.2 `make spec-check`: `openspec validate --all --strict` and
-      `openspec validate --archived`, failing on either. Listed in `AGENTS.md` under Build as
-      opt-in
+      `openspec validate --archived`, failing on either. Listed in `AGENTS.md` under Build
+- [ ] 3.2a A pre-commit hook runs `make spec-check` when the `openspec` binary is on `PATH`
+      and skips with a message otherwise (author, Q2). Added only once 3.3 is green, so it
+      never blocks the commits that make it green
+- [ ] 3.2b A pre-commit hook runs `make ui-check` on changes under `ui/` (author, Q2; it
+      takes ~10s), and skips with a message when `npm` is absent, so a clone without Node
+      can still commit
 - [ ] 3.3 `make spec-check` green
 
 ## 4. The open changes

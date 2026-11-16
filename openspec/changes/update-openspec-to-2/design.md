@@ -92,3 +92,15 @@ are checked by hand, because the tool cannot know them:
    Proposed: delete it at archive, and leave it in the history.
 4. **History sentences** (decision 2, rule 3). Proposed: they leave the requirement. If any
    should stay in the standing spec, the place is a scenario's context line.
+
+## Answers (the author, 16 November 2026)
+
+1. **In place.** As proposed.
+2. **Gate commits.** Against the proposal: a pre-commit hook runs `make spec-check` when the
+   `openspec` binary is on `PATH`, and skips otherwise. The author added that `make
+   ui-check` should join pre-commit too unless it is very slow. It takes about 10 seconds,
+   so it does, scoped to changes under `ui/` and skipped when `npm` is absent. Decision 4's
+   reason still holds for `make build`: neither check is a build step, and the corpus still
+   builds with no Node.
+3. **Delete the script at archive.** As proposed.
+4. **History sentences leave the requirement.** As proposed.

@@ -2,8 +2,9 @@
 
 ### Requirement: Standing specs and changes validate strictly
 Every standing spec and every open change SHALL pass `openspec validate --strict`, and every
-archived change SHALL pass the archive lint. The repository SHALL provide one opt-in command
-that runs both checks and fails if either does. The corpus build SHALL NOT depend on it.
+archived change SHALL pass the archive lint. The repository SHALL provide one command that runs
+both checks and fails if either does, and a pre-commit hook SHALL run it wherever the
+`openspec` binary is on `PATH`. The corpus build SHALL NOT depend on it.
 
 #### Scenario: A requirement outgrows the limit
 - **WHEN** a requirement's text before its first scenario exceeds the validator's limit

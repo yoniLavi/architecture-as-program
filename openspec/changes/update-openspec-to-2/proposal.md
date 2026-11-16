@@ -1,6 +1,7 @@
 # Move the repository to OpenSpec 2.0 and make its specs validate strictly
 
-> **Status: proposed, 16 November 2026. Not approved. Nothing is migrated until it is.**
+> **Status: approved by the author, 16 November 2026, with one answer changed: the check
+> gates commits (`design.md`, Answers).**
 
 ## Why
 
@@ -41,8 +42,10 @@ its delta was approved clean in October and "has issues" in November, with no ed
   saying why it was left, so the archive lint passes without claiming work that was not done.
   If the lint needs a tick, the note says the task was closed as not done.
 - **A check keeps it that way**: `make spec-check` runs `openspec validate --all --strict`
-  and `openspec validate --archived`. It is opt-in, like `make ui-check`, because the CLI
-  needs Node and the corpus build must not.
+  and `openspec validate --archived`. A pre-commit hook runs it wherever the `openspec`
+  binary is present, and so, on changes under `ui/`, does `make ui-check` (the author's
+  answer, 16 November 2026). Neither is a `make build` step, because the corpus build must
+  not need Node.
 - **The open changes are updated** where the migration touches them (`tasks.md`, phase 4).
 
 **Not in this change:**
@@ -55,7 +58,7 @@ its delta was approved clean in October and "has issues" in November, with no ed
 ## Impact
 
 - **Specs:** a new capability, `spec-workflow`, with one requirement (strict validity, and
-  the opt-in check). Six standing specs are restructured in place.
+  the check that gates commits). Six standing specs are restructured in place.
 - **Files:** `openspec/config.yaml` (new); `.agents/skills/`, `.claude/skills/` (new);
   `openspec/AGENTS.md` and `.claude/commands/openspec/` (deleted); `AGENTS.md` (managed
   block, and its pointers); `Makefile` (`spec-check`); `METHODOLOGY.md` and
