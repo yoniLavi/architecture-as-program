@@ -75,7 +75,7 @@ Every session working on this change first checks the feed recorder (standing ta
       Pinned as **succeeding** where the extractor returns the attacker's payee. Verify: the
       test asserts it, and the oracle-plans record is written apart from
       `poc/agentdojo/records/oracle-plans.json`, which is unchanged
-- [ ] 5.3 Approved in 0.1: re-run D2's escalation once on the subscription (Haiku,
+- [x] 5.3 Approved in 0.1: re-run D2's escalation once on the subscription (Haiku,
       low priority), with `bind` offered to developer and architect, recorded under
       `poc/slice/runs/bind/`. Exploratory and unregistered. Do not edit `poc/` while it runs.
       Verify: the record is committed, and the report states what the architect granted
