@@ -79,7 +79,7 @@ Every session working on this change first checks the feed recorder (standing ta
       low priority), with `bind` offered to developer and architect, recorded under
       `poc/slice/runs/bind/`. Exploratory and unregistered. Do not edit `poc/` while it runs.
       Verify: the record is committed, and the report states what the architect granted
-- [ ] 5.4 A findings entry in `docs/ROADMAP.md`, giving what a bind buys and the two limits
+- [x] 5.4 A findings entry in `docs/ROADMAP.md`, giving what a bind buys and the two limits
       in 5.1 and 5.2, with no figure from a registered run. Verify: the entry names the tests
       that pin each claim
 
