@@ -204,7 +204,12 @@ published.
 
 ## Open Questions
 
-To be answered by the author at task 0.1:
+**Answered by the author, 16 November 2026 (task 0.1): every recommendation taken.** The
+lever is A alone, with no further arm (C and D stay candidates for a later change). The D2
+re-run has five repetitions. Library-writer answers are accepted by tracing plain-path
+`Compose` fields.
+
+The questions as put:
 
 1. **How many repetitions of the D2 re-run?** *Recommended: five.* One run is an anecdote.
    Five give "k of 5" for each step, with no rate claimed, and the author has said the

@@ -9,10 +9,12 @@ is in progress.
 
 ## 0. Approval
 
-- [ ] 0.1 **The author approves this proposal**, chooses the lever (`design.md` D1;
+- [x] 0.1 **The author approves this proposal**, chooses the lever (`design.md` D1;
       recommended: A alone), and answers the open questions: the number of repetitions,
       further arms, and library-writer answers. Record the answers in `design.md`, and
-      update the proposal's status line
+      update the proposal's status line (16 November 2026: every recommendation taken. A
+      alone, no further arm, five repetitions (`n = 5` in 4.1), and library-writer answers
+      accepted by plain-path tracing). Recorded in `design.md`
 
 ## 1. The split request
 

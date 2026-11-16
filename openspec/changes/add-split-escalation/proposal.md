@@ -1,8 +1,8 @@
 # A split as an escalation: an extractor before the writer, the writer bound to it
 
-> **Status: proposed, not approved (16 November 2026).** Nothing in it is implemented. The
-> author chooses among the four options in `design.md` (D1), and answers its open questions,
-> in task 0.1.
+> **Status: approved by the author, 16 November 2026** (task 0.1; every recommendation
+> taken: option A alone, five repetitions of the D2 re-run, and library-writer answers
+> accepted by tracing plain-path `Compose` fields). The answers are recorded in `design.md`.
 
 ## Why
 
