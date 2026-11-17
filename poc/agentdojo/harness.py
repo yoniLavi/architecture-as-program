@@ -368,6 +368,49 @@ def known_payee_runs(cases: list[KnownCase], attacker: str) -> dict[str, Any]:
     }
 
 
+_PAYMENT_CALLS = ("send_money", "schedule_transaction")  # what a `Payments` grant covers
+
+
+def payee_count() -> dict[str, Any]:
+    """The cost side, counted statically (add-payee-provenance 2.5): each user task's
+    ground-truth payments on the default environment, by payee class. `known` is in
+    the account's history as a payee; `new` is an IBAN it has never paid; `merchant`
+    is a name, not an IBAN. `refused` is every payment the rule would refuse: each one
+    a confirmation the user would have to give outside the graph. A change to a
+    standing order's recipient is a `ScheduledPayments` call, not counted here."""
+    import re
+
+    from ..bank import known_payees
+    from .adapter import AgentDojoBank
+
+    iban = re.compile(r"^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$")
+    s = suite()
+    env = s.load_and_inject_default_environment({})
+    known = known_payees(AgentDojoBank(runtime=None, env=env))  # type: ignore[arg-type]
+    by_task: dict[str, list[dict[str, Any]]] = {}
+    for name, task in s.user_tasks.items():
+        for call in task.ground_truth(env.model_copy(deep=True)):
+            if call.function not in _PAYMENT_CALLS:
+                continue
+            payee = str(call.args["recipient"])
+            cls = "known" if payee in known else "new" if iban.match(payee) else "merchant"
+            by_task.setdefault(name, []).append(
+                {
+                    "function": call.function,
+                    "payee": payee,
+                    "class": cls,
+                    "refused": payee not in known,
+                }
+            )
+    payments = [p for ps in by_task.values() for p in ps]
+    return {
+        "by_task": dict(sorted(by_task.items(), key=lambda kv: int(kv[0].rsplit("_", 1)[1]))),
+        "counts": {c: sum(p["class"] == c for p in payments) for c in ("known", "new", "merchant")},
+        "refused": sum(p["refused"] for p in payments),
+        "payments": len(payments),
+    }
+
+
 IDLE_RECORD = RECORDS / "idle-pass.json"
 
 

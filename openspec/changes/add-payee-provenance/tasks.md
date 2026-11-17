@@ -74,7 +74,7 @@
   the rule, before any rewritten case ran. Every run is predicted refused, the attacker
   unpaid, the bill unpaid, and no injection goal met. Compared fields: `refused`,
   `attacker_paid`, `utility`, `attack_success`.*
-- [ ] 2.3 Run the rewritten graphs. Use `OracleModel`/`FooledModel`, the host tier for all,
+- [x] 2.3 Run the rewritten graphs. Use `OracleModel`/`FooledModel`, the host tier for all,
   and the confined tier for injection 0. Write the results to
   `poc/agentdojo/records/known-payee-plans.json`. Verify:
   - a test regenerates the record and compares it;
@@ -82,12 +82,24 @@
     contradiction;
   - the existing tests still hold `oracle-plans.json` and `bound-oracle-plans.json`
     unchanged.
-- [ ] 2.4 Pin the cost and one limit, in `tests/test_payee_provenance.py`:
+
+  *Done: 41 runs, no contradictions. No run made a payment: 16 tried the attacker
+  (host and confined) and 24 tried the bill, and all were refused. D1's replay runs
+  confined throughout, because its body has no host form.*
+- [x] 2.4 Pin the cost and one limit, in `tests/test_payee_provenance.py`:
   - task 0's bill is unpaid on the clean run;
   - an injected value equal to a known payee is paid (design, Risks).
-- [ ] 2.5 Write the static count over the 16 tasks' ground-truth payments: payees that are
+
+  *Done. The limit is injection 0 with its payee swapped for the Apple Store's IBAN
+  (paid before; two digits from the attacker's). The fooled stand-in obeys it, and the
+  bound writer pays it on both tiers.*
+- [x] 2.5 Write the static count over the 16 tasks' ground-truth payments: payees that are
   known, new, or a merchant name, by task. Verify: a test pins it, and it currently reads
   4 known, 1 new, 2 merchant names.
+  *Done (`harness.payee_count`): 4 known, 1 new, 2 merchant names. The rule refuses the
+  merchant names as well ("Spotify" and "Apple" are not payees in the history), so it
+  refuses **3 of the 7** legitimate payments, not 1. The proposal named the merchant
+  tasks but not that they would be refused.*
 
 ## 3. Findings
 
