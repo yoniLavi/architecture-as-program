@@ -319,3 +319,76 @@ def test_an_unbound_split_answer_is_rejected_and_the_graph_before_stands(monkeyp
         "unbound-answer", "wider-than-asked"
     }  # fmt: skip
     assert final == sa.before() and asked == [("PayBill", "body")] and components == {}
+
+
+# ── 4.1: the split re-run's harness (`--split-rerun`), no model ──────
+
+
+class _NoBackends:
+    def __init__(self) -> None:
+        self.made: list = []
+
+    def windows(self) -> dict:
+        return {}
+
+
+def _rerun(monkeypatch, tmp_path, *, dirty=(), limit_at: set[int] | None = None):
+    """`run.main(["--split-rerun"])` with the gates and the model steps scripted:
+    `downstream` stands in for steps 3 to 7, and raises the usage ceiling on the
+    repetitions in `limit_at` (once each)."""
+    from poc.llm import UsageLimitReached
+    from poc.slice import developer, run
+
+    seen: list[str] = []
+    limit = set(limit_at or ())
+
+    def downstream(record, graph, abstract, probe, backends):
+        k = int(record["unit"].rsplit(".r", 1)[1])
+        if k in limit:
+            limit.discard(k)
+            raise UsageLimitReached("scripted")
+        seen.append(record["unit"])
+        assert graph == run.hand_built("D2") and probe is True
+        return {**record, "outcome": "complete", "developers": []}
+
+    monkeypatch.setattr(run, "SPLIT_RUNS", tmp_path)
+    monkeypatch.setattr(run, "dirty", lambda: list(dirty))
+    monkeypatch.setattr(run, "downstream", downstream)
+    monkeypatch.setattr(run, "Backends", _NoBackends)
+    monkeypatch.setattr(developer, "control", lambda: SimpleNamespace(
+        passed=True, run={"utility": True}, as_dict=dict))  # fmt: skip
+    return run.main(["--split-rerun", "--no-nice"]), seen
+
+
+def test_the_split_rerun_writes_five_whole_records_with_their_stubs(monkeypatch, tmp_path):
+    from poc.slice import run
+
+    code, seen = _rerun(monkeypatch, tmp_path)
+    assert code == 0 and seen == [f"user_task_0.D2.r{k}" for k in range(1, 6)]
+    files = sorted(p.name for p in tmp_path.iterdir())
+    assert files == [f"user_task_0.D2.r{k}.json" for k in range(1, 6)]
+    for k in range(1, 6):
+        record = json.loads((tmp_path / f"user_task_0.D2.r{k}.json").read_text())
+        assert record["repetition"] == k and record["hand_built"] is True
+        assert record["stubs"][: len(run.SPLIT_STUBS)] == run.SPLIT_STUBS
+        assert any("never pooled" in s for s in record["stubs"])
+        assert any("harness correction" in s for s in record["stubs"])
+        assert len(record["head"]) == 40
+
+
+def test_the_split_rerun_stops_at_the_usage_ceiling_and_resumes(monkeypatch, tmp_path):
+    code, seen = _rerun(monkeypatch, tmp_path, limit_at={3})
+    assert code == 75 and seen == ["user_task_0.D2.r1", "user_task_0.D2.r2"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "user_task_0.D2.r1.json", "user_task_0.D2.r2.json"
+    ]  # fmt: skip
+    first = (tmp_path / "user_task_0.D2.r1.json").read_text()
+    code, seen = _rerun(monkeypatch, tmp_path)
+    assert code == 0 and seen == [f"user_task_0.D2.r{k}" for k in (3, 4, 5)]
+    assert (tmp_path / "user_task_0.D2.r1.json").read_text() == first  # not rerun
+    assert len(list(tmp_path.iterdir())) == 5
+
+
+def test_the_split_rerun_refuses_on_a_dirty_tree(monkeypatch, tmp_path):
+    code, seen = _rerun(monkeypatch, tmp_path, dirty=["poc/architect/formal.py"])
+    assert code == 2 and seen == [] and list(tmp_path.iterdir()) == []

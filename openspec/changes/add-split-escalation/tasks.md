@@ -79,7 +79,7 @@ is in progress.
 
 ## 4. The re-run (exploratory, unregistered)
 
-- [ ] 4.1 `poc.slice.run --split-rerun` (D6): D2 with the split offered, `n` repetitions
+- [x] 4.1 `poc.slice.run --split-rerun` (D6): D2 with the split offered, `n` repetitions
       (0.1), into `poc/slice/runs/split/user_task_0.D2.rN.json`, with stubs naming the
       prompt correction and "never pooled", and the slice's gates (clean tree, control
       passing). Verify: a test with scripted backends that it writes whole records, resumes,

@@ -285,11 +285,31 @@ BIND_STUBS = [
 ]
 
 
-def run_hand_built(name: str, backends: Backends) -> dict:
+# add-split-escalation, task 4.2 (approved in its 0.1): D2 again, five repetitions, with
+# the split offered to the developer (its prompt) and judged by `formal.no_wider`. Two
+# developer-side differences from the bind re-run, both stated in every record's stubs:
+# the split form, and a harness correction (the payment examples' cap is a number, or
+# `uncapped` where the amount is bound). Exploratory and unregistered, and never pooled
+# with `runs/slice/` or `runs/bind/`. Each repetition is one file, written whole.
+SPLIT_RUNS = HERE / "runs" / "split"
+SPLIT_RERUN = "user_task_0.D2"
+SPLIT_REPETITIONS = 5
+SPLIT_STUBS = [
+    "add-split-escalation 4.2: D2 re-run, five repetitions, the split offered to the developer",
+    "two developer-side differences from runs/bind/: the split form in the developer's prompt, "
+    "and a harness correction (the payment examples' cap is a number, or uncapped where the "
+    "amount is bound)",
+    "exploratory and unregistered: counts only, never pooled with runs/slice/ or runs/bind/",
+]
+
+
+def run_hand_built(name: str, backends: Backends, rep: int | None = None) -> dict:
+    """`rep` (the split re-run) suffixes the unit, so each repetition builds its own crates."""
     task = "user_task_0"
     task_prompt, _ = cell(task, "Q0")
     graph = hand_built(name)
-    record: dict[str, Any] = {"unit": f"{task}.{name}", "task": task, "condition": name,
+    unit = f"{task}.{name}" + (f".r{rep}" if rep is not None else "")
+    record: dict[str, Any] = {"unit": unit, "task": task, "condition": name,
                               "prompt": task_prompt, "document": None, "hand_built": True,
                               "architect": None, "stubs": [
         "a hand-built graph: the architect wrote none of it (it used no Custom node)",
@@ -307,6 +327,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tasks", nargs="*", default=list(TASKS))
     parser.add_argument("--bind-rerun", action="store_true",
                         help="value-bound grants 5.3: D2 once, into runs/bind/")  # fmt: skip
+    parser.add_argument("--split-rerun", action="store_true",
+                        help="add-split-escalation 4.2: D2 5 times, into runs/split/")  # fmt: skip
     args = parser.parse_args(argv)
     priority = lower_priority(not args.no_nice)
     if dirty():
@@ -325,6 +347,17 @@ def main(argv: list[str] | None = None) -> int:
             return record
 
         units = [(BIND_RERUN, rerun)]
+    elif args.split_rerun:
+        root = SPLIT_RUNS
+
+        def split_rerun(b: Backends, k: int) -> dict:
+            record = run_hand_built("D2", b, rep=k)
+            record["repetition"] = k
+            record["stubs"] = SPLIT_STUBS + record["stubs"]
+            return record
+
+        units = [(f"{SPLIT_RERUN}.r{k}", lambda b, k=k: split_rerun(b, k))
+                 for k in range(1, SPLIT_REPETITIONS + 1)]  # fmt: skip
     else:
         root = RUNS
         units = [(f"{t}.{c}", lambda b, t=t, c=c: run_unit(t, c, b))
