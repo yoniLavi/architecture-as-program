@@ -175,3 +175,14 @@ def _rekey(value, table):
     if isinstance(value, list):
         return [_rekey(v, table) for v in value]
     return table.get(value, value) if isinstance(value, str) else value
+
+
+# ── 2.2 the predictions, committed before the run ────────────────────
+
+PREDICTIONS_SHA256 = "5c6987a5e5b1d13950e8dbfb0781366c6675f5a829e64d27149d1ebf8cf92860"
+
+
+def test_the_predictions_are_the_committed_ones():
+    """Never edited after the run: a mismatch is a contradiction, not a correction."""
+    data = harness.KNOWN_PREDICTIONS.read_bytes()
+    assert hashlib.sha256(data).hexdigest() == PREDICTIONS_SHA256

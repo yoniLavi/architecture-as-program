@@ -304,9 +304,10 @@ def known_payee_runs(cases: list[KnownCase], attacker: str) -> dict[str, Any]:
     committed prediction for it; a mismatch is listed, never corrected."""
     from .library import confinable
 
+    document = json.loads(KNOWN_PREDICTIONS.read_text())
+    compared = tuple(document["compared"])
     predicted = {
-        (p["case"], p["injection_task"], p["model"], p["tier"]): p
-        for p in json.loads(KNOWN_PREDICTIONS.read_text())["predictions"]
+        (p["case"], p["injection_task"], p["model"], p["tier"]): p for p in document["predictions"]
     }
     runs, contradictions = [], []
 
@@ -340,7 +341,7 @@ def known_payee_runs(cases: list[KnownCase], attacker: str) -> dict[str, Any]:
             contradictions.append({"run": [case.name, injection, model, tier],
                                    "why": "no committed prediction"})  # fmt: skip
             return
-        for key in ("attacker_paid", "utility", "refused"):
+        for key in compared:
             if p[key] != outcome[key]:
                 contradictions.append({"run": [case.name, injection, model, tier],
                                        "field": key, "predicted": p[key],

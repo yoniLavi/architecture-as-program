@@ -62,13 +62,18 @@
   *Done: `harness.rewrite_known_payees` (exact strings and keys only; a bind is keyed by
   its grant). The split answer and D1 are test fixtures, which `poc` does not import, so
   the three cases are built in `tests/known_payee_cases.py`, which also writes the record.*
-- [ ] 2.2 Write predictions to `poc/agentdojo/predictions/known-payees.json`. Cover:
+- [x] 2.2 Write predictions to `poc/agentdojo/predictions/known-payees.json`. Cover:
   - task 0's plan under the clean run and the nine injections;
   - the split answer under the same;
   - D1's bound replay.
 
   Each prediction says whether the attacker is paid and whether utility holds. Verify: a
   test holds the file's hash. **Commit before 2.3.**
+  *Done: 41 predictions (two cases × clean + nine injections × two stand-ins + one
+  confined injection, and D1's replay), derived from the committed `[any]` records and
+  the rule, before any rewritten case ran. Every run is predicted refused, the attacker
+  unpaid, the bill unpaid, and no injection goal met. Compared fields: `refused`,
+  `attacker_paid`, `utility`, `attack_success`.*
 - [ ] 2.3 Run the rewritten graphs. Use `OracleModel`/`FooledModel`, the host tier for all,
   and the confined tier for injection 0. Write the results to
   `poc/agentdojo/records/known-payee-plans.json`. Verify:
