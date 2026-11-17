@@ -153,10 +153,15 @@ The toolchain is **not** the Phase 1 language: it implements no noninterference 
 
 Work on this repo is driven through **OpenSpec 2.0** (`openspec/`). Plan through it whenever a request mentions a proposal, spec, change or plan, introduces a capability or a breaking or architectural shift, or is ambiguous enough to need the authoritative spec first. The workflow is the six skills `openspec update` installs (`.agents/skills/openspec-*`, linked into `.claude/skills/`): `openspec-propose`, `openspec-apply-change`, `openspec-archive-change`, `openspec-update-change`, `openspec-sync-specs`, `openspec-explore`. Project context and per-artifact rules for them are in `openspec/config.yaml`. Non-trivial work gets a change proposal (`openspec/changes/<id>/` with `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas). This dogfoods the proposal's own thesis: structured intent as the primary artifact.
 
-Two conventions of this repository that the 2.0 skills do not state, and that hold regardless:
+Three conventions of this repository that the 2.0 skills do not state, and that hold regardless:
 
 - **Validate strictly before approval.** `openspec validate <id> --strict` passes before a change is put to the author, and again before it is archived.
 - **Nothing is implemented before the author approves.** A proposal says "proposed, not approved" until the author says otherwise, and task 0.1 records the approval and the answers to the design's open questions. The propose skill's planning boundary stops at the artifacts; this rule extends it to the author's decision.
+- **Subagents verify a change before it is archived** (the author, 17 November 2026). Once its tasks are done, and before the archive, at least two read-only subagents check it, in parallel:
+  - **Conformance.** One checks every requirement, scenario and task's *Verify* clause against the code and tests. For each test it asks whether the test would fail if the behaviour were wrong.
+  - **Adversarial review.** The other looks for bugs, for tests that pass for the wrong reason, and for claims in findings or records that overstate or understate the artifact.
+
+  Brief each with the change and the code, never with the implementer's conclusions: an agent handed a verdict tends to return it. Record each finding in `tasks.md` with what was done about it. A finding that would change a result, a claim or the design goes to the author before the archive. The archive still needs the author's go; the author may take the verification in place of their own read.
 
 `make spec-check` runs `openspec validate --all --strict` and `openspec validate --archived`, and a pre-commit hook runs it wherever `openspec` is on `PATH`. A requirement's text before its first scenario stays under 500 characters (move cases into scenarios, or split it; never drop a normative sentence), and a capability created by an archive gets its Purpose written in the same commit.
 
