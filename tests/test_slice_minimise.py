@@ -38,7 +38,37 @@ def test_constant_payee_and_amount_narrow_an_open_grant():
 def test_a_computed_payee_or_amount_is_left_open():
     grant = "Payments<[any], uncapped>"
     computed = {**ORDER, "recipient": "=in0.prompt", "amount": "=in0.prompt"}
-    assert narrowed(_pay(computed, grant), grant)[0] == grant
+    assert narrowed(_pay(computed, grant), grant) == (
+        grant, "no constant payee or amount to narrow to"
+    )  # fmt: skip
+
+
+def test_a_bound_grant_left_open_says_so_not_constants_sent():
+    """The split re-run's records gave a bound payment the reason "payee and cap from
+    the constants sent", though nothing was sent as a constant (17 November 2026)."""
+    grant = "Payments<[any], uncapped>"
+    computed = {**ORDER, "recipient": "=in0.prompt", "amount": "=in0.prompt"}
+    g = _pay(computed, grant)
+    g["nodes"][2]["bind"] = {grant: {"payee": "in0.recipient", "amount": "in0.amount",
+                                     "uses": 1}}  # fmt: skip
+    assert narrowed(g, grant) == (
+        grant,
+        "bound: narrowed per activation by its bind, not statically",
+    )
+    assert narrowed(_pay(ORDER, grant), grant)[1] == "payee and cap from the constants sent"
+
+
+def test_narrowing_a_bound_grant_renames_its_bind_too():
+    """A bind is keyed by its grant: narrowing the grant must carry the bind with it,
+    or the narrowed graph binds a grant no node holds."""
+    grant = "Payments<[any], uncapped>"
+    g = _pay(ORDER, grant)
+    g["nodes"][2]["bind"] = {grant: {"payee": "in0.recipient", "amount": "in0.amount",
+                                     "uses": 1}}  # fmt: skip
+    out, report = minimise(g)
+    new = f"Payments<['{IBAN}'], '98.70'>"
+    assert [r["narrowed"] for r in report] == [new]
+    assert out["nodes"][2]["bind"] == {new: g["nodes"][2]["bind"][grant]}
 
 
 def test_a_grant_already_as_narrow_is_unchanged_never_respelt():

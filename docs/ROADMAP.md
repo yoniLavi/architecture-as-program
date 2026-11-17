@@ -133,8 +133,10 @@ a split whose field names drift, and it passes no split whose values do not trac
 
 **Oddities in the records, not caused by this change:**
 - The minimiser's report gives the bound payment its generic reason, "payee and cap from
-  the constants sent", although these values are bound, not sent as constants
-  (`poc/slice/minimise.py`).
+  the constants sent", although these values are bound, not sent as constants. Fixed after
+  the archive (`poc/slice/minimise.py`): a bound grant it leaves open now says so. The fix
+  also carries a bind along when its grant is narrowed. The committed records keep the
+  old text.
 - The architect wrote the run's own date as the payment date. The catalogue does not show
   it the date, and the slice's earlier runs did the same.
 - Every hand-built record carries the stub "the architect wrote none of it (it used no

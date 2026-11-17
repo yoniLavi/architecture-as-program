@@ -107,7 +107,12 @@ def narrowed(graph: dict, cap: str) -> tuple[str | None, str]:
     writers = [_writer_values(graph, n["name"], prov) for n in holders
                if SLICE_CATALOGUE[n["uses"]].family == WRITER]  # fmt: skip
     if kind == "Payments":
-        return _payments(cap, writers), "payee and cap from the constants sent"
+        new = _payments(cap, writers)
+        if new != cap:
+            return new, "payee and cap from the constants sent"
+        if all(isinstance((n.get("bind") or {}).get(cap), dict) for n in holders):
+            return cap, "bound: narrowed per activation by its bind, not statically"
+        return cap, "no constant payee or amount to narrow to"
     return _fields_kind(cap, writers), "fields the graph sets"
 
 
@@ -124,6 +129,11 @@ def _rename(graph: dict, old: str, new: str | None) -> None:
             quote = because.pop(old)
             if new is not None:
                 because[new] = quote
+        bind = n.get("bind")  # a bind is keyed by its grant, and follows it
+        if isinstance(bind, dict) and old in bind:
+            spec = bind.pop(old)
+            if new is not None:
+                bind[new] = spec
 
 
 def minimise(graph: dict) -> tuple[dict, list[dict]]:
