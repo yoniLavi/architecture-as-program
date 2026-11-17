@@ -47,7 +47,9 @@ Reviewability by real people (steps 7–8) needs participants, and comes later.
 
 ## 17 November 2026: a split as an escalation, what D2 did with it
 
-`openspec/changes/add-split-escalation` lets a developer ask for its node to be split: a
+`openspec/changes/archive/2026-11-17-add-split-escalation` (archived 17 November 2026,
+after two independent reviews in place of the author's read) lets a developer ask for its
+node to be split: a
 node inserted before its own produces named fields, and the payment is bound to them.
 `formal.no_wider` learned to judge that answer. This is exploratory work. It uses one
 hand-built graph and five unregistered repetitions, so **no figure here comes from a

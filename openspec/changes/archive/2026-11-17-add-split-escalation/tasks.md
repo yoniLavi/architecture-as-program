@@ -90,14 +90,23 @@ is in progress.
       records as they land. Verify: `n` records exist and each names its `head` (17
       November 2026: five records, `user_task_0.D2.r1` to `r5`, each at `5f670b7`, nice 19
       with background QoS)
-- [ ] 4.3 The findings entry in `docs/ROADMAP.md`, as counts ("k of n") per step: request
+- [x] 4.3 The findings entry in `docs/ROADMAP.md`, as counts ("k of n") per step: request
       kind, the architect's answer, each rule, the reviewer, the holder's kind, the trust
       label, and utility. The limit comes first, and no rate is stated. Verify: the author
-      reads it
+      reads it. (17 November 2026: the author, busy, delegated the read to independent
+      subagent review, archiving if the reviewers were satisfied. An audit of the entry
+      against the records found every count right and corrected six statements (the
+      discharge's node, the tiers, the fixture, r4's account, "correct", "removed"). A
+      second pass found one more detail, also fixed. An adversarial code review found two
+      blocking holes in the split check (a selector as the inserted node; a non-integer
+      `uses` failing open) and seven minor ones, all fixed (`d00af40`); its re-review,
+      "sound with minor issues", raised one more (N1, fixed in `005796e`). Every
+      recorded decision replays unchanged)
 
 ## 5. Close
 
 - [x] 5.1 `make build` and `make spec-check` pass, with `make architect` unchanged and the
       Paper 2, 3 and 4 figure pins green without re-seeding
-- [ ] 5.2 `openspec validate add-split-escalation --strict`, then archive with the
-      author's go. No new capability, so no Purpose to write
+- [x] 5.2 `openspec validate add-split-escalation --strict`, then archive with the
+      author's go. No new capability, so no Purpose to write (the author's go, 17
+      November 2026: conditional on the reviewers being satisfied, which they were)
