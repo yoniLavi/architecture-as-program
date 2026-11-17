@@ -8,9 +8,9 @@ ungranted import, are its to write. Never a bank value, never the task prompt: t
 role is what the architect asked of the node, as the architect wrote it.
 
 **What it may return**: two files, or a request for authority,
-`{"escalate": {"capability": …, "bind"?: …, "because": …}}` (3.2; the optional
-`bind` is value-bound grants'). A body the gate rejects is a
-gate catch, as in Paper 3, never an escalation.
+`{"escalate": {"capability": …, "bind"?: …, "split"?: …, "because": …}}` (3.2; the
+optional `bind` is value-bound grants', and `split` add-split-escalation's). A body
+the gate rejects is a gate catch, as in Paper 3, never an escalation.
 
 **The pipeline** (`evaluate`), reusing Paper 3's pieces (`poc/generation/pipeline.py`:
 reading the reply, the ambient scan) and its gate (`poc/sandbox/interfaces.py`):
@@ -176,11 +176,17 @@ class Escalation:
     # The request's `bind`, as sent (value-bound grants). Kept even when malformed,
     # so the no-wider check fails it closed rather than reading it as unbound.
     bind: Any = _UNSET
+    # The request's `split` (add-split-escalation, D2): the fields the developer asks
+    # to receive as `in0`, from a node inserted before its own. Kept as sent too, so a
+    # malformed split fails closed rather than reading as a plain request.
+    split: Any = _UNSET
 
     def as_dict(self) -> dict:
         out: dict[str, Any] = {"capability": self.capability, "because": self.because}
         if self.bind is not _UNSET:
             out["bind"] = self.bind
+        if self.split is not _UNSET:
+            out["split"] = self.split
         return out
 
 
@@ -204,9 +210,8 @@ def escalation(reply: str) -> Escalation | None:
     if not isinstance(esc, dict) or not isinstance(esc.get("capability"), str):
         return None
     because = str(esc.get("because") or "").strip()[:500]
-    if "bind" in esc:
-        return Escalation(esc["capability"].strip(), because, esc["bind"])
-    return Escalation(esc["capability"].strip(), because)
+    return Escalation(esc["capability"].strip(), because,
+                      esc.get("bind", _UNSET), esc.get("split", _UNSET))  # fmt: skip
 
 
 # ── Build and gate ──────────────────────────────────────────────────

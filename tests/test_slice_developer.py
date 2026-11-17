@@ -55,6 +55,36 @@ def test_an_escalation_is_read_only_from_a_reply_that_is_one(reply, expected):
     assert developer.escalation(reply) == expected
 
 
+# ── A split request (add-split-escalation, 1.1) ──────────────────────
+
+SPLIT = {"fields": {"iban": "string", "total": "number"}}
+SPLIT_BIND = {"payee": "in0.iban", "amount": "in0.total", "uses": 1}
+
+
+def test_a_well_formed_split_is_kept_with_its_bind():
+    import json
+
+    reply = json.dumps({"escalate": {"capability": "Payments<[any], uncapped>", "split": SPLIT,
+                                     "bind": SPLIT_BIND, "because": "no field names it"}})  # fmt: skip
+    esc = developer.escalation(reply)
+    assert esc is not None
+    assert esc.as_dict() == {"capability": "Payments<[any], uncapped>", "because":
+                             "no field names it", "bind": SPLIT_BIND, "split": SPLIT}  # fmt: skip
+
+
+def test_a_split_with_no_bind_is_kept_as_sent_for_the_check_to_fail():
+    esc = developer.escalation('{"escalate": {"capability": "P", "split": "x", "because": ""}}')
+    assert esc is not None and esc.as_dict() == {"capability": "P", "because": "", "split": "x"}
+    plain = developer.escalation('{"escalate": {"capability": "P", "because": "b"}}')
+    assert plain is not None and "split" not in plain.as_dict()
+
+
+def test_code_that_mentions_split_is_still_read_as_code():
+    reply = ('```rust\n// {"escalate": {"capability": "X", "split": {"fields": {}}}}\n```\n'
+             "```wit\nworld node {}\n```")  # fmt: skip
+    assert developer.escalation(reply) is None
+
+
 def test_a_refusal_at_a_crossing_reaches_the_developer_as_a_class_only():
     failure = f"CapabilityError: payee {ATTACKER!r} is outside the handle's payees"
     cls, told = developer._run_failure(failure, "ParseBill")

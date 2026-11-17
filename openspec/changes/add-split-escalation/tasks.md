@@ -18,7 +18,7 @@ is in progress.
 
 ## 1. The split request
 
-- [ ] 1.1 Parse `split` in `developer.escalation` (`poc/slice/developer.py`) and keep it on
+- [x] 1.1 Parse `split` in `developer.escalation` (`poc/slice/developer.py`) and keep it on
       `Escalation`, malformed or not, as `bind` is kept. Verify: tests in
       `tests/test_slice_developer.py` for a well-formed split, a split with no bind, and a
       reply holding code that mentions `split`, which is still read as code
