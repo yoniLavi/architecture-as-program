@@ -1,7 +1,7 @@
 # A payee the account already pays: provenance for a bound payment
 
-> **Status: proposed, not approved (17 November 2026).** Nothing is implemented until the
-> author approves it and answers the open questions in `design.md` (task 0.1).
+> **Status: approved by the author, 17 November 2026,** with every recommendation taken
+> (task 0.1). It was proposed the same day.
 
 ## Why
 

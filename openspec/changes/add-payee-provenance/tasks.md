@@ -2,9 +2,14 @@
 
 ## 0. Approval
 
-- [ ] 0.1 The author approves the proposal and answers `design.md`'s open questions 3
+- [x] 0.1 The author approves the proposal and answers `design.md`'s open questions 3
   (counting only, with no modelled user) and 4 (no `SLICE_CATALOGUE` entry). Record the
   date and the answers here. Nothing below starts before this box is checked.
+  *Approved 17 November 2026, with every recommendation taken ("let's please go with your
+  recommendations"):*
+  - Q3: count where a confirmation would be needed; model no user's answer;
+  - Q4: no `SLICE_CATALOGUE` entry;
+  - Q1 and Q2 stay deferred.
 
 ## 1. The class
 
