@@ -42,18 +42,26 @@
   one; a one-character lookalike, a case change and a trailing space are refused too.
   Also pinned: a scheduled order does not make its recipient known, and the cap still
   holds.*
-- [ ] 1.3 Check the confined tier. Verify, with a test in `tests/test_payee_provenance.py`:
+- [x] 1.3 Check the confined tier. Verify, with a test in `tests/test_payee_provenance.py`:
   a known payee is paid and a new one refused through the confined banking adapter, with
   `banking.wit` byte-identical.
-- [ ] 1.4 Check the bind and the refusal. Verify, in `tests/test_payee_provenance.py`:
+  *Done, bound and unbound, on task 0's graph with `PayBill` confined; `banking.wit` and
+  `caps.wit` are held by hash.*
+- [x] 1.4 Check the bind and the refusal. Verify, in `tests/test_payee_provenance.py`:
   - a bound `[known-payees]` grant refuses a bound new payee;
   - `measure.refusal` of that failure is the fixed payee line, and contains no IBAN.
+
+  *Done. A spy shows the bind in force on each run. The failure message names the IBAN;
+  the reason built from it does not.*
 
 ## 2. Predictions, then the re-run
 
 - [ ] 2.1 Rewrite grants with a harness function. It replaces `Payments<[any], uncapped>`
   with `Payments<[known-payees], uncapped>` and touches nothing else (D6). Verify: a test
   diffs each rewritten graph against its source, and the validator accepts all three.
+  *Done: `harness.rewrite_known_payees` (exact strings and keys only; a bind is keyed by
+  its grant). The split answer and D1 are test fixtures, which `poc` does not import, so
+  the three cases are built in `tests/known_payee_cases.py`, which also writes the record.*
 - [ ] 2.2 Write predictions to `poc/agentdojo/predictions/known-payees.json`. Cover:
   - task 0's plan under the clean run and the nine injections;
   - the split answer under the same;
