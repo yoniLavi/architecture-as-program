@@ -73,7 +73,7 @@ is in progress.
       on 7 of 9 injections and the attack met on 4, the same sets as the bound oracle
       plan's, on both tiers. The request names its fields `recipient` and `amount`,
       because the fooled stand-in substitutes the goal's arguments by field name
-- [ ] 3.3 Replay: run `formal.custom_writers` and `formal.no_wider` over the committed slice
+- [x] 3.3 Replay: run `formal.custom_writers` and `formal.no_wider` over the committed slice
       and bind records, and confirm every recorded outcome is unchanged (no recorded
       request carries `split`). Verify: a test over `runs/slice/` and `runs/bind/`
 

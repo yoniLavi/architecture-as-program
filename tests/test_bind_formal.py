@@ -451,3 +451,58 @@ def test_a_request_without_a_split_is_judged_as_before():
     assert _problems(sa.library_pays(), plain) == [
         ("ExtractBill", WIDER_THAN_ASKED), ("PayBill", BIND_WIDER)
     ]  # fmt: skip
+
+
+# ── 3.3: the committed records, replayed ─────────────────────────────
+
+
+def _records() -> list[tuple[str, dict]]:
+    paths = sorted(SLICE.glob("*.json")) + sorted(BIND_RUNS.glob("*.json"))
+    return [(f"{p.parent.name}/{p.name}", json.loads(p.read_text())) for p in paths]
+
+
+def test_no_recorded_request_carries_a_split():
+    escalations = [
+        d["developer"]["escalation"]
+        for _, r in _records()
+        for d in r.get("developers", [])
+        if d["developer"].get("escalation")
+    ]
+    assert len(escalations) == 2  # the slice's D2 and the bind re-run's
+    assert all("split" not in e for e in escalations)
+
+
+def test_the_bind_reruns_recorded_findings_replay_unchanged():
+    """The bind re-run recorded both rules' findings; today's code finds the same."""
+    record = json.loads((BIND_RUNS / "user_task_0.D2.json").read_text())
+    (dev,) = record["developers"]
+    decision = dev["escalation"]["decision"]
+    before, after = record["final_graph"], dev["escalation"]["edit"]["graph"]
+    request = dev["developer"]["escalation"]
+    assert decision["outcome"] == "rejected-by-review" and before == sa.before()
+    assert [f.as_dict() for f in no_wider(before, after, dev["node"], request)] == (
+        decision["formal"]["no_wider"]
+    )
+    assert [f.as_dict() for f in custom_writers(after)] == decision["formal"]["custom_writers"]
+    assert [f.as_dict() for f in custom_writers(before)] == record["formal"]["custom_writers"]
+
+
+def test_every_recorded_graph_is_judged_as_before():
+    """Over every graph the records hold, the Custom-writer rule fails only D2's two
+    edits (the slice's, accepted then, and the bind re-run's). The no-wider check on the
+    slice D2 is pinned above (`test_d2s_recorded_decision_replayed_fails`)."""
+    failing = {}
+    for name, r in _records():
+        for d in r.get("developers", []):
+            if d.get("escalation") and d["escalation"]["edit"]["graph"]:
+                found = _fails(d["escalation"]["edit"]["graph"])
+                if found:
+                    failing[f"{name}:edit"] = found
+        for key in ("final_graph",):
+            if isinstance(r.get(key), dict) and _fails(r[key]):
+                failing[f"{name}:{key}"] = _fails(r[key])
+    assert failing == {
+        "slice/user_task_0.D2.json:edit": [OPEN],
+        "slice/user_task_0.D2.json:final_graph": [OPEN],
+        "bind/user_task_0.D2.json:edit": [OPEN],
+    }
