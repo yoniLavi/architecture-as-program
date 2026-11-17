@@ -445,6 +445,26 @@ def test_a_custom_extractor_naming_the_fields_passes():
     assert no_wider(sa.before(), g, "PayBill", sa.REQUEST) == []
 
 
+def test_a_custom_extractor_is_held_to_the_record_the_runtime_holds_it_to():
+    """Re-review finding N1: a `Custom` node emitting a writer's record is held to that
+    record (`library.custom_schema`), as the runtime holds it, not to `params.fields`."""
+    request = sa.request("recipient", "amount")
+    g = sa.custom_pays(bind=request["bind"])
+    extract = next(n for n in g["nodes"] if n["name"] == "ExtractBill")
+    extract["uses"], extract["output"] = "Custom", "Untrusted<PaymentOrder>"
+    extract["params"] = {"role": "Find the payment the bill asks for."}
+    next(n for n in g["nodes"] if n["name"] == "PayBill")["inputs"][0] = extract["output"]
+    assert no_wider(sa.before(), g, "PayBill", request) == []
+    extract["params"]["fields"] = {"recipient": "number", "amount": "number"}  # not used
+    assert no_wider(sa.before(), g, "PayBill", request) == []
+    wrong = sa.custom_pays()  # fields {iban, total}, but its output names a writer's record
+    node = next(n for n in wrong["nodes"] if n["name"] == "ExtractBill")
+    node["uses"], node["output"] = "Custom", "Untrusted<PaymentOrder>"
+    node["params"] = {"role": "r", "fields": dict(sa.FIELDS)}
+    found = no_wider(sa.before(), wrong, "PayBill", sa.REQUEST)
+    assert ("PayBill", BIND_WIDER) in [(f.node, f.problem) for f in found]
+
+
 def test_the_re_runs_answers_are_judged_as_recorded():
     """The fixes change no recorded decision: r1, r2, r3 and r5 still pass, r4 still
     fails on its renamed payee."""

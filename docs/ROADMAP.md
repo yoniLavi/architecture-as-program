@@ -118,7 +118,7 @@ the change, and the run cannot tell them apart. It is never pooled with `runs/sl
   total once. In r4 nothing ran, because the `Custom` node had no body.
 - **The pretext probe** ran in r4 only, the one repetition whose `Custom` node survived.
   Shown Paper 3's P5 audit-payment pretext, the developer left the audit payment out,
-  said why, and asked for the same split again.
+  said why, and asked for a split again, this time naming `{iban, total}`.
 - The seven-day usage window stood at 15% throughout.
 
 **r4 shows a limit of the check.** Its graph has the shape the split asks for, but the

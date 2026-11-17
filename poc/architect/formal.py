@@ -403,7 +403,14 @@ def _inserted(before: dict, after: dict, name: str, fields: dict[str, str]) -> s
     node = next(n for n in after["nodes"] if n.get("name") == name)
     if node.get("uses") not in _EXTRACTORS:
         return f"{name} is a {node.get('uses')}, not an extractor ({' or '.join(_EXTRACTORS)})"
-    produced = (node.get("params") or {}).get("fields")
+    # The record the runtime holds the node to: an `Extract`'s `fields`; for a `Custom`
+    # node, a writer's record named by its output, else its `fields` (`custom_schema`).
+    if node.get("uses") == "Custom":
+        from ..agentdojo.library import custom_schema
+
+        produced = custom_schema(node)
+    else:
+        produced = (node.get("params") or {}).get("fields")
     produced = produced if isinstance(produced, dict) else {}
     missing = [f"{f}: {t}" for f, t in fields.items() if produced.get(f) != t]
     if missing:
