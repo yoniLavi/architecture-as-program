@@ -84,8 +84,10 @@ is in progress.
       prompt correction and "never pooled", and the slice's gates (clean tree, control
       passing). Verify: a test with scripted backends that it writes whole records, resumes,
       and refuses on a dirty tree
-- [ ] 4.2 Commit the code, then run it: Haiku, the subscription, low priority. Commit the
-      records as they land. Verify: `n` records exist and each names its `head`
+- [x] 4.2 Commit the code, then run it: Haiku, the subscription, low priority. Commit the
+      records as they land. Verify: `n` records exist and each names its `head` (17
+      November 2026: five records, `user_task_0.D2.r1` to `r5`, each at `5f670b7`, nice 19
+      with background QoS)
 - [ ] 4.3 The findings entry in `docs/ROADMAP.md`, as counts ("k of n") per step: request
       kind, the architect's answer, each rule, the reviewer, the holder's kind, the trust
       label, and utility. The limit comes first, and no rate is stated. Verify: the author
