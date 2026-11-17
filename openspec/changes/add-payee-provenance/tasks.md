@@ -103,7 +103,7 @@
 
 ## 3. Findings
 
-- [ ] 3.1 Add a findings entry to `docs/ROADMAP.md`, in counts. Order:
+- [x] 3.1 Add a findings entry to `docs/ROADMAP.md`, in counts. Order:
   - first, the cost (task 0 unpaid; the static count) and the suite's flattery (the
     attacker's IBAN is new in every injection task);
   - then what is refused;
@@ -112,9 +112,19 @@
   It makes no claim of defence beyond the crossing's rule. Verify: an audit subagent reads
   the entry against the records and tests.
 
+  *Done. The audit recounted every figure independently and found them all correct, the
+  order met, and no claim of defence beyond the crossing. It raised seven wording points,
+  all taken. Three were real: task 6 is a scheduled payment, not a `send_money`; under
+  `[any]` the goal was met 10 times of 38, the confined runs included; and "utility lost"
+  became "utility false", because some runs never had it. Four tightened the text: D1's
+  truncated IBAN, injection 7 naming no payee, D3 being pinned at the handle, and where
+  the predictions came from.*
+
 ## 4. Close
 
-- [ ] 4.1 Run `make build` and `make spec-check`. Verify: both green, and the Paper 2, 3
+- [x] 4.1 Run `make build` and `make spec-check`. Verify: both green, and the Paper 2, 3
   and 4 figure pins pass without re-seeding.
+  *Done: `make build` green (1822 passed, 1 skipped); `make spec-check` 40/40; no pin
+  re-seeded.*
 - [ ] 4.2 With the author's go, archive the change, and write the `payee-provenance`
   spec's Purpose in the archive commit.
