@@ -22,23 +22,27 @@ is in progress.
       `Escalation`, malformed or not, as `bind` is kept. Verify: tests in
       `tests/test_slice_developer.py` for a well-formed split, a split with no bind, and a
       reply holding code that mentions `split`, which is still read as code
-- [ ] 1.2 The split request's well-formedness in `formal.no_wider` (D2): every bound path is
+- [x] 1.2 The split request's well-formedness in `formal.no_wider` (D2): every bound path is
       `in0.<f>` with `f` requested, the payee a string and the amount a number, and it fails
       closed otherwise. Verify: tests in `tests/test_bind_formal.py` for each of the
       spec's request scenarios, plus D2's recorded request
-      (`runs/bind/user_task_0.D2.json`), which still fails closed
+      (`runs/bind/user_task_0.D2.json`), which still fails closed. (`formal.split_fields`;
+      the two hand-written answers are rebuilt as fixtures in `tests/split_answers.py`, and
+      reproduce the proposal's table under the `formal.py` of `fba71d2`)
 - [ ] 1.3 `escalate.reason` renders a split as one bounded line (D5). Verify: a test in
       `tests/test_slice_escalate.py` on the line's text and its bound length, and that a
       request without `split` renders exactly as before
 
 ## 2. Judging a split answer
 
-- [ ] 2.1 The value tracer: from a holder's bind path, back along data edges and through
+- [x] 2.1 The value tracer: from a holder's bind path, back along data edges and through
       `Compose` fields that are a single plain path, to the producing node's field, using
       the library's path grammar. Verify: tests that the tracer and `library.resolve` agree
       on every plain-path case, and that arithmetic, a constant or a selector breaks the
-      trace
-- [ ] 2.2 `no_wider`'s split judgement (D3): the inserted node produces the fields, holds no
+      trace. (`formal.trace`; a plain path is read with the library's own tokeniser, so it
+      is exactly what `library.evaluate` passes through unchanged. A selector ends the
+      trace at itself, which is never the inserted node, so the answer fails)
+- [x] 2.2 `no_wider`'s split judgement (D3): the inserted node produces the fields, holds no
       grant but `LLMClient<inference>`, the bind traces to it, and uses are no more than
       asked; requests without `split` keep today's path. Verify: tests for every scenario
       of "A split answer is held to the split asked for", including both hand-written

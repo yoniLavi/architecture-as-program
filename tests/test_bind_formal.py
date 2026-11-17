@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,7 @@ from poc.architect.formal import (
     custom_writers,
     no_wider,
 )
+from tests import split_answers as sa
 
 SLICE = Path(__file__).resolve().parent.parent / "poc" / "slice" / "runs" / "slice"
 OPEN = "Payments<[any], uncapped>"
@@ -253,3 +255,199 @@ def _before_d2(record: dict) -> dict:
     g["capabilities"] = [c for c in g["capabilities"] if c != OPEN]
     g["parameters"] = [p for p in g["parameters"] if p != OPEN]
     return g
+
+
+# ── add-split-escalation 1.2: the split request's well-formedness ─────
+
+BIND_RUNS = SLICE.parent / "bind"
+
+
+def _split(fields: dict | None = None, bind: dict | None = None, cap: str = OPEN) -> dict:
+    return {"capability": cap, "split": {"fields": fields or dict(sa.FIELDS)},
+            "bind": dict(BOUND) if bind is None else bind, "because": "no field names it"}  # fmt: skip
+
+
+def test_a_well_formed_split_request_parses():
+    assert formal.split_fields(sa.REQUEST) == sa.FIELDS
+    assert formal.split_fields(_split(bind={"payee": "in0.iban", "uses": 1})) == sa.FIELDS
+
+
+@pytest.mark.parametrize(
+    "request_",
+    [
+        _split(bind={**BOUND, "payee": "in0.account"}),  # a path outside the split
+        _split(fields={"iban": "string", "total": "string"}),  # an amount bound to a string
+        _split(fields={"iban": "number", "total": "number"}),  # a payee bound to a number
+        _split(bind={**BOUND, "amount": "in1.total"}),  # not the split's input
+        _split(bind={**BOUND, "amount": "in0.total.cents"}),  # not one field
+        _split(bind={"uses": 1}),  # nothing bound
+        {**_split(), "bind": None},  # no bind at all
+        {**_split(), "split": {"fields": {}}},
+        {**_split(), "split": ["iban", "total"]},
+        _split(cap="UserProfile<[street]>"),  # not a bindable kind
+    ],
+)
+def test_a_malformed_split_request_fails_every_answer_closed(request_):
+    assert formal.split_fields(request_) is None
+    for answer in (sa.custom_pays(), sa.library_pays()):
+        (f,) = no_wider(sa.before(), answer, "PayBill", request_)
+        assert f.problem == UNPARSEABLE_REQUEST
+
+
+def test_d2s_recorded_bind_request_still_fails_closed():
+    """The bind re-run's request (`Payments<[any], 'bill-total'>`) carries no split and
+    does not parse: every answer to it, split or not, fails closed."""
+    record = json.loads((BIND_RUNS / "user_task_0.D2.json").read_text())
+    recorded = record["developers"][0]["developer"]["escalation"]
+    assert "split" not in recorded and recorded["capability"] == "Payments<[any], 'bill-total'>"
+    for answer in (sa.custom_pays(), sa.library_pays()):
+        assert [f.problem for f in no_wider(sa.before(), answer, "PayBill", recorded)] == [
+            UNPARSEABLE_REQUEST
+        ]
+
+
+# ── 2.1: the value tracer ────────────────────────────────────────────
+
+
+def test_the_tracer_follows_plain_path_compose_fields_to_the_extractor():
+    g = sa.library_pays()
+    assert formal.trace(g, "PayBill", "in0.recipient") == ("ExtractBill", "iban")
+    assert formal.trace(g, "PayBill", "in0.amount") == ("ExtractBill", "total")
+    assert formal.trace(sa.custom_pays(), "PayBill", "in0.iban") == ("ExtractBill", "iban")
+
+
+@pytest.mark.parametrize(
+    "spec", ["=in0.iban", "= in0.iban", "=in0.iban ", "=in1.x", "=in0.a"]
+)  # fmt: skip
+def test_the_tracer_and_library_resolve_agree_on_every_plain_path(spec):
+    """A plain path is what `library.evaluate` passes through unchanged: the tracer
+    names the same input and field the library would read."""
+    from poc.agentdojo.library import evaluate
+
+    inputs = ({"iban": "GB1", "a": 2}, {"x": "y"})
+    path = formal._plain_path(spec)
+    assert path is not None
+    m = re.fullmatch(r"in(\d+)\.(\w+)", path)
+    assert m is not None
+    assert evaluate(spec[1:], inputs) == inputs[int(m.group(1))][m.group(2)]
+
+
+@pytest.mark.parametrize("amount", ["=in0.total * 2", "=in0.total + 0", "=(in0.total)", "98.7",
+                                    "=98.7", "=in0", "=in0.total.cents", "=-in0.total"])  # fmt: skip
+def test_arithmetic_a_constant_or_a_non_field_path_breaks_the_trace(amount):
+    g = sa.library_pays(amount=amount)
+    assert formal.trace(g, "PayBill", "in0.amount") is None
+    assert formal.trace(g, "PayBill", "in0.recipient") == ("ExtractBill", "iban")
+
+
+def test_a_selector_on_the_way_ends_the_trace_at_the_selector():
+    g = sa.library_pays()
+    make = next(n for n in g["nodes"] if n["name"] == "MakeOrder")
+    make["uses"] = "Branch"
+    assert formal.trace(g, "PayBill", "in0.recipient") == ("MakeOrder", "recipient")
+
+
+def test_no_single_edge_at_the_position_breaks_the_trace():
+    g = sa.library_pays()
+    assert formal.trace(g, "PayBill", "in1.recipient") is None
+    g["data_edges"].append({"from": "ReadBill", "to": "PayBill"})
+    assert formal.trace(g, "PayBill", "in0.recipient") is None
+
+
+# ── 2.2: a split answer is held to the split asked for (D3) ──────────
+
+
+def _problems(answer: dict, request: dict = sa.REQUEST) -> list[tuple[str, str]]:
+    return [(f.node, f.problem) for f in no_wider(sa.before(), answer, "PayBill", request)]
+
+
+def test_the_developers_node_pays_bound_to_an_extractor():
+    """The proposal's first row: it failed on the `Extract`'s inference grant at
+    `fba71d2`, and passes now; the inference grant is not counted as a widening."""
+    assert _problems(sa.custom_pays()) == []
+    assert custom_writers(sa.custom_pays()) == []
+
+
+def test_a_library_writer_pays_through_a_plain_path_compose():
+    """The proposal's third row: it failed on the inference grant and as `bind-wider`
+    (paths compared as text per holder), and passes now."""
+    assert _problems(sa.library_pays()) == []
+
+
+def test_the_writer_left_unbound_still_fails():
+    """The proposal's second row: it still fails, the payment unbound and the
+    extractor's inference grant traced to by nothing."""
+    assert _problems(sa.custom_pays(bind=None)) == [
+        ("PayBill", UNBOUND_ANSWER), ("ExtractBill", WIDER_THAN_ASKED)
+    ]  # fmt: skip
+    assert [f.problem for f in custom_writers(sa.custom_pays(bind=None))] == [OPEN_WRITER]
+
+
+def test_a_value_computed_on_the_way_fails():
+    assert ("PayBill", BIND_WIDER) in _problems(sa.library_pays(amount="=in0.total * 2"))
+
+
+def test_the_inserted_node_holding_an_effect_fails():
+    g = sa.custom_pays()
+    extract = next(n for n in g["nodes"] if n["name"] == "ExtractBill")
+    extract["inputs"].append(sa.PAY)
+    found = _problems(g)
+    assert ("PayBill", BIND_WIDER) in found and ("ExtractBill", UNBOUND_ANSWER) in found
+
+
+def test_more_uses_than_asked_fails():
+    assert _problems(sa.custom_pays(bind={**sa.BIND, "uses": 2})) == [
+        ("PayBill", BIND_WIDER), ("ExtractBill", WIDER_THAN_ASKED)
+    ]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "bind",
+    [
+        {"payee": "in0.total", "amount": "in0.total", "uses": 1},  # another field
+        {"payee": "in0.iban", "uses": 1},  # a bound field dropped
+        {"payee": "in1.iban", "amount": "in0.total", "uses": 1},  # no such input
+    ],
+)
+def test_a_bind_reading_another_field_or_dropping_one_fails(bind):
+    assert ("PayBill", BIND_WIDER) in _problems(sa.custom_pays(bind=bind))
+
+
+def test_a_node_present_before_the_edit_is_not_the_inserted_one():
+    """An extractor that was already in the graph is not the split's: the bind traces
+    to it, and the answer still fails."""
+    before = sa.custom_pays()
+    for n in before["nodes"]:
+        n["inputs"] = [i for i in n["inputs"] if i != sa.PAY]
+        n.pop("bind", None)
+    before["capabilities"].remove(sa.PAY)
+    found = no_wider(before, sa.custom_pays(), "PayBill", sa.REQUEST)
+    assert [(f.node, f.problem) for f in found] == [("PayBill", BIND_WIDER)]
+    assert "was in the graph before the edit" in found[0].detail
+
+
+def test_an_extractor_producing_other_fields_fails():
+    g = sa.custom_pays()
+    extract = next(n for n in g["nodes"] if n["name"] == "ExtractBill")
+    extract["params"]["fields"] = {"iban": "string", "total": "string"}
+    found = no_wider(sa.before(), g, "PayBill", sa.REQUEST)
+    assert ("PayBill", BIND_WIDER) in [(f.node, f.problem) for f in found]
+    assert any("does not produce total: number" in f.detail for f in found)
+
+
+def test_an_inference_grant_is_exempt_only_on_the_inserted_node():
+    """A second node given `LLMClient<inference>` by the same edit is a widening."""
+    g = sa.custom_pays()
+    confirm = next(n for n in g["nodes"] if n["name"] == "Confirm")
+    confirm["inputs"].append(sa.LLM)
+    assert _problems(g) == [("Confirm", WIDER_THAN_ASKED)]
+
+
+def test_a_request_without_a_split_is_judged_as_before():
+    """The same answers, to the same request with no split: the old text comparison,
+    and the inference grant counted, exactly as measured at `fba71d2`."""
+    plain = {k: v for k, v in sa.REQUEST.items() if k != "split"}
+    assert _problems(sa.custom_pays(), plain) == [("ExtractBill", WIDER_THAN_ASKED)]
+    assert _problems(sa.library_pays(), plain) == [
+        ("ExtractBill", WIDER_THAN_ASKED), ("PayBill", BIND_WIDER)
+    ]  # fmt: skip
