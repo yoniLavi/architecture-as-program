@@ -1,8 +1,8 @@
 """Escalation as a graph edit request (task 3.2).
 
 A developer that needs more authority than its node's clause grants returns a request,
-`{"escalate": {"capability", "bind"?, "because"}}`, never a body that takes it. The request
-reaches the architect as a **structured reason** (the class `developer-request`, the
+`{"escalate": {"capability", "bind"?, "split"?, "because"}}`, never a body that takes it.
+The request reaches the architect as a **structured reason** (the class `developer-request`, the
 node, the capability, and the developer's sentence, bounded), with the same stage-two
 view the measured run's edits used: the task, its own abstract graph, its graph. The
 architect decides from the task's words. Nothing in the request grants anything: only
@@ -54,10 +54,35 @@ EDIT = (
 )
 
 
-def reason(node: str, capability: str, because: str, bind: object = None) -> Reason:
+def _split_line(node: str, capability: str, split: object, bind: object, text: str) -> str:
+    """D5: `node N asks to be split: a node before it producing {f: t, …} from its
+    inputs, then C bound payee=…, amount=…, once, because: '…'`. Every part that
+    comes from the request is bounded; a malformed part is shown as sent, bounded."""
+    fields = split.get("fields") if isinstance(split, dict) else None
+    if isinstance(fields, dict):
+        shown = "{" + ", ".join(f"{k}: {v}" for k, v in fields.items()) + "}"
+    else:
+        shown = json.dumps(split, sort_keys=True, default=str)
+    if isinstance(bind, dict):
+        paths = ", ".join(f"{f}={bind[f]}" for f in ("payee", "amount") if f in bind)
+        uses = bind.get("uses", 1)
+        times = "once" if uses == 1 else f"{uses} times"
+        bound = f"bound {paths}, {times}"[:MAX_BECAUSE]
+    else:
+        bound = f"bound {json.dumps(bind, sort_keys=True, default=str)[:MAX_BECAUSE]}"
+    cap = capability[:MAX_BECAUSE]
+    return (f"node {node} asks to be split: a node before it producing {shown[:MAX_BECAUSE]} "
+            f"from its inputs, then {cap} {bound}, because: {text!r}")  # fmt: skip
+
+
+def reason(node: str, capability: str, because: str, bind: object = None,
+           split: object = None) -> Reason:  # fmt: skip
     """The request, as the architect receives it: fixed fields, a bounded sentence.
-    A request's `bind` (value-bound grants) is shown as sent, bounded too."""
+    A request's `bind` (value-bound grants) is shown as sent, bounded too, and a
+    `split` (add-split-escalation) as one line naming the fields and the bind."""
     text = " ".join(because.split())[:MAX_BECAUSE]
+    if split is not None:
+        return Reason(DEVELOPER_REQUEST, _split_line(node, capability, split, bind, text))
     bound = "" if bind is None else f" bound {json.dumps(bind, sort_keys=True)[:MAX_BECAUSE]}"
     return Reason(DEVELOPER_REQUEST, f"node {node} asks for {capability}{bound}, because: {text!r}")
 
@@ -101,8 +126,9 @@ def decide(before: dict, after: dict | None, task: str, task_prompt: str,
            *, node: str = "", request: object = None) -> dict:  # fmt: skip
     """The review of an edit, and the outcome. `reviewer_backend` None skips the AI
     reviewer (tests only), which then cannot accept. `request` is the developer's
-    (`{"capability", "bind"?, "because"}`): the edit may grant no more than it asks
-    (`formal.no_wider`), and a missing or malformed request fails closed."""
+    (`{"capability", "bind"?, "split"?, "because"}`), passed whole: the edit may grant
+    no more than it asks (`formal.no_wider`, which judges a split answer by where its
+    bound values come from), and a missing or malformed request fails closed."""
     if after is None:
         return {"outcome": NO_GRAPH, "changed": []}
     changed = changed_grants(before, after)

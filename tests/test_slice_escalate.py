@@ -169,6 +169,36 @@ def test_the_request_shows_its_bind_to_the_architect():
     assert f"asks for {CAPPED} bound " in r.detail and '"payee": "in0.iban"' in r.detail
 
 
+SPLIT = {"fields": {"iban": "string", "total": "number"}}
+SPLIT_LINE = (
+    "node PayBill asks to be split: a node before it producing {iban: string, total: number} "
+    f"from its inputs, then {PAY} bound payee=in0.iban, amount=in0.total, once, because: "
+    "'no field names the payee'"
+)
+
+
+def test_a_split_reaches_the_architect_as_one_bounded_line():
+    """D5's line, exactly; and every part the developer wrote is bounded."""
+    r = escalate.reason("PayBill", PAY, "no field\nnames the payee", BIND, SPLIT)
+    assert r.cls == escalate.DEVELOPER_REQUEST and r.detail == SPLIT_LINE
+    huge = escalate.reason("PayBill", PAY + "x" * 5000, "y" * 5000,
+                           {"payee": "in0." + "p" * 5000, "uses": 2},
+                           {"fields": {f"f{i}": "string" for i in range(2000)}})  # fmt: skip
+    assert len(huge.detail) < 1400 and "\n" not in huge.detail
+    malformed = escalate.reason("PayBill", PAY, "b", "x" * 5000, ["iban"] * 5000)
+    assert len(malformed.detail) < 1400
+
+
+def test_a_request_without_a_split_renders_exactly_as_before():
+    assert escalate.reason("PayBill", CAPPED, "to pay it", BIND).detail == (
+        f'node PayBill asks for {CAPPED} bound {{"amount": "in0.total", "payee": "in0.iban", '
+        "\"uses\": 1}, because: 'to pay it'"
+    )
+    assert escalate.reason("PayBill", PAY, "to pay").detail == (
+        f"node PayBill asks for {PAY}, because: 'to pay'"
+    )
+
+
 def test_the_developers_request_keeps_its_bind_as_sent():
     from poc.slice import developer
 
@@ -189,3 +219,103 @@ def test_a_fabricated_quote_stops_the_edit_at_the_link_check():
     }
     out = _decide(control.graph(), after, Fake(_verdicts(after)), {"capability": PAY})
     assert out["outcome"] == REJECTED and out["formal"]["links"][0]["problem"] == "fabricated-link"
+
+
+# ── add-split-escalation 2.3: a split through decide and the worklist ──
+
+
+class Scripted(Fake):
+    """A fake that reports the slice's model, as `Caller` checks."""
+
+    def __init__(self, *replies: str) -> None:
+        super().__init__(*replies)
+        self.usage = [{"model": "claude-haiku-5-5"}]
+
+
+class ScriptedBackends:
+    """`run.Backends` with scripted replies: the architect's edit, then the reviewer."""
+
+    def __init__(self, *replies: str) -> None:
+        self.made = [Scripted(r) for r in replies]
+        self.calls = 0
+
+    def __call__(self):
+        self.calls += 1
+        return self.made[self.calls - 1]
+
+
+def _worklist(monkeypatch, answer: dict) -> tuple[dict, dict, list[dict], list[tuple[str, str]]]:
+    """D2 through `develop_all`: `PayBill`'s developer asks for the split; a scripted
+    architect answers with `answer`, a scripted reviewer passes every grant."""
+    from poc.slice import developer, run
+    from tests import split_answers as sa
+
+    asked: list[tuple[str, str]] = []
+
+    def develop(graph, node, task, unit, backends, text=None, tag="body"):
+        asked.append((node, tag))
+        if tag == "body":
+            esc = developer.escalation(json.dumps({"escalate": sa.REQUEST}))
+            return {"outcome": developer.ESCALATED, "escalation": esc.as_dict()}  # type: ignore[union-attr]
+        held = [i for i in developer.node_of(graph, node)["inputs"] if i in graph["capabilities"]]
+        return {"outcome": developer.BODY, "component": f"/nowhere/{node}.wasm", "held": held,
+                "bind": developer.node_of(graph, node).get("bind")}  # fmt: skip
+
+    monkeypatch.setattr(run, "_develop", develop)
+    backends = ScriptedBackends(json.dumps(answer), _verdicts(answer))
+    before = sa.before()
+    final, components, records = run.develop_all(
+        before, "user_task_0", PROMPT, run.abstract_of(before), "test", False, backends
+    )  # type: ignore[arg-type]
+    return final, components, records, asked
+
+
+def test_a_split_kept_as_a_bound_payer_gets_its_developer_again(monkeypatch):
+    from tests import split_answers as sa
+
+    final, components, (entry,), asked = _worklist(monkeypatch, sa.custom_pays())
+    decision = entry["escalation"]["decision"]
+    assert decision["outcome"] == ACCEPTED and decision["formal"]["no_wider"] == []
+    assert decision["changed"] == sorted([sa.LLM, sa.PAY])
+    assert asked == [("PayBill", "body"), ("PayBill", "after-escalation")]
+    assert entry["after_escalation"]["held"] == [sa.PAY]
+    assert entry["after_escalation"]["bind"] == {sa.PAY: sa.BIND}
+    assert final == sa.custom_pays() and set(components) == {"PayBill"}
+
+
+def test_a_split_answered_by_a_library_writer_removes_the_node(monkeypatch):
+    from tests import split_answers as sa
+
+    final, components, (entry,), asked = _worklist(monkeypatch, sa.library_pays())
+    assert entry["escalation"]["decision"]["outcome"] == ACCEPTED
+    assert entry["after_escalation"] == {"outcome": "node-removed-by-edit"}
+    assert asked == [("PayBill", "body")]
+    assert final == sa.library_pays() and components == {}
+
+
+def test_the_architect_is_shown_the_split_line(monkeypatch):
+    from tests import split_answers as sa
+
+    backends_seen: list[str] = []
+    real = Scripted.generate
+
+    def spy(self, request):
+        backends_seen.append(request.prompt)
+        return real(self, request)
+
+    monkeypatch.setattr(Scripted, "generate", spy)
+    _worklist(monkeypatch, sa.custom_pays())
+    assert "- developer-request: node PayBill asks to be split: a node before it producing " \
+           "{iban: string, total: number}" in backends_seen[0]  # fmt: skip
+
+
+def test_an_unbound_split_answer_is_rejected_and_the_graph_before_stands(monkeypatch):
+    from tests import split_answers as sa
+
+    final, components, (entry,), asked = _worklist(monkeypatch, sa.custom_pays(bind=None))
+    decision = entry["escalation"]["decision"]
+    assert decision["outcome"] == REJECTED
+    assert {f["problem"] for f in decision["formal"]["no_wider"]} == {
+        "unbound-answer", "wider-than-asked"
+    }  # fmt: skip
+    assert final == sa.before() and asked == [("PayBill", "body")] and components == {}

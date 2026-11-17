@@ -29,7 +29,7 @@ is in progress.
       (`runs/bind/user_task_0.D2.json`), which still fails closed. (`formal.split_fields`;
       the two hand-written answers are rebuilt as fixtures in `tests/split_answers.py`, and
       reproduce the proposal's table under the `formal.py` of `fba71d2`)
-- [ ] 1.3 `escalate.reason` renders a split as one bounded line (D5). Verify: a test in
+- [x] 1.3 `escalate.reason` renders a split as one bounded line (D5). Verify: a test in
       `tests/test_slice_escalate.py` on the line's text and its bound length, and that a
       request without `split` renders exactly as before
 
@@ -48,7 +48,7 @@ is in progress.
       of "A split answer is held to the split asked for", including both hand-written
       answers from the proposal's table, which now pass, and the unbound one, which still
       fails
-- [ ] 2.3 `escalate.decide` passes the split through, and the worklist in `develop_all`
+- [x] 2.3 `escalate.decide` passes the split through, and the worklist in `develop_all`
       handles both answers: the requesting node kept as a bound payer, which gets its
       developer again, and the node removed. Verify: tests in
       `tests/test_slice_escalate.py` with a scripted architect and a scripted reviewer, and
