@@ -95,7 +95,7 @@ is in progress.
 
 ## 5. Close
 
-- [ ] 5.1 `make build` and `make spec-check` pass, with `make architect` unchanged and the
+- [x] 5.1 `make build` and `make spec-check` pass, with `make architect` unchanged and the
       Paper 2, 3 and 4 figure pins green without re-seeding
 - [ ] 5.2 `openspec validate add-split-escalation --strict`, then archive with the
       author's go. No new capability, so no Purpose to write
