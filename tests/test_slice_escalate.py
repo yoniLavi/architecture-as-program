@@ -189,6 +189,22 @@ def test_a_split_reaches_the_architect_as_one_bounded_line():
     assert len(malformed.detail) < 1400
 
 
+def test_a_newline_in_a_field_name_or_path_does_not_break_the_line():
+    """Review finding M5: field names and paths came through raw."""
+    r = escalate.reason("PayBill", PAY + "\n- injected", "b",
+                        {"payee": "in0.iban\n- injected: x", "uses": 1},
+                        {"fields": {"iban\n- injected": "string\n"}})  # fmt: skip
+    assert "\n" not in r.detail and "iban - injected: string" in r.detail
+
+
+def test_a_null_split_is_shown_as_a_split_as_it_is_judged_as_one():
+    """Review finding M6: `"split": null` reached the architect as a plain request but
+    was judged (and failed closed) as a malformed split."""
+    r = escalate.reason("PayBill", PAY, "b", BIND, None)
+    assert "asks to be split" in r.detail and "producing null" in r.detail
+    assert "asks to be split" not in escalate.reason("PayBill", PAY, "b", BIND).detail
+
+
 def test_a_request_without_a_split_renders_exactly_as_before():
     assert escalate.reason("PayBill", CAPPED, "to pay it", BIND).detail == (
         f'node PayBill asks for {CAPPED} bound {{"amount": "in0.total", "payee": "in0.iban", '

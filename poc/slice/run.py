@@ -130,7 +130,7 @@ def develop_all(graph: dict, task: str, task_prompt: str, abstract: dict, unit: 
         if rec["outcome"] == developer.ESCALATED:
             req = rec["escalation"]
             why = escalate.reason(node, req["capability"], req["because"], req.get("bind"),
-                                  req.get("split"))  # fmt: skip
+                                  req.get("split", escalate.NO_SPLIT))  # fmt: skip
             edit = escalate.edit(task_prompt, abstract, graph, why, backends(), MODEL)
             decision = escalate.decide(graph, edit["graph"], task, task_prompt, backends(), MODEL,
                                        node=node, request=req)  # fmt: skip
@@ -379,7 +379,10 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_USAGE
         record.update(head=repo_git.at(REPO_ROOT).head(), priority=priority,
                       usage_windows=backends.windows(), backends=len(backends.made))  # fmt: skip
-        path.write_text(json.dumps(record, indent=1, ensure_ascii=False, default=str) + "\n")
+        # Whole or not at all: a crash mid-write leaves no partial record for resume to skip.
+        partial = path.with_suffix(".json.partial")
+        partial.write_text(json.dumps(record, indent=1, ensure_ascii=False, default=str) + "\n")
+        partial.replace(path)
         devs = [(d["node"], d["developer"]["outcome"]) for d in record.get("developers", [])]
         print(f"{record['unit']}: {record['outcome']}, developers={devs}, "
               f"utility={record.get('utility', {}).get('final', {}).get('utility')}",

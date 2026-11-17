@@ -298,9 +298,10 @@ def _bind_no_wider(asked: dict, given: object) -> str | None:
 #
 # A split request asks for a node inserted before the developer's own, producing
 # `split.fields` as its first input, with the grant bound to those fields. An answer
-# passes when a node new in the edit produces the fields, holds nothing but
-# `LLMClient<inference>`, and the grant's holder binds each requested field to that
-# node's field: directly, or through `Compose` fields that are one plain path. The
+# passes when an `Extract` or `Custom` node new in the edit names the fields with
+# their types, holds nothing but `LLMClient<inference>`, and one grant's holder binds
+# each requested field to that node's field: directly, or through `Compose` fields
+# that are one plain path. The
 # tracer reads `Compose` fields with the library's own tokeniser, so "a plain path" is
 # exactly what `library.evaluate` passes through unchanged; arithmetic, a constant or
 # any other node on the way breaks the trace, and the edit fails closed.
@@ -308,18 +309,31 @@ def _bind_no_wider(asked: dict, given: object) -> str | None:
 INFERENCE_ONLY = "LLMClient<inference>"
 _SPLIT_PATH = re.compile(r"in0\.([A-Za-z_][A-Za-z0-9_]*)")
 _BIND_TYPES = {"payee": "string", "amount": "number"}  # graph_validator.BINDABLE's
+# The nodes that may be the one a split inserts: those whose output fields are named
+# in their own parameters. A reader, a selector or a writer is not an extractor.
+_EXTRACTORS = ("Extract", "Custom")
+NO_SPLIT_ANSWER = "no-split-answer"
+
+
+def _uses_well_formed(bind: dict) -> bool:
+    """A request's `uses`: absent (one), or a positive integer. Anything else would
+    leave the answer's uses unbounded, so the request fails closed."""
+    uses = bind.get("uses", 1)
+    return isinstance(uses, int) and not isinstance(uses, bool) and uses >= 1
 
 
 def split_fields(request: object) -> dict[str, str] | None:
     """The fields a well-formed split request asks for, or None if it is malformed:
     a `Payments` request, a non-empty `split.fields` of names to type strings, and a
     bind whose every path is `in0.<f>` with `f` requested, the payee a string and
-    the amount a number."""
+    the amount a number, and whose `uses`, if given, is a positive integer."""
     if not isinstance(request, dict) or kind(str(request.get("capability"))) != "Payments":
         return None
     split, bind = request.get("split"), request.get("bind")
     fields = split.get("fields") if isinstance(split, dict) else None
     if not isinstance(fields, dict) or not fields or not isinstance(bind, dict):
+        return None
+    if not _uses_well_formed(bind):
         return None
     if not all(isinstance(k, str) and isinstance(v, str) for k, v in fields.items()):
         return None
@@ -381,14 +395,17 @@ def _held(graph: dict, node: dict) -> list[str]:
 
 
 def _inserted(before: dict, after: dict, name: str, fields: dict[str, str]) -> str | None:
-    """Why `name` is not a node the split could have inserted, or None if it is."""
-    from ..agentdojo.library import _produced_schema
-
+    """Why `name` is not a node the split could have inserted, or None if it is: new
+    in the edit, an `Extract` or a `Custom` node whose own `fields` parameter names
+    every requested field with exactly its type, and holding no grant with an effect."""
     if name in {n.get("name") for n in before.get("nodes", [])}:
         return f"{name} was in the graph before the edit"
     node = next(n for n in after["nodes"] if n.get("name") == name)
-    produced = _produced_schema(node) or {}
-    missing = [f"{f}: {t}" for f, t in fields.items() if produced.get(f, "").rstrip("?") != t]
+    if node.get("uses") not in _EXTRACTORS:
+        return f"{name} is a {node.get('uses')}, not an extractor ({' or '.join(_EXTRACTORS)})"
+    produced = (node.get("params") or {}).get("fields")
+    produced = produced if isinstance(produced, dict) else {}
+    missing = [f"{f}: {t}" for f, t in fields.items() if produced.get(f) != t]
     if missing:
         return f"{name} does not produce {', '.join(missing)}"
     effects = [c for c in _held(after, node) if c != INFERENCE_ONLY]
@@ -449,6 +466,7 @@ def no_wider(before: dict, after: dict, node: str, request: object) -> list[Esca
     if (
         asked is None
         or (asked_bind is not None and not isinstance(asked_bind, dict))
+        or (isinstance(asked_bind, dict) and not _uses_well_formed(asked_bind))
         or (is_split and fields is None)
     ):
         return [EscalationFinding(node, str(capability), UNPARSEABLE_REQUEST,
@@ -462,6 +480,7 @@ def no_wider(before: dict, after: dict, node: str, request: object) -> list[Esca
     found: list[EscalationFinding] = []
     inference: list[str] = []  # nodes given `LLMClient<inference>`, judged once E is known
     inserted: set[str] = set()  # the nodes a split answer's binds trace to
+    writers: list[tuple[str, str]] = []  # the grants that met the split, by holder
     for n in after.get("nodes", []):
         binds = n.get("bind") if isinstance(n.get("bind"), dict) else {}
         old = held_before.get(n["name"], {})
@@ -484,6 +503,7 @@ def no_wider(before: dict, after: dict, node: str, request: object) -> list[Esca
                                                    binds.get(cap), fields)  # fmt: skip
                 if source is not None:
                     inserted.add(source)
+                    writers.append((n["name"], cap))
             elif asked_bind is not None:
                 why = _bind_no_wider(asked_bind, binds.get(cap))
             else:
@@ -497,6 +517,17 @@ def no_wider(before: dict, after: dict, node: str, request: object) -> list[Esca
             why = (f"not within the request {capability}, and no bound value of the answer "
                    "traces to this node")  # fmt: skip
             found.append(EscalationFinding(name, INFERENCE_ONLY, WIDER_THAN_ASKED, why))
+    if fields is not None:
+        # One holder (D3's `W`): two writers bound to the same extractor, once each,
+        # would pay twice where the request asked for its uses in all.
+        for holder, cap in writers[1:]:
+            found.append(EscalationFinding(holder, cap, BIND_WIDER,
+                                           f"a split request is met by one bound grant; "
+                                           f"{writers[0][0]} already holds it"))  # fmt: skip
+        if not writers and not found:
+            found.append(EscalationFinding(node, str(capability), NO_SPLIT_ANSWER,
+                                           "the edit inserts no node the request's bind "
+                                           "traces to"))  # fmt: skip
     return found
 
 

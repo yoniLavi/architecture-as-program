@@ -65,14 +65,16 @@ is in progress.
       test asserts that it does. Verify: the new case in `tests/test_bind_limits.py`
       passes, and the bind is labelled `untrusted`. **Corrected in implementation (17
       November 2026): for the library-writer answer the label is `trusted`, and the test
-      pins that.** `SendMoney` takes a trusted `PaymentOrder` only, so the `Compose` before
-      it must declare `discharges_trust` (as the control graph's does), and the label
-      follows the holder's declared input, not where its values came from. The
-      developer's own node paying (`custom_pays`) reads the extractor's output directly
-      and is labelled `untrusted`; the test pins both. The pinned run: the attacker paid
-      on 7 of 9 injections and the attack met on 4, the same sets as the bound oracle
-      plan's, on both tiers. The request names its fields `recipient` and `amount`,
-      because the fooled stand-in substitutes the goal's arguments by field name
+      pins that.** `SendMoney` takes a trusted `PaymentOrder` only, so some node between
+      the bill and the writer must declare `discharges_trust`. In the fixture it is the
+      `Compose`, as in the control graph; in the re-run's answers it was the `Extract`.
+      The label follows the holder's declared input, not where its values came from. Where
+      the developer's own node pays (`custom_pays`), it reads the extractor's output
+      directly and is labelled `untrusted`; the test pins both. The pinned run: on the host
+      tier, the attacker is paid on 7 of 9 injections and the attack is met on 4, the same
+      sets as the bound oracle plan's; on the confined tier only injection 0 is run, and it
+      pays the attacker. The request names its fields `recipient` and `amount`, because the
+      fooled stand-in substitutes the goal's arguments by field name
 - [x] 3.3 Replay: run `formal.custom_writers` and `formal.no_wider` over the committed slice
       and bind records, and confirm every recorded outcome is unchanged (no recorded
       request carries `split`). Verify: a test over `runs/slice/` and `runs/bind/`

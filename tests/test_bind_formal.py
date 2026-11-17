@@ -340,11 +340,124 @@ def test_arithmetic_a_constant_or_a_non_field_path_breaks_the_trace(amount):
     assert formal.trace(g, "PayBill", "in0.recipient") == ("ExtractBill", "iban")
 
 
-def test_a_selector_on_the_way_ends_the_trace_at_the_selector():
+def test_a_selector_on_the_way_ends_the_trace_at_the_selector_and_the_answer_fails():
     g = sa.library_pays()
     make = next(n for n in g["nodes"] if n["name"] == "MakeOrder")
     make["uses"] = "Branch"
     assert formal.trace(g, "PayBill", "in0.recipient") == ("MakeOrder", "recipient")
+    found = no_wider(sa.before(), g, "PayBill", sa.REQUEST)
+    assert ("PayBill", BIND_WIDER) in [(f.node, f.problem) for f in found]
+
+
+def test_a_new_selector_is_not_the_inserted_node():
+    """Review finding B1: a `SelectTransaction` new in the edit, holding nothing, whose
+    output record has the fields, passed as the split's node. The payee was picked from
+    the transaction history, and no extractor existed. Only an `Extract` or `Custom`
+    node naming its fields can be the node a split inserts."""
+    db = "DBHandle<'transactions', read>"
+    before = sa.before()
+    before["capabilities"].append(db)
+    before["parameters"].append(db)
+    before["nodes"].insert(1, {"name": "ReadTx", "uses": "ReadTransactions",
+                               "inputs": ["TaskRequest", db],
+                               "output": "Untrusted<TransactionList>"})  # fmt: skip
+    before["data_edges"].append({"from": "Start", "to": "ReadTx"})
+    request = sa.request("recipient", "amount")
+    after = copy.deepcopy(before)
+    after["capabilities"].append(sa.PAY)
+    after["parameters"].append(sa.PAY)
+    i = next(k for k, n in enumerate(after["nodes"]) if n["name"] == "PayBill")
+    after["nodes"].insert(i, {"name": "PickTx", "uses": "SelectTransaction",
+                              "params": {"where": ["amount > 0"], "pick": "last"},
+                              "inputs": ["Untrusted<TransactionList>"],
+                              "output": "Untrusted<Transaction>"})  # fmt: skip
+    pay = after["nodes"][i + 1]
+    pay["inputs"] = ["Untrusted<Transaction>", sa.PAY]
+    pay["bind"] = {sa.PAY: dict(request["bind"])}
+    after["data_edges"] = [e for e in after["data_edges"] if e["to"] != "PayBill"] + [
+        {"from": "ReadTx", "to": "PickTx"}, {"from": "PickTx", "to": "PayBill"}
+    ]  # fmt: skip
+    assert formal.trace(after, "PayBill", "in0.recipient") == ("PickTx", "recipient")
+    found = no_wider(before, after, "PayBill", request)
+    assert [(f.node, f.problem) for f in found] == [("PayBill", BIND_WIDER)]
+    assert "not an extractor" in found[0].detail
+
+
+# ── Review findings on the split check (17 November 2026) ────────────
+
+
+@pytest.mark.parametrize("uses", ["1", "once", 1.0, 0, -1, True, None])
+def test_a_request_whose_uses_is_not_a_positive_integer_fails_closed(uses):
+    """B2: a non-integer `uses` left the answer's uses unbounded. Split or not, such
+    a request now fails closed (an answer with 99 uses used to pass)."""
+    answer = sa.custom_pays(bind={**sa.BIND, "uses": 99})
+    split_request = {**sa.REQUEST, "bind": {**sa.BIND, "uses": uses}}
+    assert formal.split_fields(split_request) is None
+    assert [f.problem for f in no_wider(sa.before(), answer, "PayBill", split_request)] == [
+        UNPARSEABLE_REQUEST
+    ]
+    plain = {"capability": CAPPED, "bind": {**BOUND, "uses": uses}}
+    before, after = _edit(CAPPED, {**BOUND, "uses": 99})
+    assert [f.problem for f in no_wider(before, after, "PayBill", plain)] == [UNPARSEABLE_REQUEST]
+
+
+def test_two_writers_bound_to_one_extractor_fail():
+    """M1: a second `SendMoney`, through a second plain-path `Compose`, each bound
+    once, would pay twice where once was asked."""
+    g = sa.library_pays()
+    make = copy.deepcopy(next(n for n in g["nodes"] if n["name"] == "MakeOrder"))
+    pay = copy.deepcopy(next(n for n in g["nodes"] if n["name"] == "PayBill"))
+    make["name"], pay["name"] = "MakeOrder2", "PayBill2"
+    g["nodes"] += [make, pay]
+    g["data_edges"] += [{"from": "ExtractBill", "to": "MakeOrder2"},
+                        {"from": "MakeOrder2", "to": "PayBill2"}]  # fmt: skip
+    found = no_wider(sa.before(), g, "PayBill", sa.REQUEST)
+    assert [(f.node, f.problem) for f in found] == [("PayBill2", BIND_WIDER)]
+
+
+def test_an_edit_that_makes_no_split_does_not_pass():
+    """M2: a changed graph with no grant added passed a split request's check."""
+    after = copy.deepcopy(sa.before())
+    after["nodes"][0]["because"] = {}
+    found = no_wider(sa.before(), after, "PayBill", sa.REQUEST)
+    assert [f.problem for f in found] == [formal.NO_SPLIT_ANSWER]
+
+
+@pytest.mark.parametrize("value", ["number?", "string", {"type": "number"}, 7])
+def test_the_extractor_must_name_each_field_with_exactly_its_type(value):
+    """M3 and M4: an optional field is not the field asked for, and a malformed type
+    fails as a finding, not a crash."""
+    g = sa.custom_pays()
+    extract = next(n for n in g["nodes"] if n["name"] == "ExtractBill")
+    extract["params"]["fields"]["total"] = value
+    found = no_wider(sa.before(), g, "PayBill", sa.REQUEST)
+    assert ("PayBill", BIND_WIDER) in [(f.node, f.problem) for f in found]
+    extract["uses"] = "Custom"
+    found = no_wider(sa.before(), g, "PayBill", sa.REQUEST)
+    assert ("PayBill", BIND_WIDER) in [(f.node, f.problem) for f in found]
+
+
+def test_a_custom_extractor_naming_the_fields_passes():
+    g = sa.custom_pays()
+    extract = next(n for n in g["nodes"] if n["name"] == "ExtractBill")
+    extract["uses"] = "Custom"
+    extract["params"] = {"role": "Find the IBAN and the total.", "fields": dict(sa.FIELDS)}
+    assert no_wider(sa.before(), g, "PayBill", sa.REQUEST) == []
+
+
+def test_the_re_runs_answers_are_judged_as_recorded():
+    """The fixes change no recorded decision: r1, r2, r3 and r5 still pass, r4 still
+    fails on its renamed payee."""
+    runs = SLICE.parent / "split"
+    judged = {}
+    for path in sorted(runs.glob("*.json")):
+        record = json.loads(path.read_text())
+        (dev,) = record["developers"]
+        found = no_wider(sa.before(), dev["escalation"]["edit"]["graph"], dev["node"],
+                         dev["developer"]["escalation"])  # fmt: skip
+        assert [f.as_dict() for f in found] == dev["escalation"]["decision"]["formal"]["no_wider"]
+        judged[record["repetition"]] = [f.problem for f in found]
+    assert judged == {1: [], 2: [], 3: [], 4: [BIND_WIDER, WIDER_THAN_ASKED], 5: []}
 
 
 def test_no_single_edge_at_the_position_breaks_the_trace():

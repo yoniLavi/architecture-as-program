@@ -42,6 +42,14 @@ The formal review SHALL accept an answer to a split request only when a node new
 - **WHEN** the answer's bind allows two uses and the request asked for one
 - **THEN** the check fails the edit
 
+#### Scenario: A selector stands in for the extractor
+- **WHEN** the node the bind traces to is new in the edit but is a reader, a selector or a writer, not an `Extract` or `Custom` node naming the fields
+- **THEN** the check fails the edit
+
+#### Scenario: A request whose uses is not a positive integer
+- **WHEN** a split request's bind gives `uses` as a string, a fraction, zero or a boolean
+- **THEN** the request fails closed, and no answer to it can pass
+
 ## MODIFIED Requirements
 
 ### Requirement: An accepted escalation grants no more than was asked

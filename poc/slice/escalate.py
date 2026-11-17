@@ -58,30 +58,39 @@ def _split_line(node: str, capability: str, split: object, bind: object, text: s
     """D5: `node N asks to be split: a node before it producing {f: t, …} from its
     inputs, then C bound payee=…, amount=…, once, because: '…'`. Every part that
     comes from the request is bounded; a malformed part is shown as sent, bounded."""
+
+    def flat(value: object) -> str:  # one line, whatever the developer put in a name
+        return " ".join(str(value).split())
+
     fields = split.get("fields") if isinstance(split, dict) else None
     if isinstance(fields, dict):
-        shown = "{" + ", ".join(f"{k}: {v}" for k, v in fields.items()) + "}"
+        shown = "{" + ", ".join(f"{flat(k)}: {flat(v)}" for k, v in fields.items()) + "}"
     else:
         shown = json.dumps(split, sort_keys=True, default=str)
     if isinstance(bind, dict):
-        paths = ", ".join(f"{f}={bind[f]}" for f in ("payee", "amount") if f in bind)
+        paths = ", ".join(f"{f}={flat(bind[f])}" for f in ("payee", "amount") if f in bind)
         uses = bind.get("uses", 1)
-        times = "once" if uses == 1 else f"{uses} times"
+        times = "once" if uses == 1 else f"{flat(uses)} times"
         bound = f"bound {paths}, {times}"[:MAX_BECAUSE]
     else:
         bound = f"bound {json.dumps(bind, sort_keys=True, default=str)[:MAX_BECAUSE]}"
-    cap = capability[:MAX_BECAUSE]
+    cap = flat(capability)[:MAX_BECAUSE]
     return (f"node {node} asks to be split: a node before it producing {shown[:MAX_BECAUSE]} "
             f"from its inputs, then {cap} {bound}, because: {text!r}")  # fmt: skip
 
 
+NO_SPLIT = object()  # a request with no `split` key; `"split": null` is a split, malformed
+
+
 def reason(node: str, capability: str, because: str, bind: object = None,
-           split: object = None) -> Reason:  # fmt: skip
+           split: object = NO_SPLIT) -> Reason:  # fmt: skip
     """The request, as the architect receives it: fixed fields, a bounded sentence.
     A request's `bind` (value-bound grants) is shown as sent, bounded too, and a
-    `split` (add-split-escalation) as one line naming the fields and the bind."""
+    `split` (add-split-escalation) as one line naming the fields and the bind. A
+    request carrying the key is shown as a split whatever its value, as `no_wider`
+    judges it as one."""
     text = " ".join(because.split())[:MAX_BECAUSE]
-    if split is not None:
+    if split is not NO_SPLIT:
         return Reason(DEVELOPER_REQUEST, _split_line(node, capability, split, bind, text))
     bound = "" if bind is None else f" bound {json.dumps(bind, sort_keys=True)[:MAX_BECAUSE]}"
     return Reason(DEVELOPER_REQUEST, f"node {node} asks for {capability}{bound}, because: {text!r}")
