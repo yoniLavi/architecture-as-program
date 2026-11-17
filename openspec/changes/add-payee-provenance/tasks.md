@@ -56,7 +56,7 @@
 
 ## 2. Predictions, then the re-run
 
-- [ ] 2.1 Rewrite grants with a harness function. It replaces `Payments<[any], uncapped>`
+- [x] 2.1 Rewrite grants with a harness function. It replaces `Payments<[any], uncapped>`
   with `Payments<[known-payees], uncapped>` and touches nothing else (D6). Verify: a test
   diffs each rewritten graph against its source, and the validator accepts all three.
   *Done: `harness.rewrite_known_payees` (exact strings and keys only; a bind is keyed by
