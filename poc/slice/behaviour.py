@@ -172,7 +172,7 @@ def provenance(graph: dict) -> dict[str, dict[str, frozenset]]:
 class Scope:
     kind: str
     payees: tuple[str, ...] = ()  # literal payees
-    dynamic: tuple[str, ...] = ()  # 'any', 'inbound-senders'
+    dynamic: tuple[str, ...] = ()  # 'any', 'inbound-senders', 'known-payees'
     cap: str | None = None  # None: uncapped
     recurring: bool = False
     orders: tuple[str, ...] = ()
@@ -259,6 +259,8 @@ def _payees(s: Scope) -> str:
         out.append("any payee at all")
     if "inbound-senders" in s.dynamic:
         out.append("anyone who has sent the user money")
+    if "known-payees" in s.dynamic:
+        out.append("anyone the user has already paid")
     out += [repr(p) for p in s.payees]
     return ", ".join(out) if out else "no payee"
 

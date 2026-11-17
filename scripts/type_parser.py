@@ -519,7 +519,9 @@ def _http_allowlist(app: TApp) -> frozenset[str] | None:
 # Payee sets read from the environment rather than written in the type. `any` is
 # the unnarrowed form, there so that a payee known only from a document (a bill)
 # is expressible at all; a reviewer should treat it as the widest grant it is.
-DYNAMIC_PAYEES = frozenset({"any", "inbound-senders"})
+# `inbound-senders` is whoever has paid the account; `known-payees` is whoever the
+# account has already paid (completed outgoing payments, read at the crossing).
+DYNAMIC_PAYEES = frozenset({"any", "inbound-senders", "known-payees"})
 SCHEDULED_FIELDS = frozenset({"recipient", "amount", "subject", "date", "recurring"})
 PROFILE_FIELDS = frozenset({"first_name", "last_name", "street", "city"})
 

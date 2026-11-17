@@ -13,19 +13,35 @@
 
 ## 1. The class
 
-- [ ] 1.1 Add `known-payees` to `DYNAMIC_PAYEES` in `scripts/type_parser.py`. Verify:
+- [x] 1.1 Add `known-payees` to `DYNAMIC_PAYEES` in `scripts/type_parser.py`. Verify:
   - a case in `tests/test_type_parser.py` parses it as dynamic;
   - narrowing cases pass: `any` covers it, and it is incomparable with `inbound-senders`
     and with a literal list;
   - the parser stays stdlib-only;
   - `dist/grammar.md` regenerates with the class.
-- [ ] 1.2 Add `known_payees(bank)` (D2) to `poc/bank.py`: outgoing, completed payments only.
+
+  *Done. The last check's premise was wrong: the grammar card
+  (`scripts/emit-grammar.py`) documents no banking kind, and so names neither
+  `any` nor `inbound-senders`. It regenerates, and is unchanged. Adding a
+  `Payments` section would be an unplanned `scripts/` edit, so it is left to
+  the author. The slice's behaviour page (`poc/slice/behaviour.py`) gained
+  words for the class ("anyone the user has already paid"), so a
+  `known-payees` grant never renders as "no payee"; no slice graph holds one.*
+- [x] 1.2 Add `known_payees(bank)` (D2) to `poc/bank.py`: outgoing, completed payments only.
   `_check_payment` admits a payee in it. Verify, with `tests/test_banking_kinds.py` cases on
   AgentDojo's default environment:
   - the four past payees are admitted;
   - the attacker's IBAN, the lookalike, the bill's IBAN and an inbound-only sender are
     refused with "outside the handle's payees";
   - a payment made earlier in the run makes its payee known (D3).
+
+  *Done. The default environment has no inbound-only sender (its one sender, GB29, was
+  also paid), so that case adds one inbound row to a copy. The copy is held to
+  AgentDojo's history where the `agentdojo` group is installed. The proposal's
+  "lookalike" (the Apple Store's IBAN) differs from the attacker's in two digits, not
+  one; a one-character lookalike, a case change and a trailing space are refused too.
+  Also pinned: a scheduled order does not make its recipient known, and the cap still
+  holds.*
 - [ ] 1.3 Check the confined tier. Verify, with a test in `tests/test_payee_provenance.py`:
   a known payee is paid and a new one refused through the confined banking adapter, with
   `banking.wit` byte-identical.

@@ -321,5 +321,50 @@ class TestTrustLattice(unittest.TestCase):
         self.assertNotEqual(trust_level(u), trust_level(t))
 
 
+class TestKnownPayees(unittest.TestCase):
+    """`known-payees` (add-payee-provenance 1.1): a third environment-read payee
+    set, narrowed by the existing rule with no new code."""
+
+    FRIEND = "GB29NWBK60161331926819"
+
+    def _ok(self, actual: str, target: str) -> bool:
+        return is_assignable(parse_type(actual), parse_type(target))
+
+    def test_parses_as_a_dynamic_set(self):
+        from type_parser import DYNAMIC_PAYEES, payments_scope
+
+        self.assertIn("known-payees", DYNAMIC_PAYEES)
+        scope = payments_scope(parse_type("Payments<[known-payees], uncapped>"))
+        assert scope is not None
+        self.assertEqual(scope.dynamic, frozenset({"known-payees"}))
+        self.assertEqual(scope.literal, frozenset())
+        # Quoted, it would be a literal payee of that name: refused.
+        self.assertIsNone(payments_scope(parse_type("Payments<['known-payees'], uncapped>")))
+
+    def test_any_covers_it(self):
+        self.assertTrue(self._ok("Payments<[any], uncapped>", "Payments<[known-payees], '100'>"))
+        self.assertFalse(
+            self._ok("Payments<[known-payees], uncapped>", "Payments<[any], uncapped>")
+        )
+
+    def test_incomparable_with_inbound_senders(self):
+        kp, ib = "Payments<[known-payees], '10'>", "Payments<[inbound-senders], '10'>"
+        self.assertFalse(self._ok(kp, ib))
+        self.assertFalse(self._ok(ib, kp))
+
+    def test_incomparable_with_a_literal_list(self):
+        lit, kp = f"Payments<['{self.FRIEND}'], uncapped>", "Payments<[known-payees], uncapped>"
+        self.assertFalse(self._ok(lit, kp))  # whether a literal is known depends on the run
+        self.assertFalse(self._ok(kp, lit))
+
+    def test_the_cap_still_narrows(self):
+        self.assertTrue(
+            self._ok("Payments<[known-payees], '100'>", "Payments<[known-payees], '10'>")
+        )
+        self.assertFalse(
+            self._ok("Payments<[known-payees], '10'>", "Payments<[known-payees], '100'>")
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

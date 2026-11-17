@@ -87,6 +87,24 @@ def inbound_senders(bank: Bank) -> frozenset[str]:
     )
 
 
+def known_payees(bank: Bank) -> frozenset[str]:
+    """Recipients of completed payments *out of* this account: whoever it has
+    already paid, read at the crossing (add-payee-provenance, D2 and D3).
+
+    Scheduled orders are excluded: one can be created by the kind of injected
+    instruction this set is meant to refuse, and counting it would let one
+    injection launder the next. Membership is exact (D4): no normalisation of an
+    attacker-supplied string sits in front of the check. A payment made earlier in
+    the same run counts, because the history is read here; that is the rule's
+    trust boundary, not an oversight."""
+    own = bank.inspect("iban")
+    return frozenset(
+        t["recipient"]
+        for t in bank.inspect("transactions")
+        if t["sender"] in (own, "me") and t["recipient"] not in (own, "me")
+    )
+
+
 def _check_payment(scope: PaymentsScope, bank: Bank, recipient: str, amount: float) -> None:
     if not isinstance(amount, int | float) or amount <= 0:
         raise CapabilityError(f"payment amount {amount!r} is not a positive number")
@@ -95,6 +113,8 @@ def _check_payment(scope: PaymentsScope, bank: Bank, recipient: str, amount: flo
     if "any" in scope.dynamic or recipient in scope.literal:
         return
     if "inbound-senders" in scope.dynamic and recipient in inbound_senders(bank):
+        return
+    if "known-payees" in scope.dynamic and recipient in known_payees(bank):
         return
     raise CapabilityError(
         f"payee {recipient!r} is outside the handle's payees "
