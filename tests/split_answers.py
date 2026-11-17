@@ -44,10 +44,16 @@ def _grant(g: dict, *caps: str) -> None:
             g["parameters"].append(cap)
 
 
-def _extract() -> dict:
+def request(payee: str = "iban", amount: str = "total") -> dict:
+    """The split request, with its fields named `payee` and `amount`."""
+    return {**REQUEST, "split": {"fields": {payee: "string", amount: "number"}},
+            "bind": {"payee": f"in0.{payee}", "amount": f"in0.{amount}", "uses": 1}}  # fmt: skip
+
+
+def _extract(fields: dict[str, str] = FIELDS) -> dict:
     return {"name": "ExtractBill", "uses": "Extract",
             "params": {"instruction": "Find the IBAN to pay and the total due in the bill.",
-                       "fields": dict(FIELDS)},
+                       "fields": dict(fields)},
             "inputs": ["Untrusted<FileText>", LLM], "output": "Untrusted<BillDue>",
             "because": {LLM: PAY_QUOTE}}  # fmt: skip
 
@@ -69,14 +75,18 @@ def custom_pays(bind: dict | None = BIND) -> dict:
     return g
 
 
-def library_pays(amount: str = "=in0.total", bind: dict | None = None) -> dict:
+def library_pays(amount: str = "=in0.total", bind: dict | None = None,
+                 names: tuple[str, str] = ("iban", "total")) -> dict:  # fmt: skip
+    """`names` are the extractor's two fields (the request's), payee then amount."""
     g = copy.deepcopy(before())
     _grant(g, LLM, PAY)
     i = next(k for k, n in enumerate(g["nodes"]) if n["name"] == "PayBill")
+    payee_f, amount_f = names
+    amount = amount.replace("in0.total", f"in0.{amount_f}")
     g["nodes"][i : i + 1] = [
-        _extract(),
+        _extract({payee_f: "string", amount_f: "number"}),
         {"name": "MakeOrder", "uses": "Compose",
-         "params": {"fields": {"recipient": "=in0.iban", "amount": amount,
+         "params": {"fields": {"recipient": f"=in0.{payee_f}", "amount": amount,
                                "subject": "Bill", "date": "2022-04-01"}},
          "inputs": ["Untrusted<BillDue>"], "output": "PaymentOrder",
          "discharges_trust": True},

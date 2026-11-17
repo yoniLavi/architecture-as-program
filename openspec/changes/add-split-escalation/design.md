@@ -178,8 +178,12 @@ written whole or not at all, and a rerun resumes.
 ## Risks / Trade-offs
 
 - [The split is read as a defence] → The split graph under injection is pinned as paying
-  the attacker (spec, value-bound-grants). Its bind is labelled `untrusted` wherever the
-  extractor read untrusted text. The roadmap entry says so first.
+  the attacker (spec, value-bound-grants). The roadmap entry says so first. *Corrected
+  in implementation, 17 November 2026:* this line said the bind is labelled `untrusted`
+  wherever the extractor read untrusted text. That holds only where the developer's node
+  pays. A library writer takes a trusted record, so the `Compose` before it declares the
+  discharge, and its bind is labelled `trusted` (task 3.2 pins both). The label follows
+  the declaration, so it cannot carry this risk; only the pinned limit does.
 - [Two developer-side changes confound the re-run's comparison with the bind re-run] → Both
   are stated in the record's stubs. The cap correction alone would only have made D2's
   request parse, and D2 would still have had no field to bind, which is the gap this change
