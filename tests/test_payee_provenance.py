@@ -65,15 +65,37 @@ def test_the_wit_is_unchanged():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == sha, name
 
 
+def _spy_components(monkeypatch) -> list[str]:
+    """The component of every confined call: so a confined pin cannot pass on the
+    host tier (verification finding)."""
+    from poc.sandbox import host
+
+    seen: list[str] = []
+    real = host.Sandbox.__init__
+
+    def spy(self, component_name, caps=None):
+        seen.append(component_name)
+        real(self, component_name, caps)
+
+    monkeypatch.setattr(host.Sandbox, "__init__", spy)
+    return seen
+
+
 @pytest.mark.parametrize("bound", [False, True], ids=["unbound", "bound"])
-def test_the_confined_adapter_pays_a_known_payee_and_refuses_a_new_one(bound):
+def test_the_confined_adapter_pays_a_known_payee_and_refuses_a_new_one(bound, monkeypatch):
+    from poc.agentdojo.confined import COMPONENTS
+
     g = _task0(bound=bound)
     sandbox = tuple(confinable(g))
     assert "PayBill" in sandbox  # the writer is its component, not a host body
+    seen = _spy_components(monkeypatch)
     known = run_pair(g, "user_task_0", backend=_plan(KNOWN), sandbox=sandbox)
     assert known.failure is None and _sends(known.calls) == [KNOWN]
+    assert COMPONENTS["SendMoney"] in seen
+    seen.clear()
     new = run_pair(g, "user_task_0", backend=_plan(ATTACKER), sandbox=sandbox)
-    assert new.failure and "outside the handle's payees" in new.failure
+    assert new.failure and harness.KNOWN_REFUSAL in new.failure
+    assert COMPONENTS["SendMoney"] in seen  # refused from inside the component's call
     assert _sends(new.calls) == []
 
 
@@ -102,7 +124,8 @@ def test_a_bound_known_payee_grant_refuses_a_bound_new_payee(monkeypatch):
     r = run_pair(_task0(bound=True), "user_task_0", backend=_plan(BILL_PAYEE))
     (bound,) = seen
     assert bound["grant"] == KNOWN_GRANT and bound["scope"].literal == frozenset({BILL_PAYEE})
-    assert r.failure and "outside the handle's payees" in r.failure
+    # The class refused it, not the bind: the bind's refusal would name its literal.
+    assert r.failure and harness.KNOWN_REFUSAL in r.failure
     assert _sends(r.calls) == []
 
 
@@ -149,13 +172,18 @@ def _diff(a, b, path=()) -> list[tuple]:
 
 
 def test_the_rewrite_replaces_the_grant_and_nothing_else():
-    from poc.agentdojo.library import check_graph
+    from poc.agentdojo.library import CATALOGUE, SLICE_CATALOGUE, check_graph
+    from poc.graph import validate_graph_dicts
 
     graphs = _case_graphs()
     assert set(graphs) == {"task-0-bound", "split-answer", "d1-bound"}
     for name, before in graphs.items():
         after = rewrite_known_payees(before)
-        check_graph(after)  # the validator accepts all three
+        # The validator accepts all three, and each composes from its catalogue
+        # (D1 has a `Custom` node, which only the slice's catalogue knows).
+        assert validate_graph_dicts([after]) == [], name
+        catalogue = SLICE_CATALOGUE if name == "d1-bound" else CATALOGUE
+        assert check_graph(after, catalogue) == [], name
         assert ANY_GRANT not in str(after), name
         changes = _diff(before, after)
         assert changes, name
@@ -214,6 +242,78 @@ def test_every_outcome_was_compared_and_none_contradicts_its_prediction():
     predictions = __import__("json").loads(harness.KNOWN_PREDICTIONS.read_text())["predictions"]
     assert len(rec["runs"]) == len(predictions) == 41
     assert rec["contradictions"] == []
+    # The payee each run tried is the one predicted (the harness compares it too).
+    by_key = {(p["case"], p["injection_task"], p["model"], p["tier"]): p for p in predictions}
+    for r in rec["runs"]:
+        p = by_key[(r["case"], r["injection_task"], r["model"], r["tier"])]
+        assert r["attempted_payee"] == p["attempted_payee"]
+
+
+@pytest.mark.parametrize(
+    ("field", "flipped"),
+    [("utility", True), ("attempted_payee", ATTACKER), ("refused", False)],
+)
+def test_a_mismatched_prediction_is_listed_as_a_contradiction(
+    tmp_path, monkeypatch, field, flipped
+):
+    """The comparison can fail: a copy of the predictions with one field flipped, on
+    one clean run, gives exactly one contradiction naming it."""
+    import json
+
+    from tests import known_payee_cases
+
+    doc = json.loads(harness.KNOWN_PREDICTIONS.read_text())
+    target = next(p for p in doc["predictions"]
+                  if p["case"] == "task-0-bound" and p["injection_task"] is None)  # fmt: skip
+    target[field] = flipped
+    path = tmp_path / "predictions.json"
+    path.write_text(json.dumps(doc))
+    monkeypatch.setattr(harness, "KNOWN_PREDICTIONS", path)
+    case = next(c for c in known_payee_cases.cases() if c.name == "task-0-bound")
+    case.injections, case.confined_injection = False, None
+    out = harness.known_payee_runs([case], ATTACKER)
+    assert [(c["field"], c["predicted"]) for c in out["contradictions"]] == [(field, flipped)]
+
+
+def test_a_run_without_a_prediction_is_listed(tmp_path, monkeypatch):
+    import json
+
+    from tests import known_payee_cases
+
+    doc = json.loads(harness.KNOWN_PREDICTIONS.read_text())
+    doc["predictions"] = []
+    path = tmp_path / "predictions.json"
+    path.write_text(json.dumps(doc))
+    monkeypatch.setattr(harness, "KNOWN_PREDICTIONS", path)
+    case = next(c for c in known_payee_cases.cases() if c.name == "task-0-bound")
+    case.injections, case.confined_injection = False, None
+    out = harness.known_payee_runs([case], ATTACKER)
+    assert [c["why"] for c in out["contradictions"]] == ["no committed prediction"]
+
+
+def test_a_payment_earlier_in_the_run_makes_its_payee_known_on_agentdojos_bank():
+    """D3 through the AgentDojo-backed bank, whose `send_money` records the sender as
+    the account's IBAN rather than 'me' (verification finding)."""
+    from agentdojo.functions_runtime import FunctionsRuntime
+
+    from poc.agentdojo.adapter import AgentDojoBank
+    from poc.bank import known_payees
+    from poc.handles import CapabilityError, World, provision
+    from poc.llm import StubLLM
+
+    s = harness.suite()
+    bank = AgentDojoBank(FunctionsRuntime(s.tools), s.load_and_inject_default_environment({}))
+
+    def handle(cap):
+        return provision(cap, backend=StubLLM(), stores={}, world=World(bank=bank))
+
+    assert BILL_PAYEE not in known_payees(bank)
+    with pytest.raises(CapabilityError, match=r"\['known-payees'\]"):
+        handle(KNOWN_GRANT).send(BILL_PAYEE, 1.0, "x", "2022-04-01")
+    handle(ANY_GRANT).send(BILL_PAYEE, 1.0, "x", "2022-04-01")
+    assert BILL_PAYEE in known_payees(bank)
+    handle(KNOWN_GRANT).send(BILL_PAYEE, 1.0, "x", "2022-04-01")
+    assert [c.function for c, _, err in bank.calls if err is None] == ["send_money"] * 2
 
 
 def test_the_any_records_are_unchanged():

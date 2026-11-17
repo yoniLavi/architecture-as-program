@@ -128,3 +128,48 @@
   re-seeded.*
 - [ ] 4.2 With the author's go, archive the change, and write the `payee-provenance`
   spec's Purpose in the archive commit.
+
+## Verification before the archive (17 November 2026)
+
+Two read-only subagents ran in parallel, per AGENTS.md's convention: one for conformance,
+one adversarial. Neither was given the implementer's conclusions. Neither found a fault in
+the mechanism: the rule, its interaction with binds, both tiers, and the counts in the
+findings all held when probed independently. Their findings, and what was done:
+
+**Fixed (tests and harness; no result moved):**
+- 2.1's "the validator accepts all three" was not asserted: `check_graph` returns a list,
+  and its result was dropped. Both the validator (`validate_graph_dicts`) and the library
+  check, with the right catalogue, are now asserted empty.
+- `refused` matched a substring that a bind, `inbound-senders` or a literal list also
+  raise. It now requires the class's own refusal (`harness.KNOWN_REFUSAL`), and the tier
+  and bind tests assert it. All 41 runs still meet it.
+- The confined tier was assumed, not observed. A spy now shows the `SendMoney` component
+  instantiated, for the known payee paid and the new one refused.
+- The contradiction path was never exercised. Tests now flip one prediction (`utility`,
+  `attempted_payee`, `refused`) and drop all of them; each case is listed.
+- `attempted_payee` was predicted but not compared. The harness now records and compares
+  it. The record gained that field and is otherwise unchanged; the hash-pinned predictions
+  file is untouched.
+- D3 was pinned only on `MemoryBank`. It is now also pinned through AgentDojo's bank,
+  whose `send_money` records the sender as the account's IBAN.
+- `_paid` checked only `send_money`; it now counts scheduled payments too.
+
+**For the author before the archive (each changes a claim or the design):**
+- **The cost is overstated** (both verifiers). "The rule refuses 3 of the 7" reads
+  AgentDojo's ground truth literally. Both merchant names resolve to known IBANs, and task
+  5's own utility requires the known Spotify IBAN; task 11's checks only the amount. Only
+  task 0's refusal is unavoidable: 1 of 7 for certain, 3 of 7 if names are paid as
+  written. Affects `docs/ROADMAP.md`, the 2.5 note, and `payee_count`'s `refused`.
+- **D1's premise is false** (both verifiers). Four user tasks name an IBAN in their prompt
+  (3 and 4: GB29…; 6: US122…; 15: CA133…). D1's conclusion roughly survives, since 3, 4
+  and 6 are already known and 15's goes to a standing order. But open question 1 is framed
+  on the false premise, and this suite is one whose prompts carry payees.
+- **Provenance wording.** The predictions say they were written "before any rewritten
+  case was run". Tests in `658b1fe` had already run the rewritten task 0 graph on
+  hand-picked payees; the measured run came after. The file is hash-pinned, so only the
+  findings entry can say so.
+- **Tier qualification.** The findings say "on both tiers" without saying that host-tier
+  enforcement is host discipline.
+- *(Trivial, file pinned, left as is.)* The predictions' method says "goals 0, 1, 3 and 5
+  need a payment". Goals 2, 6 and 8 need one too; 0, 1, 3 and 5 are those any payment
+  meets.
