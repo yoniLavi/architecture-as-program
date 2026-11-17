@@ -79,6 +79,57 @@ def test_a_split_with_no_bind_is_kept_as_sent_for_the_check_to_fail():
     assert plain is not None and "split" not in plain.as_dict()
 
 
+def _examples(text: str) -> list[dict]:
+    import json
+    import re
+
+    blocks = re.findall(r"```json\n(.*?)\n```", text, re.S)
+    return [json.loads(b)["escalate"] for b in blocks]
+
+
+def test_the_slice_prompt_offers_a_split_and_its_payment_caps_parse():
+    """3.1 (D4): the split form is offered with one example, and every `Payments` type
+    the prompt shows parses to a scope, so a developer copying it is not refused on the
+    placeholder (D2's `'bill-total'` failed to parse on `'<cap>'`). A harness correction:
+    the re-run's records say so."""
+    import re
+
+    from type_parser import parse_type, payments_scope
+
+    from poc.architect import formal
+
+    text = developer.task_text(control.graph(), control.NODE)
+    assert "`split`" in text and "'<cap>'" not in text
+    section = text.split("## What to return")[1].split("## The crate")[0]  # not the WIT's
+    caps = re.findall(r"Payments<\[[^\]]*\], [^>]*>", section)
+    assert len(caps) >= 3
+    assert all(payments_scope(parse_type(c)) is not None for c in caps)
+    split = [e for e in _examples(text) if "split" in e]
+    assert len(split) == 1
+    # The example, with its placeholders filled, is a well-formed split request.
+    filled = json_loads_filled(split[0])
+    assert formal.split_fields(filled) == {"iban": "string", "total": "number"}
+
+
+def json_loads_filled(example: dict) -> dict:
+    import json
+
+    text = json.dumps(example).replace("<payee field>", "iban").replace("<amount field>", "total")
+    return json.loads(text)
+
+
+def test_paper_3s_generation_prompt_and_registration_do_not_move():
+    """The slice's prompt is its own file; the registered generation tasks still hash to
+    their registered values."""
+    import json
+
+    from poc.generation import registration
+
+    assert developer.PROMPT.parent.parent.name == "slice"
+    registered = json.loads(registration.REGISTRATION_PATH.read_text())
+    assert registration.task_hashes() == registered["task_sha256"]
+
+
 def test_code_that_mentions_split_is_still_read_as_code():
     reply = ('```rust\n// {"escalate": {"capability": "X", "split": {"fields": {}}}}\n```\n'
              "```wit\nworld node {}\n```")  # fmt: skip

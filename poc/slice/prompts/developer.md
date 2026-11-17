@@ -44,13 +44,21 @@ Either the body, or a request for authority.
 **A request for authority.** If the node cannot do what its role says with the interfaces it is granted, do not write the body. Reply with one JSON object and nothing else:
 
 ```json
-{"escalate": {"capability": "<the capability the node needs, as a type such as Payments<['<payee>'], '<cap>'>>", "because": "<why the role needs it, in a sentence>"}}
+{"escalate": {"capability": "<the capability the node needs, as a type such as Payments<['<payee>'], '100'>>", "because": "<why the role needs it, in a sentence>"}}
 ```
+
+A `Payments` cap is a number, such as `'100'`, or `uncapped` where the amount is bound.
 
 A `Payments` request may also carry a `bind`, which narrows the grant to values from the node's own inputs, as `inN.<field>` paths: input 1 above is `in0`. With it, the node could pay only that payee, at most that amount, that many times:
 
 ```json
-{"escalate": {"capability": "Payments<[any], '<cap>'>", "bind": {"payee": "in0.<field>", "amount": "in0.<field>", "uses": 1}, "because": "<why the role needs it, in a sentence>"}}
+{"escalate": {"capability": "Payments<[any], uncapped>", "bind": {"payee": "in0.<field>", "amount": "in0.<field>", "uses": 1}, "because": "<why the role needs it, in a sentence>"}}
+```
+
+If no field of the node's inputs names a value the bind needs, such as when an input holds only a document's text, ask for a `split` instead: a node placed before this one that produces the fields you name, with their types, from this node's inputs. This node then receives those fields as input 1 (`in0`), and its other inputs move up by one. Bind to the fields you name. A payee field is a `string` and an amount field a `number`:
+
+```json
+{"escalate": {"capability": "Payments<[any], uncapped>", "split": {"fields": {"<payee field>": "string", "<amount field>": "number"}}, "bind": {"payee": "in0.<payee field>", "amount": "in0.<amount field>", "uses": 1}, "because": "<why the role needs it, in a sentence>"}}
 ```
 
 The architect decides on a request. If it is granted, the graph is changed and reviewed again before anything runs, and you are asked again with the new grant. A grant wider than the request is refused.

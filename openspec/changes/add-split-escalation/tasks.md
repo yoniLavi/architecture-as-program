@@ -56,7 +56,7 @@ is in progress.
 
 ## 3. The developer prompt, and the limit
 
-- [ ] 3.1 `poc/slice/prompts/developer.md`: the split paragraph and example, and the cap
+- [x] 3.1 `poc/slice/prompts/developer.md`: the split paragraph and example, and the cap
       correction (D4). Verify: a test that the slice prompt offers `split` and that its
       payment examples' caps parse, and that Paper 3's generation prompt and the
       registration hashes are unchanged
