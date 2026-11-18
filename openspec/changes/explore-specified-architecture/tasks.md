@@ -105,15 +105,38 @@
 
 ## 5. S3 and S4: proofs
 
-- [ ] 5.1 S3, by hand: prove two or three deterministic nodes and one model-calling node
+- [x] 5.1 S3, by hand: prove two or three deterministic nodes and one model-calling node
   with an effect against their contracts.
   - The model-calling node's theorem is quantified over every response its type admits.
   - Record the specification lines, the proof lines and the time spent, per node.
+
+  Done 18 November 2026. Three pure cores were translated by Aeneas on the first attempt
+  and proved; `s3/check.sh` ACCEPTED, with standard axioms only.
+  - **The nodes:**
+    - DropSeen (deterministic);
+    - SummariseItem's summary, for every model reply (≤ `limit` code points, no line
+      break);
+    - GenerateResponse's tool loop, for every model and knowledge base (the model-calling
+      node with effects).
+  - **Statement lines** (in `Statements.lean`): about 6, 5 and 11.
+  - **Proof lines:** about 114, 122 and 222, written by a subagent in about 10, 7 and 9
+    minutes against statements it could not edit.
+  - **Deviation:** the "hand" proofs were written by an agent with tools and the Aeneas
+    skill files, not by a person. A person's effort was not measured.
 - [ ] 5.2 S3, generated (only with the author's approval, on the subscription, and with no
   paid spend): a small pilot in which the agent writes body and proof and the checker
   decides. Report counts.
-- [ ] 5.3 S4: for one node, prove a bound on the number of crossings, and compare it with
+- [x] 5.3 S4: for one node, prove a bound on the number of crossings, and compare it with
   the trace over the contract's inputs. Report every excess.
+
+  Done 18 November 2026 (`s4/RESULT.md`).
+  - **The proof:** GenerateResponse makes at most 3 model calls and at most 3 lookups,
+    for every `Host`, that is, every model. It is part of `respond_spec`.
+  - **The trace check:** over 81 reply scripts on the unchanged component, at most 6
+    crossings; the bound is reached, with 0 excesses and 0 sequence mismatches with the
+    core.
+  - **Finding:** proved calls times an enforced per-call cost needs a per-call output
+    cap, which the CLI backend lacks.
 - [ ] 5.4 Write up S3 and S4, each with a recommendation.
 
 ## 6. Close
