@@ -127,8 +127,11 @@
   and 4 figure pins pass without re-seeding.
   *Done: `make build` green (1822 passed, 1 skipped); `make spec-check` 40/40; no pin
   re-seeded.*
-- [ ] 4.2 With the author's go, archive the change, and write the `payee-provenance`
+- [x] 4.2 With the author's go, archive the change, and write the `payee-provenance`
   spec's Purpose in the archive commit.
+  *Done 18 November 2026, on the author's go ("Great, yes, accepted"), after the
+  verification below, which the author took in place of their own read. The main spec
+  is created with the delta's Purpose.*
 
 ## Verification before the archive (17 November 2026)
 
