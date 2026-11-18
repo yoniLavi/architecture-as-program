@@ -155,7 +155,24 @@ agentic review, then the author's prepublication read (4.2).
         least-privilege permission inference and LLM permission judges in §6
         (unchecked).
 
+      **The author's answers (18 November 2026: "go with your recommendations"):**
+      - *S2:* kept the "likely lower bound" reading, because `registration.json`
+        (`model_similarity`) and the `architect-pipeline` spec commit to it. Added to
+        §7 that the post-hoc run gives the reading little support within the family,
+        that the labels share the family, and that the paper keeps the reading as a
+        registered prediction, not a finding. The hedge pin is unchanged.
+      - *S3:* the abstract now says the verdict sits near the threshold and points to
+        §5.1; the post-hoc p stays in §5.1 only.
+      - *B1:* task 10 disclosed, not reanalysed.
+      - *Minors:* the claim-block trim and the related-work survey are left to the
+        fresh review.
+
       **Noted, not applied:** task 15's unseen grants are mostly a new recurring
       payment in place of the labelled edit, a second judgement line. §4.1 now names
       the plural line only.
-- [ ] 5.5 Rebuild and send the author the PDF for 4.2; no stamp, publish or push
+- [x] 5.5 Rebuild and send the author the PDF for 4.2; no stamp, publish or push (sent
+      18 November 2026)
+- [ ] 5.6 **A fresh review in a new session** (the author, 18 November 2026). It is
+      read-only, and its findings are applied and recorded here. If it finds no remaining
+      significant issue, the author does the final read (4.2); otherwise its significant
+      findings go to the author first
