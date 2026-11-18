@@ -9,8 +9,8 @@ propose a change, or stop.
 |---|---|---|
 | `s1/` | Budgets as capability scopes | `uv run --group poc pytest spikes/specified-architecture/s1` |
 | `s2/` | Contracts that compose along edges | `uv run pytest spikes/specified-architecture/s2` |
-| `s3/` | Proofs of node bodies | see `s3/README.md` |
-| `s4/` | Proofs of resource bounds | see `s4/README.md` |
+| `s3/` | Proofs of node bodies | see `s3/RESULT.md` |
+| `s4/` | Proofs of resource bounds | see `s4/RESULT.md` |
 
 Measurement scripts run from this directory with the repo's import paths:
 

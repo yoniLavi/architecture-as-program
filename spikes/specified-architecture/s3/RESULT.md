@@ -83,7 +83,9 @@ None of the statements was false.
 **One amendment after 3 trials** (`18ca433`). An Opus call passed the default 600-second
 timeout and stopped the run. Calls then got 30 minutes, and a failed call voids its
 trial, recorded and never counted. One trial was voided this way: Opus, body+proof,
-SummariseItem's summary, timed out at 1,800 seconds.
+SummariseItem's summary, timed out at 1,800 seconds. The trial interrupted by the first
+timeout was re-run from scratch after the amendment. Any attempts it had made were
+discarded unrecorded.
 
 | arm | target | Opus | Sonnet |
 |---|---|---|---|
@@ -94,13 +96,13 @@ SummariseItem's summary, timed out at 1,800 seconds.
 | body+proof | SummariseItem's summary | 1/2 (3), 1 void | 1/3 (5) |
 | **all** | | **13/14** | **7/15** |
 
-**Accepted trials (18 of 29 counted):**
+**Accepted trials (20 of 29 counted):**
 - **None was accepted on its first attempt.** Every success came after one or more repairs
   from the gate's refusal.
 - **All 99 refusals were Lean build failures.** No Rust body failed Charon or Aeneas.
   None of the 99 tripped the forbidden-declaration scan or the axiom check.
 - **Every accepted body+proof body agreed with the shipped body** on the differential
-  test: 7 of 7. That test is information, not part of the gate. No body gamed
+  test: 6 of 6. That test is information, not part of the gate. No body gamed
   `one_line_spec`'s admission of an empty summary.
 
 **How to read it.** These are counts from a pilot, not rates:

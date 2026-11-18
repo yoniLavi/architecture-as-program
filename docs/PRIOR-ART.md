@@ -504,7 +504,8 @@ lean): Lean via Aeneas, on the pure core.**
   rates. It never compares them with generated-specification rates.
 - The gate rejects cheating mechanically. It checks `#print axioms` (no `sorryAx`,
   `Lean.ofReduceBool` or `Lean.trustCompiler`), allows no new `axiom` or `opaque` outside
-  the host model, and requires a statement byte-identical to the generated one.
+  the host model, and requires a statement byte-identical to the generated one. (S3's statements
+  were hand-written and pinned by hash; generating them is not yet shown.)
 
 ### 23. Resource bounds: count calls with a lemma, and bound instructions with fuel
 

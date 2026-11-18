@@ -129,11 +129,11 @@
 
   Done 18 November 2026 (`s3/pilot/`; design committed before any call, amended once
   after 3 trials for a call timeout).
-  - **Accepted:** 18 of 29 counted trials, 1 void; Opus 13/14, Sonnet 7/15. None was
+  - **Accepted:** 20 of 29 counted trials, 1 void; Opus 13/14, Sonnet 7/15. None was
     accepted on its first attempt.
   - **Refused:** all 99 refusals were build failures, and nothing passed the gate
     improperly.
-  - **Bodies:** every accepted body+proof body agreed with the shipped one (7/7).
+  - **Bodies:** every accepted body+proof body agreed with the shipped one (6/6).
   - **Reading:** pilot counts, not rates.
 - [x] 5.3 S4: for one node, prove a bound on the number of crossings, and compare it with
   the trace over the contract's inputs. Report every excess.

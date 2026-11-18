@@ -33,9 +33,11 @@ another tool}: 81 scripts. The host counted and logged each crossing in order.
 
 - **No excess.** An excess would have indicted the shell or the trusted base. None
   occurred.
-- **Every crossing sequence equals the core's log,** so the proved function and the
-  shipped one agree on every input checked here. The core is also held to the shipped
-  control flow in `s3/cores/tests/differential.rs`.
+- **Every crossing sequence equals the expected log.** That log comes from `core_log`
+  in `trace_check.py`, a Python transcription of the core's loop, not the proved core
+  itself. The tie from the Rust core to the shipped body is
+  `s3/cores/tests/differential.rs`. The tie from the Rust core to its Lean translation
+  is Charon and Aeneas, which are trusted.
 - **The bound is tight.** Three granted-tool calls in a row reach six crossings.
 
 ## The combined guarantee, and where it stops

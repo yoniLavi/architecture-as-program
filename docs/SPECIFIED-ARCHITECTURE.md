@@ -66,7 +66,7 @@ list.
 | S1 | Budgets as capability scopes | Done (18 November 2026): recommend `add-resource-budgets` |
 | S2 | Contracts that compose along edges | Done (18 November 2026): recommend a warning-strength validator analysis |
 | Survey | Provers, agent-written proofs, resource bounds | Done (18 November 2026): Lean via Aeneas on a pure core |
-| S3 | Proofs of node bodies | Done (18 November 2026): three nodes proved and gate-accepted; in a pilot, models reached accepted proofs in 18 of 29 counted trials, never on a first attempt; recommend `add-proved-cores` |
+| S3 | Proofs of node bodies | Done (18 November 2026): three nodes proved and gate-accepted; in a pilot, models reached accepted proofs in 20 of 29 counted trials, never on a first attempt; recommend `add-proved-cores` |
 | S4 | Proofs of resource bounds | Done (18 November 2026): a call bound proved for every model, with no excess on the shipped component; fold into S3's change |
 
 **What has been found so far:**
@@ -90,13 +90,16 @@ list.
 
 - **Trusted base:**
   - the Rust compiler;
-  - the translation into the prover (Charon and Aeneas), which is differential-tested;
+  - the translation into the prover (Charon and Aeneas). The differential tests compare
+    the Rust cores with the shipped Rust; the Lean translation itself is never run or
+    compared;
   - the WIT bindings;
   - the host adapter;
   - the `run` shell around the proved core;
   - the host model of each capability.
 - **Specification:** a proof is only as strong as its postcondition. The gate, not the
-  agent, generates each theorem statement, and pins it by hash.
+  agent, owns each theorem statement, and pins it by hash. In S3 the statements were
+  written by hand; generating them from contracts is not yet shown.
 - **The tiers:** everything enforced is enforced on the confined tier. On the host tier it
   is host discipline, as every scope is.
 - **Counts, not rates.** The proof corpus is small and chosen, as the mutation corpus is.

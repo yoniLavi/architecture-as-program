@@ -1,14 +1,15 @@
 """S4's check against the artifact: the shipped GenerateResponse component's
 crossings, over every reply script, against the bound proved in Lean
-(`s3/lean/Proofs.lean`, `respond_crossings_le`: at most 3 generates and 3 lookups,
+(`s3/lean/Proofs.lean`, `respond_holds`: at most 3 generates and 3 lookups,
 so at most 6 crossings, for every model).
 
     cd spikes/specified-architecture
     PYTHONPATH=../../scripts:../.. uv run --project ../.. --group poc python -m s4.trace_check
 
 "The contract's inputs" here are reply scripts: every sequence of four replies over
-{text, call the granted tool, call another tool} (81 scripts; the fourth reply is
-never reached, which is itself checked). The component is the committed
+{text, call the granted tool, call another tool} (81 scripts; the bound implies
+the fourth reply is never reached, though nothing here asserts that separately).
+The component is the committed
 `poc/sandbox/wasm/node_generate_response.wasm`, unchanged; crossings are counted by
 the host, in order, through `Sandbox`'s own wrapping. Writes trace_check.json.
 """
