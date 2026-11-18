@@ -211,6 +211,18 @@
 
 ## 6. Close
 
-- [ ] 6.1 The end condition: every spike has a written result, and the author has decided
+- [x] 6.1 The end condition: every spike has a written result, and the author has decided
   on each recommendation (propose a change, or stop). Record the decisions here. Run
   `make build` and `make spec-check` (both green), then archive with the author's go.
+
+  **The author's decisions, 18 November 2026:** "I accept your recommendations. Please
+  write these up and archive the completed change."
+  - **S1:** propose `add-resource-budgets`.
+  - **S2:** propose the warning-strength analysis, `add-contract-composition-check`.
+  - **S3 and S4:** propose `add-proved-cores`, with S4's call bounds folded in.
+  - **The author took the two verifying subagents' review** (section 7) in place of their
+    own read before the archive. `docs/SPECIFIED-ARCHITECTURE.md` remains unread by the
+    author (1.1).
+  - **Q2 (what a proof earns)** moves to `add-proved-cores` as an open question.
+  - The three proposals are written as "proposed, not approved"; each waits on its own
+    task 0.1.

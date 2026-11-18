@@ -54,6 +54,17 @@ enforced at run time and proved where a bound can be proved. The direction note 
 `openspec/changes/explore-specified-architecture`. This reaches step 5 of the north star:
 a developer agent hands over a body, a proof and a budget, and the gate checks all three.
 
+**The spikes finished the same day, and were archived on the author's acceptance**
+(`openspec/changes/archive/2026-11-18-explore-specified-architecture`). Every result is in
+a spike `RESULT.md`. Three implementation changes are proposed, not approved:
+- `add-resource-budgets` (S1);
+- `add-contract-composition-check` (S2);
+- `add-proved-cores` (S3 with S4).
+
+They are the evidence for a later paper on specified architecture. The completed grant
+work (value-bound grants, split escalation, payee provenance) has a paper change of its
+own, `add-paper-5`, which cannot be stamped before Paper 4 is published.
+
 ## 17 November 2026: a payee the account already pays, and what refusing the rest costs
 
 `openspec/changes/archive/2026-11-18-add-payee-provenance` (archived 18 November 2026,
