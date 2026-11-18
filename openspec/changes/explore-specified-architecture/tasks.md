@@ -2,10 +2,33 @@
 
 ## 0. Approval
 
-- [ ] 0.1 After the Paper 4 work is finished, the author discusses this direction, approves
+- [x] 0.1 After the Paper 4 work is finished, the author discusses this direction, approves
   it or amends it, and answers `design.md`'s open question 1: a prover as an external gate,
   for spikes only. Record the date and the answers here. Nothing below starts before this
   box is checked.
+
+  **Approved by the author, 18 November 2026**, after a discussion grounded in the code.
+  - **The Paper 4 gate is waived.** Paper 4 is drafted and reviewed; it waits on the
+    author's read, not on work. Nothing here touches Paper 4's files, records or runs.
+  - **Order amended: S1 first** (D3 now reads S1, S2, survey, S3, S4). Tasks keep their
+    numbers; section 3 (S1) runs before section 2 (S2).
+  - **Q1, a prover: yes, pre-approved.** Install or upgrade Lean (`elan`), Rust
+    verification tooling (`rustup`/`cargo`) and similar in their usual home-directory
+    locations without asking. Repo-side dependencies go in their own group, in no build
+    step.
+  - **Model calls: approved within the Claude Max subscription** (the author: quota to spare
+    this week). This answers the approval task 5.2 waits on. No paid API spend.
+  - **Q2 (what a proof earns): deferred** until S3 has numbers, as recommended.
+  - **Q3 (prover): the survey decides.** The author leans to Lean, from prior experience and
+    its weight in agent training data.
+  - **Q4 (grammar form): left to the implementer.** Decided: handle-reached budgets are
+    trailing scope arguments the parser already accepts, `LLMClient<inference, Calls<'5'>>`,
+    `StateHandle<'seen', read-write, Bytes<'5242880'>>`, `HTTPClient<[...], Requests<'50'>>`
+    (quoted numbers, as `Payments` writes its cap). Store-bounded budgets (fuel, memory, a
+    deadline) are not reached through a handle, so they are a `budget` annotation on the
+    node. S1 tests this split; S1's write-up may revise it.
+  - The author asked that the work be pushed as far as it can go without them, asking only
+    before a dangerous or one-way-door step. The archive still needs the author's go.
 
 ## 1. The direction note
 

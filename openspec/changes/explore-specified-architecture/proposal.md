@@ -1,9 +1,8 @@
 # The architecture graph as specification: contracts, proofs and budgets
 
-> **Status: proposed, not approved (17 November 2026).** This is a future-directions change.
-> It records a direction and the spikes that would test it. Nothing in it starts before the
-> Paper 4 work is finished, and nothing starts before the author has discussed and approved
-> it (task 0.1).
+> **Status: approved, 18 November 2026** (task 0.1 records the answers; the Paper 4 gate
+> was waived and S1 now leads). Proposed 17 November 2026. This is a future-directions
+> change: it records a direction and the spikes that test it.
 
 ## Why
 
@@ -88,10 +87,10 @@ None.
   and `docs/ROADMAP.md` (a pointer).
 - **Code:** none in this change. Spike code lives under `spikes/specified-architecture/`,
   outside `poc/` and `scripts/`, and is imported by no build step.
-- **Open changes:** this makes four open changes:
+- **Open changes:** this makes three open changes (`add-payee-provenance`, open when this
+  was proposed, was archived on 18 November 2026):
   - `add-paper-4`;
   - `operate-feed-triage`;
-  - `add-payee-provenance`;
   - this one.
 
   The author asked for it. It has an end condition (task 6.1): archive once every spike

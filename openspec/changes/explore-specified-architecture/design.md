@@ -137,10 +137,23 @@ and the spikes, and each strand graduates on its spike's result.
 build step imports them, the Paper 2–4 pins cannot move, and the validator stays
 stdlib-only. A prover is installed in its own dependency group.
 
-**D3. The order is S2, S1, the survey, S3, then S4.**
-- S2 is stdlib-only and answers a precise question.
-- S1 is cheap and demonstrable.
+**D3. The order is S1, S2, the survey, S3, then S4** (amended at approval, 18 November
+2026; it was S2 first).
+- S1 is cheap and demonstrable, and reuses the narrowing machinery the routing point
+  enforces.
+- S2 is stdlib-only, but the canonical graphs give it two edges with contracts on both
+  sides, one of them non-trivial, so it runs second and widens its corpus.
 - S3 and S4 depend on the survey's choice of prover.
+
+**D5. Budgets do not narrow as sets do** (added at approval). Set scopes can be granted
+twice and still mean the same thing; budgets are spent. Two children may each declare
+`≤ N` under a parent's `≤ N` and pass narrowing while together spending 2N. So a budget
+has three parts, kept apart in every result:
+- *narrowing*, the existing machinery;
+- *metering*, one counter held by the parent's handle (or the backend), which every facade
+  shares, so the parent's total holds at run time;
+- *totals*, a new static analysis (add along a path, maximum over exclusive branches,
+  multiply under `each`), which narrowing does not give.
 
 **D4. A proof is offered, not required, at least to start.** In this proposal a proof is a
 certificate a node may carry. What it earns (lower review, larger budgets, running without
@@ -164,6 +177,10 @@ cost would make it a tax with no measured price.
 None. Nothing ships from this change.
 
 ## Open Questions
+
+Answered at approval, 18 November 2026 (task 0.1): 1 yes, pre-approved; 2 deferred; 3 the
+survey decides (the author leans to Lean); 4 decided by the implementer (scopes for
+handle-reached budgets, a node annotation for store-bounded ones). The questions as posed:
 
 1. *(for task 0.1)* May a proof toolchain enter the repo as an external gate, in its own
    dependency group and in no build step? Recommended **yes** for spikes only. Whether it
