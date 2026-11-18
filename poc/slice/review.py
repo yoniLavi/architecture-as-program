@@ -1,10 +1,15 @@
 """The behaviour-shown reviewer, replayed over the registered architect run (task 2.1).
 
 The registered reviewer, unchanged, sees the task and the canonical graph. This
-variant sees exactly that, and after it what the graph would do with each grant
+variant sees that, and after it what the graph would do with each grant
 (`behaviour.render`), with the nodes called by the same `N1…Nk`. Its system text is
 the registered reviewer's primary text plus one paragraph saying what the added view
 is. Nothing else changes: the model, the verdict format, the repair bound, the scoring.
+One difference was found after the run (`add-paper-4` 5.4): the graph is read from the
+committed record, which stores it with its keys sorted, so its JSON is laid out
+differently from the architect's order the registered reviewer saw; none of its 152
+shown prompts reproduces the registered hash. `poc.architect.posthoc_sonnet` rebuilds
+the graph from the architect's final reply to avoid this.
 
 **The replay is shadow mode**, as 1.2's: it reads the registered run's committed
 records (`poc/architect/runs/registered/`), never changes them, and decides no

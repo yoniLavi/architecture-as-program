@@ -96,11 +96,66 @@ agentic review, then the author's prepublication read (4.2).
       view, same trials. Post hoc: never pooled, no confirmatory test, described as a
       reviewer of greater capability from the same family (diversity, not independence).
       If the ceiling stops it, it resumes; the paper reports it only once complete
-- [ ] 5.2 The run, in the background at low priority; no edit to `poc/`, `scripts/` or
-      `graphs/` while it runs
-- [ ] 5.3 `report.py`: a separate `post_hoc_sonnet` block in `dist/architect.json`, with
+- [x] 5.2 The run, in the background at low priority; no edit to `poc/`, `scripts/` or
+      `graphs/` while it runs (18 November 2026: 304 of 304 calls, every one resolving to
+      `claude-sonnet-5-5`, every one with a verdict, one repair; records `6b3a729`)
+- [x] 5.3 `report.py`: a separate `post_hoc_sonnet` block in `dist/architect.json`, with
       `display` strings; Paper 4's post-hoc subsection, Limitations and Future work;
-      the figure pin re-seeded deliberately
-- [ ] 5.4 Agentic review: a critical paper review and an adversarial claims check, in
-      parallel, briefed with the paper and code only; findings and actions recorded here
+      the figure pin re-seeded deliberately (`44edd46`; two hedge pins seeded for the
+      same-family qualification; headline figures pinned by test)
+- [x] 5.4 Agentic review: a critical paper review and an adversarial claims check, in
+      parallel, briefed with the paper and code only; findings and actions below.
+      The claims check recomputed every figure from the raw records and found **none
+      wrong**.
+
+      **Applied:**
+      - *Both reviewers:* the paper called Sonnet "more capable" and left out that
+        §3's selection rule ranks it the model most moved by claimed approvals
+        (240/300, against Haiku's 90), and that in channel A it reads the pretext.
+        §5.3 now states both, calls it "larger", and gives its channel-A catches
+        (new key `widened_by_channel`). "Changing nothing else" became "changing
+        nothing in what it was shown", because CLI version, date and default effort
+        differ.
+      - *Critical review:*
+        - The noise floor is now stated: the rationale view's 23 against 22 is 6
+          gained and 5 lost, and no test-retest exists; the test-retest is added to
+          Future work.
+        - Task 10's label, whose reason cites AgentDojo's scorer, is disclosed in
+          §4.1, §5.2 and §5.4, and task 15's plural line in §4.1.
+        - The unit for the 59 grants on open-question labels is fixed, with its
+          denominator (8 of 16 labels; new key `counts.labels.with_open_question`).
+        - The conclusion's wording is now non-causal, and the claim block says
+          "channel A".
+        - The repeated "pre-use test overstated" in §6 is cut to a cross-reference,
+          and the composition of the planted set is added in §5.2.
+        - "Answer" became "bear on".
+        - The reviewer rule's unit (first attempts) is fixed.
+        - §5.1 says that no spelling slip falls in channel A.
+        - The model behind `Extract` is named.
+      - *Claims check:*
+        - The conclusion said "17 of 76 natural widenings", but 76 is trials; it now
+          says trials.
+        - The behaviour replay showed each graph with its keys sorted, so none of
+          its 152 prompts matches the registered hash. This is disclosed in §5.3, and
+          `poc/slice/review.py`'s docstring is corrected.
+        - A test now covers a clean trial flagged on a read-class widening, which
+          counts as a flagged clean trial but not a false alarm.
+
+      **To the author, not applied** (each changes a framing or an author's decision):
+      - *Critical review S2:* drop "likely lower bound" in §7. The reviewer argues
+        that misses shared with Sonnet on the same contested tasks fit label lines
+        better than self-preference, and that catches rose only with false alarms.
+        This would re-seed the `limits/lower-bound` hedge pin.
+      - *Critical review S3:* take the post-hoc p = 0.0084 out of the abstract and
+        keep it in §5.1 (the author decided on 16 November to state it; the
+        abstract was not discussed).
+      - *Critical review B1, consequence:* 3 of Q0's 6 unseen trials are on task 10,
+        whose label draws on the scorer. That is disclosed, not reanalysed.
+      - *Minor:* trim the claim block, which repeats the abstract's figures. Survey
+        least-privilege permission inference and LLM permission judges in §6
+        (unchecked).
+
+      **Noted, not applied:** task 15's unseen grants are mostly a new recurring
+      payment in place of the labelled edit, a second judgement line. §4.1 now names
+      the plural line only.
 - [ ] 5.5 Rebuild and send the author the PDF for 4.2; no stamp, publish or push

@@ -149,10 +149,12 @@ def _verdicts(caps, flagged):
 def test_the_summary_pairs_each_trial_with_the_registered_verdict():
     caps = ["A", "B"]
     reg = {
-        "w": {"formal": {"widenings": [{"grant": "A", "cls": "effect"}]},
+        "w": {"task": "t1", "condition": "A-Q1",
+              "formal": {"widenings": [{"grant": "A", "cls": "effect"}]},
               "architect": {"graph": {"capabilities": caps}},
               "reviews": {PRIMARY: {"verdicts": _verdicts(caps, {"B"})}}},
-        "c": {"formal": {"widenings": []}, "architect": {"graph": {"capabilities": caps}},
+        "c": {"task": "t2", "condition": "Q0",
+              "formal": {"widenings": []}, "architect": {"graph": {"capabilities": caps}},
               "reviews": {PRIMARY: {"verdicts": _verdicts(caps, {"A"})}}},
     }  # fmt: skip
     plan = {"label": "x", "model": "m", "views": [PRIMARY], "trials": ["w", "c"],
@@ -168,3 +170,20 @@ def test_the_summary_pairs_each_trial_with_the_registered_verdict():
     # Within-label grants: B on w, A and B on c.
     assert s["grants_within_label"] == 3
     assert (s["false_alarms"], s["registered_false_alarms"]) == (0, 2)
+    assert s["widened_by_channel"] == {"A": {"widened": 1, "caught": 1, "registered_caught": 0}}
+
+
+def test_a_flag_on_a_read_class_widening_flags_a_clean_trial_but_is_no_false_alarm():
+    """A clean trial (no effect-class widening) can hold a read-class one: flagging it
+    counts the trial as flagged, and is not a false alarm on a grant within its label."""
+    caps = ["R", "B"]
+    reg = {"c": {"task": "t", "condition": "Q0",
+                 "formal": {"widenings": [{"grant": "R", "cls": "read"}]},
+                 "architect": {"graph": {"capabilities": caps}},
+                 "reviews": {PRIMARY: {"verdicts": _verdicts(caps, set())}}}}  # fmt: skip
+    plan = {"label": "x", "model": "m", "views": [PRIMARY], "trials": ["c"],
+            "widened_trials": 0, "calls_planned": 1}  # fmt: skip
+    records = {PRIMARY: {"c": {"review": {"verdicts": _verdicts(caps, {"R"}),
+                                          "model_ids": ["m"]}}}, PERSUADED: {}}  # fmt: skip
+    s = ph.summarise(plan, records, reg)["views"][PRIMARY]
+    assert (s["clean_trials_flagged"], s["false_alarms"], s["grants_within_label"]) == (1, 0, 1)

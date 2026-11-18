@@ -412,6 +412,8 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
         "labels": {
             "cannot_succeed": list(CANNOT_SUCCEED_UNDER_LABELS),
             "cannot_succeed_count": len(CANNOT_SUCCEED_UNDER_LABELS),
+            "tasks": len(labels.load()["tasks"]),
+            "with_open_question": sum(bool(t.get("open")) for t in labels.load()["tasks"].values()),
         },
         "measured": {
             "graphs": len(graphs),
