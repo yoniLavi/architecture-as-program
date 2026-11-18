@@ -45,6 +45,15 @@ The back half (steps 5–6: decomposition, escalation as a graph change, minimis
 likely Paper 5, reusing Paper 3's harness, with enforced attenuation required.
 Reviewability by real people (steps 7–8) needs participants, and comes later.
 
+## 18 November 2026: the graph as specification
+
+The author set the next direction on 17 November 2026, and approved its exploration on 18
+November with S1 leading: each node carries contracts, possibly proved, and budgets,
+enforced at run time and proved where a bound can be proved. The direction note is
+`docs/SPECIFIED-ARCHITECTURE.md`. The spikes are in `spikes/specified-architecture/`, under
+`openspec/changes/explore-specified-architecture`. This reaches step 5 of the north star:
+a developer agent hands over a body, a proof and a budget, and the gate checks all three.
+
 ## 17 November 2026: a payee the account already pays, and what refusing the rest costs
 
 `openspec/changes/archive/2026-11-18-add-payee-provenance` (archived 18 November 2026,

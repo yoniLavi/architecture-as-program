@@ -431,6 +431,129 @@ et al. appeared at ICLR 2024 (proceedings page); Ernst and Baldassarre is EMSE 2
 55 (Crossref). The same pass read Yang et al. in full: Claude Sonnet 4.6 is among the models
 below 10% over-privileged selection, which Paper 3 now notes beside its zero baseline.
 
+## Survey, November 2026 — specified architecture (`explore-specified-architecture`, task 4.1)
+
+Run on 18 November 2026, before the proof strands S3 and S4. The survey was written by a
+subagent and is kept whole, with every source, in `docs/specified-architecture-survey.md`;
+claims it could not check are marked UNVERIFIED there. I re-checked two claims the decision
+rests on against their primary pages: Rust-Prover's abstract (arXiv:2610.03994) and
+wasmtime's statement on fuel and epochs. None of it is in `citations.bib` yet, because no
+paper cites it.
+
+### 20. Proof-carrying code is the gate's shape, and it names two duties
+
+Necula and Lee (OSDI 1996), Necula (POPL 1997), and Appel's *foundational* PCC (LICS 2001).
+**What changed:**
+- **The consumer owns the safety policy.** The gate generates each theorem statement from
+  the graph's contract and pins it by hash. The agent writes only the body and the proof.
+- **The translation joins the trusted base.** For us that translation is Rust→prover.
+  Appel's version exists because Necula's trusted VC generator held bugs. That is why S3
+  lists Charon and Aeneas as trusted, and differential-tests their output against the
+  Rust.
+- **This decides between the provers.** A Lean proof is a kernel-checked object, which
+  matches the PCC shape. A Verus proof is re-checked by running Verus and Z3, which makes
+  for a much larger trusted base.
+
+### 21. Rust provers: neither takes our crates as written, so prove a pure core
+
+**Surveyed:**
+- Verus (OOPSLA 2023, SOSP 2024);
+- Aeneas with Charon, Rust→Lean (ICFP 2022);
+- hax, whose Lean backend became Charon plus Aeneas in version 0.4, September 2026;
+- Kani (ASE 2026), Creusot (ICFEM 2022), Prusti (OOPSLA 2019).
+
+**Why neither fits as is.**
+- Aeneas rejects `unsafe`, so it cannot take wit-bindgen's glue.
+- Verus's own LLM guide names procedural-macro output as a weak spot.
+- Neither can verify `serde_json`.
+
+**What changed:** S3 proves a **pure core** pulled out of each node body, not the crate.
+- The core takes every host result as an argument, the model's reply included, and returns
+  its effects as data.
+- The `run` shell performs those effects and is trusted.
+- This makes the design note's "for every response r" a literal universally quantified
+  argument.
+- Kani is kept as a possible oracle that the shell performs exactly the core's effects.
+- Prusti is set aside; its maintenance status is unclear.
+
+**The prover chosen for S3 and S4 (the survey's recommendation, matching the author's
+lean): Lean via Aeneas, on the pure core.**
+- **First,** check that Aeneas translates the core at all. String literals and `chars()`
+  are the likely failures.
+- **The fallback** is Verus on the same core. There, tracked ghost tokens give a natural
+  bound on calls.
+- **Verus's evidence is stronger for agent proofs,** and it has been reviewed. Lean's
+  strongest result is a preprint with its own translator, not Aeneas.
+
+### 22. Agent-written proofs: high when the specification is supplied, low when it is generated
+
+**When the specification is supplied:**
+- AutoVerus (OOPSLA 2025): over 90% of 150 tasks;
+- SAFE (ICLR 2025): about 79%;
+- VeruSAGE (preprint): over 80% of 849 tasks;
+- Rust-Prover (preprint, October 2026; re-checked): all 1,325 theorems of 1,007 VeriContest
+  problems, translated into Lean by its own translator and checked by the Lean kernel; 1,259
+  in one run on Claude Opus 5.5, at a median of 3.2 minutes and $1.17 per proof.
+
+**When the model also writes the specification:**
+- VERINA (ICML 2025): 4.9% of proofs;
+- the vericoding benchmark: Lean 27%, Verus 44%, Dafny 82%.
+
+**What changed:**
+- S3's generation pilot supplies the statement and reports only supplied-specification
+  rates. It never compares them with generated-specification rates.
+- The gate rejects cheating mechanically. It checks `#print axioms` (no `sorryAx`,
+  `Lean.ofReduceBool` or `Lean.trustCompiler`), allows no new `axiom` or `opaque` outside
+  the host model, and requires a statement byte-identical to the generated one.
+
+### 23. Resource bounds: count calls with a lemma, and bound instructions with fuel
+
+**Surveyed:**
+- RAML and amortised analysis (POPL 2011; the survey in MSCS 2022);
+- RaRust (OOPSLA 2025), which infers linear bounds over a variant of LLBC, the language
+  Charon emits;
+- time credits in separation logic;
+- a WebAssembly cost-bound analysis (VSTTE 2025 preprint).
+
+None of these yields a certificate that a gate could check.
+
+**What changed:**
+- **Calls are proved.** With effects as data, a call bound is an ordinary lemma,
+  `(decide …).length ≤ k`. It needs no cost semantics, which Lean lacks anyway. S4 checks
+  it against the trace.
+- **Instructions are enforced.** Instruction counts stay with fuel at run time (S1).
+- **RaRust is the citation if a node ever needs a symbolic bound.**
+
+### 24. Meters and space banks are D5's precedent
+
+**Surveyed:** KeyKOS (1992) and EROS (SOSP 1999). In KeyKOS, meters and space banks are
+capabilities that subdivide, and spending from a submeter spends from its parent.
+
+**What changed:** this is exactly S1's finding that budgets are spent, not narrowed like
+sets, and S1's meters follow it.
+
+**Descendants:**
+- **seL4 MCS** scheduling contexts (EuroSys 2018) are the formally targeted descendant, for
+  CPU only.
+- **Fuchsia** job policies set no quantities, so they are not a precedent for budgets.
+
+**Wasmtime** says fuel is "completely deterministic". It puts epochs at "around a 10%
+slowdown", with fuel costing more (re-checked). **S1 measured less:** within ±4% for
+both, on one tight loop. That is one guest on one machine. It contradicts nothing, and is
+not a general figure.
+
+### 25. Checking contracts on an edge without SMT has precedent
+
+**Surveyed:**
+- interface automata (FSE 2001);
+- contract-based design, the assume–guarantee algebra (Benveniste et al., 2018);
+- JSON subschema checking (ISSTA 2021), which decides containment with type-specific
+  checkers and no SMT.
+
+**What changed:** S2 makes the same move as JSON subschema checking: canonicalise each
+path's constraints, then check containment per kind. S2 cites it as the precedent for
+going without a solver.
+
 ## Open verification debts
 
 - ~~**Wassette's permission mechanism**~~ — **resolved, confirmed and sharpened**

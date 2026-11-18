@@ -32,12 +32,16 @@
 
 ## 1. The direction note
 
-- [ ] 1.1 Write `docs/SPECIFIED-ARCHITECTURE.md` from `design.md`, covering:
+- [x] 1.1 Write `docs/SPECIFIED-ARCHITECTURE.md` from `design.md`, covering:
   - the four strands;
   - the split between proved, enforced, and neither;
   - the treatment of model calls as quantified inputs.
 
   Link it from `docs/ROADMAP.md`. Verify: the author reads it.
+
+  Written 18 November 2026 and linked from the roadmap (its 18 November entry). It keeps a
+  table of what is proved, what is enforced and what is neither, filled in from the spikes.
+  **The author has not read it yet**; the box is ticked for the writing.
 
 ## 2. S2: contracts that compose along edges
 
@@ -82,7 +86,7 @@
 
 ## 4. Prior-art survey
 
-- [ ] 4.1 Add a survey section to `docs/PRIOR-ART.md`, covering:
+- [x] 4.1 Add a survey section to `docs/PRIOR-ART.md`, covering:
   - proof-carrying code;
   - Verus, Aeneas/Lean, Kani, Creusot and Prusti;
   - RAML and amortised resource analysis;
@@ -90,6 +94,14 @@
   - current agent-written proof results, each cited.
 
   It ends in a prover recommendation for S3 and S4. Verify: every claim has a source.
+
+  Done 18 November 2026: `docs/PRIOR-ART.md` §§20–25. The full survey, with sources and
+  UNVERIFIED marks, is `docs/specified-architecture-survey.md`; a subagent wrote it, and I
+  re-checked two load-bearing claims against their primary pages.
+  - **Recommendation: Lean via Aeneas, on a pure core** pulled out of each node body (no
+    prover takes wit-bindgen glue or `serde_json`). Verus is the fallback.
+  - **S4 route:** call bounds as lemmas on effects-as-data; instruction counts stay with
+    fuel.
 
 ## 5. S3 and S4: proofs
 
