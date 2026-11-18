@@ -39,7 +39,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from poc.llm import ClaudeCLIBackend, LLMRequest, UsageLimitReached
+from poc.llm import ClaudeCLIBackend, LLMRequest, ModelCallError, UsageLimitReached
 
 S3 = Path(__file__).resolve().parents[1]
 LEAN = S3 / "lean"
@@ -268,12 +268,19 @@ def main() -> None:
     for arm, target, model, rep in plan:
         if (arm, target, model, rep) in done:
             continue
-        backend = ClaudeCLIBackend(model=model)
+        # 30 minutes per call: the first run's default 600s timed out an Opus proof
+        # mid-generation and stopped the run (amended after 3 trials, 18 Nov 2026).
+        backend = ClaudeCLIBackend(model=model, timeout=1800.0)
         try:
             rec = trial(backend, target, arm)
         except UsageLimitReached as e:
             print("usage ceiling reached; stopping:", e)
             return
+        except ModelCallError as e:
+            # A failed call is the harness's or the service's, never the model's
+            # answer: the trial is void, recorded apart, and never counted.
+            rec = {"target": target, "arm": arm, "model": model, "accepted_on": None,
+                   "void": str(e)[:500], "attempts": []}  # fmt: skip
         rec["rep"] = rep
         with out.open("a") as f:
             f.write(json.dumps(rec) + "\n")
