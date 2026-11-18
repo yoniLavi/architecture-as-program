@@ -26,6 +26,11 @@ lake build Proofs >/tmp/s3-check-build.log 2>&1 || {
 
 cat > /tmp/s3-axioms.lean <<'EOF'
 import Proofs
+-- Each theorem must prove the pinned statement itself, not something else that
+-- happens to share its name (the pilot's smoke test found that hole).
+example : Statements.drop_seen_spec := Proofs.drop_seen_holds
+example : Statements.one_line_spec := Proofs.one_line_holds
+example : Statements.respond_spec := Proofs.respond_holds
 #print axioms Proofs.drop_seen_holds
 #print axioms Proofs.one_line_holds
 #print axioms Proofs.respond_holds
