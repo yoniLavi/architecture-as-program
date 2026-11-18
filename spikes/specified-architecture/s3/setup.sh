@@ -27,8 +27,10 @@ fi
 eval "$(opam env --switch=aeneas --set-switch)"
 opam install ./src --deps-only -y
 
-make setup-charon
-make
+# Aeneas's Makefile needs GNU make (`brew install make` provides `gmake` on macOS).
+MAKE_BIN="$(command -v gmake || command -v make)"
+"$MAKE_BIN" setup-charon
+"$MAKE_BIN"
 
 echo "--- Lean library"
 elan self update || true
