@@ -75,3 +75,32 @@ Every session working on this change first checks the feed recorder (standing ta
       agenda goes further first, and Paper 4 publishes later as a checkpoint, as Papers 2
       and 3 did. The draft stays unstamped, held by its figure and hedge pins meanwhile
 - [ ] 4.3 `papers/README.md`, `AGENTS.md`, `docs/ROADMAP.md`; `openspec validate --strict`
+
+## 5. A post-hoc reviewer of greater capability (the author, 18 November 2026)
+
+The author asked for a brief post-hoc run with Sonnet as the reviewer, because the
+identical model in both roles is Paper 4's largest threat to validity. Model calls on
+the subscription via `ClaudeCLIBackend`; no paid API spend. Then another round of
+agentic review, then the author's prepublication read (4.2).
+
+- [x] 5.1 **The plan, committed before the first call** (`poc/architect/posthoc_sonnet.py`,
+      `poc/architect/runs/posthoc-sonnet/plan.json`). The registered reviewer's two views,
+      re-run with `claude-sonnet-5-5` and nothing else changed, on the behaviour replay's
+      fixed sample: 152 registered trials (all 76 with an effect-class widening, and 76
+      clean ones chosen by SHA-256 of the trial ID), both views, so **304 calls** plus at
+      most two repairs each. Primary view over every trial first, then persuaded. Before
+      each call the system text and shown prompt are hashed and must equal the registered
+      record's `inputs_sha256` for that view: all 304 reproduce, once the graph is rebuilt
+      from the architect's final reply (the committed record sorts the graph's keys; the
+      reviewer saw the architect's order). Baseline: the registered Haiku verdict, same
+      view, same trials. Post hoc: never pooled, no confirmatory test, described as a
+      reviewer of greater capability from the same family (diversity, not independence).
+      If the ceiling stops it, it resumes; the paper reports it only once complete
+- [ ] 5.2 The run, in the background at low priority; no edit to `poc/`, `scripts/` or
+      `graphs/` while it runs
+- [ ] 5.3 `report.py`: a separate `post_hoc_sonnet` block in `dist/architect.json`, with
+      `display` strings; Paper 4's post-hoc subsection, Limitations and Future work;
+      the figure pin re-seeded deliberately
+- [ ] 5.4 Agentic review: a critical paper review and an adversarial claims check, in
+      parallel, briefed with the paper and code only; findings and actions recorded here
+- [ ] 5.5 Rebuild and send the author the PDF for 4.2; no stamp, publish or push

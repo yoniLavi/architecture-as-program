@@ -164,3 +164,20 @@ changed pipeline or a reviewer from another family. Replication for its own sake
   fit, the lever is scope (the pilot section first). Ask before cutting.
 - **The report moves under the paper.** The keys Paper 4 reads are pinned by a test at
   stamping, as Paper 2's are.
+
+## A post-hoc reviewer of greater capability (the author, 18 November 2026)
+
+The identical model as architect and reviewer is the threat Limitations names first. The
+author asked for a brief post-hoc re-review of the registered graphs with Sonnet, on the
+subscription, changing nothing else. It is the cheapest partial answer: it varies the
+reviewer's capability and keeps the family, so it bounds how much of the gap is the
+reviewer being Haiku, not how much is the reviewer being Claude. The control from another
+family, on a registered subset, stays unrun and unfunded.
+
+- **Sample:** the behaviour replay's (152 trials, 76 widened), so the registered reviewer,
+  the behaviour-shown reviewer and Sonnet are compared on the same graphs.
+- **Unchanged inputs, checked:** the hashes of the system text and shown prompt must equal
+  the registered ones before each call.
+- **Reporting:** a separate `post_hoc_sonnet` block in `dist/architect.json`, labelled post
+  hoc; the paper's post-hoc subsection reports it beside the registered reviewer on the
+  same trials, never as a test and never pooled.
