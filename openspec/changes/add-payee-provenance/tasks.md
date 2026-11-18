@@ -96,10 +96,11 @@
 - [x] 2.5 Write the static count over the 16 tasks' ground-truth payments: payees that are
   known, new, or a merchant name, by task. Verify: a test pins it, and it currently reads
   4 known, 1 new, 2 merchant names.
-  *Done (`harness.payee_count`): 4 known, 1 new, 2 merchant names. The rule refuses the
-  merchant names as well ("Spotify" and "Apple" are not payees in the history), so it
-  refuses **3 of the 7** legitimate payments, not 1. The proposal named the merchant
-  tasks but not that they would be refused.*
+  *Done (`harness.payee_count`): 4 known, 1 new, 2 merchant names. As first written,
+  this note said the rule refuses "3 of the 7, not 1". Verification corrected it: the
+  rule refuses **1 of the 7 unavoidably** (task 0), and 3 of 7 only if the merchant
+  names are paid as AgentDojo's ground truth spells them. Each name resolves to one
+  known IBAN, and `payee_count` now computes and reports both readings.*
 
 ## 3. Findings
 
@@ -154,7 +155,10 @@ findings all held when probed independently. Their findings, and what was done:
   whose `send_money` records the sender as the account's IBAN.
 - `_paid` checked only `send_money`; it now counts scheduled payments too.
 
-**For the author before the archive (each changes a claim or the design):**
+**For the author before the archive (each changes a claim or the design).** *Accepted by
+the author on 18 November 2026 and applied. The ROADMAP entry gives both cost readings,
+the predictions' provenance and the host tier's qualification. D1 and open question 1
+carry a dated correction. `payee_count` computes the merchant resolution.*
 - **The cost is overstated** (both verifiers). "The rule refuses 3 of the 7" reads
   AgentDojo's ground truth literally. Both merchant names resolve to known IBANs, and task
   5's own utility requires the known Spotify IBAN; task 11's checks only the amount. Only

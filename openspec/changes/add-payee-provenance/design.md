@@ -46,6 +46,16 @@ design:
   lookup in the history anyway.
 - *Consequence:* a prompt-quoted class would add a parser and still admit nothing in this
   suite. It stays a candidate for a suite where prompts carry IBANs (open question 1).
+- *Correction (verification before the archive, 18 November 2026; accepted by the
+  author).* The premise is false. Four user tasks name an IBAN in their prompt: 3 and 4
+  (`GB29NWBK60161331926819`), 6 (`US122000000121212121212`) and 15
+  (`CA133012400231215421872`). The decision survives on other grounds:
+  - the three `Payments` payees among them are already known payees;
+  - task 15's goes to a standing order, which `known-payees` does not cover;
+  - task 0's bill payee, the one the class refuses, is not in its prompt.
+
+  So a prompt-quoted class would admit nothing here that `known-payees` refuses. This
+  suite *is* one whose prompts carry payees, and open question 1 should be read so.
 
 **D2. Outgoing, completed payments only.**
 - A payee is known if a transaction in the history has the account as sender ('me' or its
@@ -118,6 +128,8 @@ None. The class is additive: no existing graph holds it, and `any` keeps its mea
 
 1. *(deferrable)* A prompt-quoted payee class (D1), for a suite whose prompts carry
    payees. It stays out of this change; it is recorded so the decision is not lost.
+   *(Corrected: banking `v1.2.2`'s prompts do carry payees, in four tasks; see D1. Here
+   the class would add nothing, which is a fact about this suite, not about the class.)*
 2. *(deferrable)* An amount bound read from history (D5). It is left out; this question
    asks whether to propose it after the findings are read.
 3. *(for task 0.1)* The confirmation channel. This change counts where a confirmation

@@ -393,9 +393,16 @@ def payee_count() -> dict[str, Any]:
     """The cost side, counted statically (add-payee-provenance 2.5): each user task's
     ground-truth payments on the default environment, by payee class. `known` is in
     the account's history as a payee; `new` is an IBAN it has never paid; `merchant`
-    is a name, not an IBAN. `refused` is every payment the rule would refuse: each one
-    a confirmation the user would have to give outside the graph. A change to a
-    standing order's recipient is a `ScheduledPayments` call, not counted here."""
+    is a name, not an IBAN. A change to a standing order's recipient is a
+    `ScheduledPayments` call, not counted here.
+
+    Two readings of the cost, both reported (verification before the archive):
+    `refused_as_written` takes the ground truth literally, so a merchant name is
+    refused. But a name is looked up, and `resolves_to` gives the past payees whose
+    outgoing payments name it in their subject; where that is one known IBAN, a graph
+    paying it is admitted (task 5's own scorer wants that IBAN). `refused_unavoidably`
+    counts only the payments whose payee is refused under either reading: each one a
+    confirmation the user would have to give outside the graph."""
     import re
 
     from ..bank import known_payees
@@ -404,7 +411,9 @@ def payee_count() -> dict[str, Any]:
     iban = re.compile(r"^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$")
     s = suite()
     env = s.load_and_inject_default_environment({})
-    known = known_payees(AgentDojoBank(runtime=None, env=env))  # type: ignore[arg-type]
+    bank = AgentDojoBank(runtime=None, env=env)  # type: ignore[arg-type]
+    known = known_payees(bank)
+    outgoing = [t for t in bank.inspect("transactions") if t["recipient"] in known]
     by_task: dict[str, list[dict[str, Any]]] = {}
     for name, task in s.user_tasks.items():
         for call in task.ground_truth(env.model_copy(deep=True)):
@@ -412,19 +421,25 @@ def payee_count() -> dict[str, Any]:
                 continue
             payee = str(call.args["recipient"])
             cls = "known" if payee in known else "new" if iban.match(payee) else "merchant"
+            resolves = sorted(
+                {t["recipient"] for t in outgoing if payee.lower() in t["subject"].lower()}
+            ) if cls == "merchant" else []  # fmt: skip
             by_task.setdefault(name, []).append(
                 {
                     "function": call.function,
                     "payee": payee,
                     "class": cls,
-                    "refused": payee not in known,
+                    "resolves_to": resolves,
+                    "refused_as_written": payee not in known,
+                    "refused_unavoidably": payee not in known and len(resolves) != 1,
                 }
             )
     payments = [p for ps in by_task.values() for p in ps]
     return {
         "by_task": dict(sorted(by_task.items(), key=lambda kv: int(kv[0].rsplit("_", 1)[1]))),
         "counts": {c: sum(p["class"] == c for p in payments) for c in ("known", "new", "merchant")},
-        "refused": sum(p["refused"] for p in payments),
+        "refused_as_written": sum(p["refused_as_written"] for p in payments),
+        "refused_unavoidably": sum(p["refused_unavoidably"] for p in payments),
         "payments": len(payments),
     }
 
