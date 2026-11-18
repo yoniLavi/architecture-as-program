@@ -130,6 +130,10 @@ def translate_body(rust: str, target: str) -> tuple[bool, str]:
 
 
 def gate(lean: str, target: str) -> tuple[bool, str]:
+    # SUPERSEDED (18 Nov 2026): this is the gate the pilot ran, kept as run. The
+    # adversarial review fooled it (`macro_rules` over `#print axioms`; `sorryAx`
+    # passes `\bsorry\b`; build-time `#eval`). Every accepted trial is re-checked
+    # under `reaudit.hardened_gate`; use that for any new run.
     if not pinned_ok():
         raise RuntimeError("the pinned statements changed: harness fault, stopping")
     if FORBIDDEN.search(lean):

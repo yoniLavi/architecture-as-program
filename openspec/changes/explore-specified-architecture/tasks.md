@@ -131,8 +131,9 @@
   after 3 trials for a call timeout).
   - **Accepted:** 20 of 29 counted trials, 1 void; Opus 13/14, Sonnet 7/15. None was
     accepted on its first attempt.
-  - **Refused:** all 99 refusals were build failures, and nothing passed the gate
-    improperly.
+  - **Refused:** all 99 refusals were build failures.
+  - **Re-audit:** all 20 accepted proofs also pass the hardened gate (`reaudit.json`),
+    which the adversarial review made necessary (see section 7).
   - **Bodies:** every accepted body+proof body agreed with the shipped one (6/6).
   - **Reading:** pilot counts, not rates.
 - [x] 5.3 S4: for one node, prove a bound on the number of crossings, and compare it with
@@ -154,6 +155,59 @@
   - **`s4/RESULT.md`:** fold call bounds into that change, and name a per-call output cap
     as the missing piece of a token bound.
   - **`docs/SPECIFIED-ARCHITECTURE.md`:** strand table and findings updated.
+
+## 7. Verification before archive (AGENTS.md)
+
+- [x] 7.1 Two read-only subagents ran in parallel, briefed with the change and the code
+  (18 November 2026): one for conformance, one adversarial. Their findings, and what was
+  done about each, are below. **Findings A1, A3 and A4 change claims or the design, so
+  they go to the author before the archive.**
+
+  **Conformance:** tasks 0.1 to 5.4 conform. 52 spike tests pass, the gate ACCEPTS, and
+  no file in `poc/`, `scripts/`, `graphs/` or WIT changed. Spikes are imported by no build
+  step, and no spike test calls git.
+  - C1. The pilot accepted 20 trials, not 18 (13 + 7), in three places. **Fixed**
+    (`7ff56b6`).
+  - C2. The bodies agreeing with the shipped ones were 6/6, not 7/7. **Fixed.**
+  - C3. The direction note claimed statements are generated and the Lean translation is
+    differential-tested. Both are wrong: the statements were hand-written, and it is the
+    Rust that is tested. **Fixed**, with a note in `PRIOR-ART.md` §22.
+  - C4. `s4/RESULT.md` called a Python transcription "the core's log". The trace-check
+    docstring cited a lemma that does not exist and a check that is not asserted.
+    **Fixed.**
+  - C5. The README linked to non-existent `s3/README.md` and `s4/README.md`. **Fixed.**
+  - C6. S1's 86-unit overshoot is in no record. **Disclosed** in `s1/RESULT.md`. The
+    memory test has no unlimited control: **noted, not fixed.**
+  - C7. The trial interrupted by the first timeout was re-run from scratch.
+    **Disclosed.**
+
+  **Adversarial:**
+  - A1. **Both S3 gates accepted `sorry` proofs**, via `macro_rules` redefining `#print
+    axioms`, and `sorryAx` evaded the pilot's scan. A proof file also runs code at build
+    time.
+    - **Fixed:** a sandboxed build, the compiled statements pinned by hash, and an audit
+      in a separate process (`s3/audit/Audit.lean`): exact statement type, an axiom walk
+      over the compiled terms, and a kernel replay.
+    - **Confirmed:** re-run on the attack files, the `sorry` proofs are refused and the
+      `#eval` write is denied.
+    - **The audit's own first draft skipped theorem values.** It was caught and fixed.
+    - **`check.sh` no longer copies a file over `Proofs.lean`.**
+  - A2. "The gate was never fooled" could not rest on a foolable gate. **Fixed:** all 20
+    accepted pilot proofs were re-run through the hardened gate (`pilot/reaudit.json`)
+    and still pass, and the claim now rests on that.
+  - A3. **`respond_spec` omits the tool-scope property.** A lookup carries no tool name,
+    so a body looking up any tool satisfies it. It is also partial correctness.
+    **Disclosed** in both RESULT files; the fix is the proposed change's work.
+  - A4. The direction note's "Proved" cell named a payment property S3 never proved.
+    **Fixed.**
+  - A5. S1 folded the parent's three instantiation failures into one message, and its
+    test could not tell them apart. **Fixed:** the classes are kept, and the test asserts
+    the capability message. 52 tests pass.
+  - A6. S2's fuzz does not check `no-guarantee` or `undecided`. One conservative
+    mislabel. The reviewer's 20,000-case fuzz found no unsound verdict. **Disclosed** in
+    `s2/RESULT.md`.
+  - A7. Trusted base not named: Aeneas's library, the lakefile and manifest, and the
+    sandbox. **Disclosed.**
 
 ## 6. Close
 

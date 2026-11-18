@@ -29,7 +29,7 @@ Every result in this direction says which kind of claim it is making.
 
 | | Proved (a checked certificate) | Enforced (refused at run time) | Neither |
 |---|---|---|---|
-| **Safety of effects** | "For every model reply r, every payment is in scope" (S3) | The handle's scope, at the crossing (shipped) | That the effect is the one the user wanted (utility) |
+| **Safety of effects** | The kind of statement S3 targets, e.g. "for every model reply r, every payment is in scope". S3 proved three such statements, none about payments (`spikes/specified-architecture/s3/RESULT.md`) | The handle's scope, at the crossing (shipped) | That the effect is the one the user wanted (utility) |
 | **Number of calls** | `(decide …).length ≤ k` (S4) | A `Calls` budget, metered at the backend (S1) | — |
 | **Tokens and cost** | — (depends on the model) | A `Tokens` budget; may overrun by at most one call (S1) | The exact cost of a run |
 | **Instructions** | — (no checkable certificate exists; PRIOR-ART §23) | Fuel, deterministic, overshooting by one check interval (S1) | — |

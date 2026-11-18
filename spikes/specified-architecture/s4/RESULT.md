@@ -16,7 +16,11 @@ Whenever a run completes:
   `Statements.lean`'s docstring says "no lookup without a model call before it", which
   is stronger than the `Prop` it describes. The statement is pinned, so the gap is
   recorded here and in `s3/RESULT.md`, not edited away;
-- a refused tool is never the granted one.
+- a refused tool is never the granted one. This does *not* say that every lookup is of
+  the granted tool, since a lookup carries no tool name in the core's effects
+  (`s3/RESULT.md` has the gap).
+
+It is partial correctness: the bound holds whenever a run completes.
 
 The bound is an ordinary lemma about a list, because the core returns its crossings as
 data (the survey's route). It needed no cost semantics and no resource library.

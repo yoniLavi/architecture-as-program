@@ -33,7 +33,13 @@ from pathlib import Path
 from typing import Any
 
 from poc.sandbox import host
-from poc.sandbox.host import Sandbox, SandboxError, engine_config
+from poc.sandbox.host import (
+    IncompleteHostBinding,
+    Sandbox,
+    SandboxError,
+    _is_resource_exhaustion,
+    engine_config,
+)
 
 from .budget import BudgetExhausted
 
@@ -170,11 +176,30 @@ class MeteredSandbox(Sandbox):
         try:
             self._instance = linker.instantiate(self._store, self._component)
         except Exception as e:
-            # A store bound first; then the parent's three cases, unchanged.
+            # A store bound first; then the parent's three cases, unchanged. (The first
+            # draft folded all three into one generic message, which is the very
+            # misattribution AGENTS.md warns of; the adversarial review found it.)
             classified = classify(e, budget, self.fuel_spent())
             if classified is not e:
                 raise classified from e
-            raise SandboxError(f"{component_name!r} could not be instantiated: {e}") from e
+            if _is_resource_exhaustion(e):
+                raise SandboxError(
+                    f"{component_name!r} could not be instantiated — the host could not "
+                    f"allocate memory for the guest, a resource failure and not a "
+                    f"capability one: {e}"
+                ) from e
+            text = str(e)
+            for iface_name, funcs in self._caps.items():
+                if f"`{iface_name}`" in text and "function implementation is missing" in text:
+                    raise IncompleteHostBinding(
+                        f"{component_name!r} could not be instantiated — the host binds "
+                        f"{iface_name} with only {sorted(funcs)}; a fault in the host "
+                        f"adapter, not an ungranted capability: {e}"
+                    ) from e
+            raise SandboxError(
+                f"{component_name!r} could not be instantiated — it imports a capability "
+                f"it was not granted: {e}"
+            ) from e
         self.instantiation_fuel = self.fuel_spent()
         self._exports = {}
 

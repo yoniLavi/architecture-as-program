@@ -193,6 +193,8 @@ def test_an_ungranted_import_is_still_an_ungranted_import_on_the_metered_engine(
     with pytest.raises(SandboxError) as e:
         MeteredSandbox("hostile_ungranted", {}, StoreBudget(fuel=10**9))
     assert not isinstance(e.value, BudgetExhausted)
+    # Named as the capability case, not a generic failure or a resource failure.
+    assert "imports a capability it was not granted" in str(e.value)
 
 
 def test_runtime_adapters_run_under_a_fuel_budget():

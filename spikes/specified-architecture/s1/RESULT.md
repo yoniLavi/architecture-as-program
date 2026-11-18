@@ -50,8 +50,9 @@ directory; nothing in `poc/`, `scripts/`, `graphs/` or any WIT file changed. Che
    `GenerateResponse`, 16,386 to instantiate it). A runaway guest is stopped and classed
    `Fuel`. **The bound has slack:** wasmtime checks fuel at loop headers and function
    entries, so a run is stopped within one check interval past its budget, measured at 23
-   units for the loop and 86 for `ParseMessage` (of 43,588). Small, deterministic, and to
-   be stated with any fuel figure.
+   units for the loop (a test bounds it at 64). The 86 units for `ParseMessage` (of
+   43,588) was seen in a manual bisection and is in no record or test. Small,
+   deterministic, and to be stated with any fuel figure.
 6. **The deadline works, and is a backstop.** An epoch ticker (1 ms) stops a runaway guest
    (`Deadline`). It can only fire late, never early, but it counts time the guest was
    descheduled, so on a loaded machine it cuts work off earlier than fuel would. Use fuel

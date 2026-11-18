@@ -76,6 +76,17 @@ It needs no solver.
   is a proof (S3), not this check.
 - Anything about the agent-written graphs (Paper 4's architect). The node library
   carries no `requires`/`ensures` today.
+- **Two verdicts are not checked against the evaluator** (found by the adversarial
+  review). The fuzz checks `discharged`, `contradicted` and `vacuous`. It does not check
+  `no-guarantee` (514 of 3,000) or `undecided` (71), and its values include no length-4
+  string or list.
+  - **What held:** the reviewer's wider fuzz (20,000 cases, with length 4 and fractional
+    values) found no unsound `discharged`, `contradicted` or `vacuous`.
+  - **One verdict is mislabelled conservatively.** `x >= 0 ⇒ len(x) >= 0` comes back
+    `no-guarantee`, although under the evaluator's semantics it is `contradicted`. The
+    error is downgraded to a warning, which is the safe direction.
+  - **A validator analysis built from this** should fuzz every verdict class and widen
+    the value set.
 
 ## Recommendation: propose a small validator analysis, at warning strength
 
