@@ -12,7 +12,10 @@
 behaviour, so the statement covers every model, however it adapts to what it has seen.
 Whenever a run completes:
 - there are at most 3 model calls and at most 3 lookups, so at most 6 crossings;
-- there is no lookup without a model call before it;
+- there are no more lookups than model calls. This is a count, not an order.
+  `Statements.lean`'s docstring says "no lookup without a model call before it", which
+  is stronger than the `Prop` it describes. The statement is pinned, so the gap is
+  recorded here and in `s3/RESULT.md`, not edited away;
 - a refused tool is never the granted one.
 
 The bound is an ordinary lemma about a list, because the core returns its crossings as

@@ -66,8 +66,8 @@ list.
 | S1 | Budgets as capability scopes | Done (18 November 2026): recommend `add-resource-budgets` |
 | S2 | Contracts that compose along edges | Done (18 November 2026): recommend a warning-strength validator analysis |
 | Survey | Provers, agent-written proofs, resource bounds | Done (18 November 2026): Lean via Aeneas on a pure core |
-| S3 | Proofs of node bodies | In progress |
-| S4 | Proofs of resource bounds | In progress |
+| S3 | Proofs of node bodies | Done (18 November 2026): three nodes proved and gate-accepted; in a pilot, models reached accepted proofs in 18 of 29 counted trials, never on a first attempt; recommend `add-proved-cores` |
+| S4 | Proofs of resource bounds | Done (18 November 2026): a call bound proved for every model, with no excess on the shipped component; fold into S3's change |
 
 **What has been found so far:**
 - **Budgets are spent, not narrowed like sets** (D5). They need meters shared down the
@@ -76,6 +76,15 @@ list.
 - **Contract guarantees do not survive a node,** because the vocabulary cannot relate a
   node's output to its input. A proof can carry that relation, which is one reason S3
   matters for S2.
+- **Model calls as quantified inputs work in plain Lean** (S3). A theorem over every
+  reply, or every `Host`, assumes nothing about the model.
+- **A gate must check a proof against the statement's term, not a name.** A theorem named
+  `holds` of type `True` passed the first gate.
+- **A pinned statement can say less than its prose.** One said `lookups ≤ generates`
+  where its docstring claimed an order. Nothing yet checks that a statement means what
+  its docstring says.
+- **A proved call count times an enforced per-call cost needs a per-call output cap**
+  (S4). The CLI backend has none.
 
 ## The limits every result states
 

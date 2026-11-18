@@ -123,9 +123,18 @@
     minutes against statements it could not edit.
   - **Deviation:** the "hand" proofs were written by an agent with tools and the Aeneas
     skill files, not by a person. A person's effort was not measured.
-- [ ] 5.2 S3, generated (only with the author's approval, on the subscription, and with no
+- [x] 5.2 S3, generated (only with the author's approval, on the subscription, and with no
   paid spend): a small pilot in which the agent writes body and proof and the checker
   decides. Report counts.
+
+  Done 18 November 2026 (`s3/pilot/`; design committed before any call, amended once
+  after 3 trials for a call timeout).
+  - **Accepted:** 18 of 29 counted trials, 1 void; Opus 13/14, Sonnet 7/15. None was
+    accepted on its first attempt.
+  - **Refused:** all 99 refusals were build failures, and nothing passed the gate
+    improperly.
+  - **Bodies:** every accepted body+proof body agreed with the shipped one (7/7).
+  - **Reading:** pilot counts, not rates.
 - [x] 5.3 S4: for one node, prove a bound on the number of crossings, and compare it with
   the trace over the contract's inputs. Report every excess.
 
@@ -137,7 +146,14 @@
     core.
   - **Finding:** proved calls times an enforced per-call cost needs a per-call output
     cap, which the CLI backend lacks.
-- [ ] 5.4 Write up S3 and S4, each with a recommendation.
+- [x] 5.4 Write up S3 and S4, each with a recommendation.
+
+  Done 18 November 2026.
+  - **`s3/RESULT.md`:** propose `add-proved-cores`. The open risk is in statements, not
+    proofs.
+  - **`s4/RESULT.md`:** fold call bounds into that change, and name a per-call output cap
+    as the missing piece of a token bound.
+  - **`docs/SPECIFIED-ARCHITECTURE.md`:** strand table and findings updated.
 
 ## 6. Close
 
