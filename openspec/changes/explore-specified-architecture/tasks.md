@@ -41,12 +41,24 @@
 
 ## 2. S2: contracts that compose along edges
 
-- [ ] 2.1 In `spikes/specified-architecture/s2/`, write the implication check: per edge,
+- [x] 2.1 In `spikes/specified-architecture/s2/`, write the implication check: per edge,
   and per variant on a sum. It must be stdlib-only. Run it over `graphs/*.json`.
   - Report: edges with contracts on both sides, edges that pass, and edges it cannot
     decide.
   - Verify: the spike's own tests include one edge that fails by construction.
-- [ ] 2.2 Write up the result and a recommendation: propose a validator analysis, or stop.
+
+  Done 18 November 2026 (25 checks, including `len(q) <= 600 ⇒ len(q) <= 512`, not
+  implied, and `len(q) > 600 ⇒ len(q) <= 512`, contradicted). The corpus was widened with
+  Paper 3's generation contracts.
+  - **Over the graphs:** 6 requirement-edges; 3 discharged, 3 with no guarantee, 0
+    undecided.
+  - **The evaluator fuzz** (3,000 cases) found a soundness bug in the first draft, now
+    fixed.
+- [x] 2.2 Write up the result and a recommendation: propose a validator analysis, or stop.
+  `s2/RESULT.md`. The finding: a guarantee does not survive a pass-through node, because
+  the vocabulary cannot relate output to input. Recommendation: a stdlib validator
+  analysis at warning strength (contradicted or vacuous are errors; unguaranteed
+  preconditions are listed). The relational atom is deferred to S3.
 
 ## 3. S1: budgets as scopes
 
