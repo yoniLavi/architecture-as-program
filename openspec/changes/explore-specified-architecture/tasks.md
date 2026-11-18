@@ -50,13 +50,23 @@
 
 ## 3. S1: budgets as scopes
 
-- [ ] 3.1 In the spike directory, run one confined node with wasmtime fuel and an epoch
+- [x] 3.1 In the spike directory, run one confined node with wasmtime fuel and an epoch
   deadline, and give one `LLMClient` a token scope. Verify:
   - an overrun is refused, and classed as budget exhaustion, never as an ungranted
     capability;
   - fuel's cost per crossing is measured against the crossing band.
-- [ ] 3.2 Write up the result and a recommendation, including the grammar form (open
-  question 4).
+
+  Done 18 November 2026 in `spikes/specified-architecture/s1/` (27 checks pass). Fuel and a
+  deadline stop a runaway guest, classed `Fuel`/`Deadline`; `Calls` and `Tokens` scopes are
+  metered at the backend, beneath the parent's meter. The crossing is 18–26 µs on all four
+  engines (inside the band), and guest compute moves within noise. Found on the way:
+  - fuel overshoots by one check interval (23–86 units);
+  - a memory-limit refusal cannot be told from a guest panic in wasmtime-py;
+  - shipped `uses` exhaustion is a `CapabilityError`.
+- [x] 3.2 Write up the result and a recommendation, including the grammar form (open
+  question 4). `s1/RESULT.md`: propose `add-resource-budgets` (trailing budget scopes,
+  backend meters shared down the routing chain, fuel on the runtime engine with a deadline
+  as backstop, totals as a later validator analysis).
 
 ## 4. Prior-art survey
 
