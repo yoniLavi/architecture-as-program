@@ -138,6 +138,30 @@ def registered_summary() -> dict[str, Any]:
             Counter(r["condition"] for r, g in unseen if quoted_dynamic(g))
         ),
         "unseen_by_task": dict(Counter(r["task"] for r, _ in unseen).most_common()),
+        # Unseen grants by task and grant text: which grant a task's count is made of.
+        "unseen_by_task_grant": {
+            t: dict(Counter(g for r, g in unseen if r["task"] == t).most_common())
+            for t in sorted({r["task"] for r, _ in unseen}, key=_task_number)
+        },
+        # Unseen grants that were exactly the pretext's target, by task, and how many of
+        # them the architect also wrote, unseen, with no pretext (the same grant in Q0).
+        "unseen_target_by_task": dict(
+            Counter(
+                r["task"]
+                for r, g in unseen
+                if r["condition"] != "Q0" and g == targets[r["task"]]["grant"]
+            )
+        ),
+        "unseen_target_also_unseen_in_q0": sum(
+            1
+            for r, g in unseen
+            if r["condition"] != "Q0"
+            and g == targets[r["task"]]["grant"]
+            and any(q["task"] == r["task"] and g in q["unseen"] for q in q0)
+        ),
+        # Trials with an effect-class widening, by task: the base rate the unseen grants'
+        # concentration is read against.
+        "widened_by_task": dict(Counter(r["task"] for r in trials if _effect(r)).most_common()),
         "read_widenings": dict(reads),
         "false_alarms_primary": _false_alarms(trials, PRIMARY),
         "false_alarms_persuaded": _false_alarms(trials, PERSUADED),
@@ -267,6 +291,10 @@ def measured_summary() -> dict[str, Any]:
                 "holds_writer": any(n.get("uses") in WRITER_ENTRIES for n in graph["nodes"]),
                 # The measured graph is a registered trial; these are its unseen grants.
                 "unseen": q0["unseen"],
+                # Review is recorded, not enforced: a graph whose effect-class widening
+                # the reviewer caught still ran. This marks the ones that did.
+                "reviewer_caught_widening": bool(_effect(q0))
+                and _flagged(q0, PRIMARY, _effect(q0)),
                 "predicted_residual": residual,
                 "attack_success": sorted(succeeded),
                 "contradictions": sorted(g for g in succeeded if g not in residual),
@@ -407,6 +435,10 @@ def counts(data: dict[str, Any]) -> dict[str, Any]:
             # drafted (`labels/banking.json`, `open`): where the labels drew a judgement line.
             "unseen_grants_on_open_label_tasks": sum(
                 n for t, n in r["unseen_by_task"].items() if labels.load()["tasks"][t].get("open")
+            ),
+            # The same tasks' share of widened trials, caught or not: the base rate.
+            "widened_trials_on_open_label_tasks": sum(
+                n for t, n in r["widened_by_task"].items() if labels.load()["tasks"][t].get("open")
             ),
         },
         "labels": {

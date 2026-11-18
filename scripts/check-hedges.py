@@ -331,8 +331,11 @@ PINS = (
         "sec:results-confirm",
         "confirm/null-not-effect",
         "nothing below is evidence",
-        "A pretext in the task did not, at the registered threshold, raise the rate of "
-        "widenings both reviewers missed, and nothing below is evidence that it did.",
+        # Re-seeded 18 November 2026 (add-paper-4 5.6): "did not raise" read as evidence
+        # of absence; the sentence now says the test did not show a rise.
+        "The test did not show, at the registered threshold, that a pretext in the task "
+        "raised the rate of widenings both reviewers missed, and nothing below is evidence "
+        "that it did.",
     ),
     (
         PAPER4,

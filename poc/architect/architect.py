@@ -13,7 +13,8 @@ fabricated justification would be repaired into a quoted one before the review s
 
 **What the architect is shown, and nothing else:** the two stages' system texts, the
 task, the document (channel B), its own abstract graph, its own earlier replies, and
-reasons from a closed set of classes. No tool output, no injection, no reviewer
+the checks' reasons, each a class from a closed set with the check's own message, which
+is built from the architect's graph alone. No tool output, no injection, no reviewer
 verdict: `author` takes no argument through which one could arrive, and a test holds
 every request to that list.
 

@@ -172,7 +172,105 @@ agentic review, then the author's prepublication read (4.2).
       the plural line only.
 - [x] 5.5 Rebuild and send the author the PDF for 4.2; no stamp, publish or push (sent
       18 November 2026)
-- [ ] 5.6 **A fresh review in a new session** (the author, 18 November 2026). It is
+- [x] 5.6 **A fresh review in a new session** (the author, 18 November 2026). It is
       read-only, and its findings are applied and recorded here. If it finds no remaining
       significant issue, the author does the final read (4.2); otherwise its significant
-      findings go to the author first
+      findings go to the author first.
+
+      Two read-only subagents, briefed with the paper, the code and the records only: a
+      critical referee review (R) and an adversarial claims check (C). C recomputed every
+      figure from the raw records with its own scripts, and all of them match. Each
+      finding was checked against the records before it was acted on.
+
+      **To the author, answered 18 November 2026 (both as recommended):**
+      - *R1:* the paper never said what a reviewer flag does. `measure.py` ran task 5's Q0
+        rep-0 graph, whose widening the reviewer had caught (`wider`), and it counts
+        toward utility as an idle pass. **Disclosed:** §3 now says review is recorded and
+        measured, not enforced; §5.4 says each graph ran whatever its verdict, and names
+        task 5 (new key `measured.tasks[].reviewer_caught_widening`).
+      - *R11:* §6's figures for CaMeL, FIDES and Progent on banking had no recorded check
+        against their papers. **Dropped**; "no head-to-head figure" and its reason stay.
+
+      **Applied:**
+      - *Corrections of fact:*
+        - C1: validator verdicts reach the architect as the validator's messages under a
+          class from a closed set, not "reason classes, never free text"
+          (`repair_text`). §3 and `architect.py`'s docstring are corrected.
+        - C2: the reviewer still sees the architect's parameters, `Extract` instructions
+          among them; this is stated in §3, and the contributions say "rationales".
+        - C3: the other-family control has a gated backend, but no registered subset.
+        - R3/C4: task 15's unseen grants are 16 of 20 a new recurring payment where the
+          label grants an edit, not the plural line; §4.1 now names it (new key
+          `unseen_by_task_grant`).
+        - C7: "19 open scopes" became "no literal payee or cap to bind"; 2 of the 19 are
+          profile fields.
+        - C8: the pilot's first run was on one task (asserted).
+        - C9, C10, C11, C15, C16, C17: "a widening" not "of scope"; "other unseen
+          slips"; task 10's scorer note is its label's open question; the harness
+          refuses uncommitted changes and the trials ran from the fix commit; a test
+          holds the request builder, not the registered requests; the no-graph tasks are
+          those of the first repetition's Q0 trial; the pre-use kind/scope split, which
+          is hand-tagged, is dropped; the document date is 18 November.
+      - *Hedges and limits added:*
+        - R4/C5: "upper bounds … conservative call" is qualified by the contested lines
+          on tasks 2, 10 and 15, which hold 48 of the 61 unseen grants.
+        - R5: the primary outcome is per trial, so fewer `inexpressible` answers alone
+          would raise it; per-graph counts are added in §7 (computed from the table).
+        - R6: §5.1 says the test "did not show" a rise, and that a test of this size can
+          miss one of the observed size. The `confirm/null-not-effect` hedge pin is
+          re-seeded for it.
+        - R7: the noise caveat is moved to the head of §5.3, covering every post-hoc
+          comparison. "Moved" and "made" became non-causal. In §7, "flagged more clean
+          trials" no longer supports the S2 sentence; the author's S2 decision and its
+          wording otherwise stand.
+        - R8: §7 says the pretext test ran on the model Paper 3 ranks least moved by
+          claimed approvals.
+        - R9: base rate: the open-question tasks hold 67 of the 76 widened trials too
+          (new keys `widened_by_task`, `widened_trials_on_open_label_tasks`).
+        - R10: 10 of the 12 target hits are a grant also written, unseen, in Q0 (new keys
+          `unseen_target_by_task`, `unseen_target_also_unseen_in_q0`); "part-way" is
+          dropped as uncounted.
+        - R12: the conclusion allows that a closer look may show where the labels drew a
+          line too tight, and its "how little" and "more" are computed.
+      - *Rules and wording:*
+        - R2: the claim block gives utility beyond the idle-pass tasks too.
+        - R13: new asserts: Sonnet ranked most moved, both directions of change, task
+          10's Extract failure, task 15's composition, the target share, the pilot's
+          task counts, and the open-question majority.
+        - R14: first attempts, not trials; Sonnet's 22 "of the 76".
+        - R15: Table 2's caption says the graphs' attack success excludes the no-graph
+          tasks.
+        - R16: "as the pilot suggested" is dropped; both explanations of the `Extract`
+          failures are named.
+        - R17: "link check" throughout.
+        - R18: the abstract's pointer is now "(§5.1)".
+        - R21: "or a classifier" is cut; "the cells" became "the conditions"; the
+          numerals are reworded; the evidence comment on Paper 3's figures is corrected.
+        - R19: the construct paragraph cross-references §2 and §5.2 instead of
+          restating them.
+
+      **Rejected, with reason:**
+      - *C6:* "today's parser moves the registered counts to p = 0.044". The script
+        counted a refused spelling as a widening. Task 0's label is `[any]`; `'any'` read
+        as intended or as a literal payee is within it, so the run-time verdict holds
+        either way. The paper's one recount (the task-15 slip, by intent) is the
+        consistent one.
+
+      **Noted, not applied:**
+      - R19: the two "zero is not a defence" sentences in §5.4 bound different claims
+        (two graphs; the whole column), and one is a hedge pin. §7's two mentions of
+        Claude-drafted labels were the author's S2 addition.
+      - R20: related-work additions (Felt et al., Ye et al., AgentBound) are not added,
+        because the paper is over its length budget.
+      - The claim block is not trimmed: it is the approved claim.
+      - C14: the link check's own false alarms (7 grants within their labels) are not
+        reported; they bear on no claim.
+      - R13: "That failure, on task 2" (§4.3) has no key; the claims check confirmed it
+        from the pilot records.
+      - C18: the figure pin compares `build()` with its seed, so it catches drift, not
+        wrong values, and does not check `dist/` against `build()` (equal now).
+      - The `architect-pipeline` spec says the architect receives "the reason classes".
+        It also gets the message, which the spec does not forbid; the spec is unchanged.
+      - Length: about 8,200 words rendered, against ~7,000. This round added ~210, almost
+        all disclosure. The lever left is scope (for example, §5.3's scope-binding
+        replay), which is the author's call.
