@@ -371,6 +371,24 @@ PINS = (
         "They are post hoc: not registered, and neither pooled with the registered figures "
         "nor tested against them.",
     ),
+    # Seeded 18 November 2026 (add-paper-4 5.3): a same-family re-run must not read
+    # as an answer to the other-family question.
+    (
+        PAPER4,
+        "sec:results-posthoc",
+        "posthoc/sonnet-same-family",
+        "not their family",
+        "This removes the identity of the two roles, not their family",
+    ),
+    (
+        PAPER4,
+        "sec:limits",
+        "limits/sonnet-not-other-family",
+        "it leaves the other-family question open",
+        "That separates the reviewer from the architect, but not from its family, where "
+        "correlated errors and a shared reading of the task would persist; it is no test, "
+        "and it leaves the other-family question open.",
+    ),
     (
         PAPER4,
         "sec:registration",

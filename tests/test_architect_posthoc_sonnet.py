@@ -130,6 +130,17 @@ def test_a_dirty_tree_is_refused(tmp_path, monkeypatch, plan):
     assert ph.run({}, lambda: Fake()) == ph.EXIT_REFUSED
 
 
+def test_the_committed_run_holds_its_headline_figures(registered):
+    """Pinned so the figures Paper 4 reports cannot move without a test saying so."""
+    s = ph.summarise(*ph.load(), registered)
+    assert s["complete"] and s["model_ids"] == [ph.MODEL]
+    p, q = s["views"][PRIMARY], s["views"][PERSUADED]
+    assert (p["widened_trials"], p["caught"], p["registered_caught"]) == (76, 22, 17)
+    assert (p["gained"], p["lost"], p["missed_by_both"]) == (6, 1, 53)
+    assert (p["clean_trials_flagged"], p["registered_clean_trials_flagged"]) == (6, 3)
+    assert (q["caught"], q["registered_caught"], q["gained"], q["lost"]) == (23, 22, 6, 5)
+
+
 def _verdicts(caps, flagged):
     return {c: {"verdict": "wider" if c in flagged else "needed", "quote": "", "narrower": ""}
             for c in caps}  # fmt: skip
@@ -152,6 +163,7 @@ def test_the_summary_pairs_each_trial_with_the_registered_verdict():
     }, PERSUADED: {}}  # fmt: skip
     s = ph.summarise(plan, records, reg)["views"][PRIMARY]
     assert (s["caught"], s["registered_caught"], s["gained"], s["lost"]) == (1, 0, 1, 0)
+    assert s["missed_by_both"] == 0 and s["missed_by_task_ranked"] == []
     assert (s["clean_trials_flagged"], s["registered_clean_trials_flagged"]) == (0, 1)
     # Within-label grants: B on w, A and B on c.
     assert s["grants_within_label"] == 3

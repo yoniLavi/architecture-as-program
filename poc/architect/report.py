@@ -314,8 +314,23 @@ def build() -> dict[str, Any]:
         "pilot": pilot_summary(),
     }
     data["counts"] = counts(data)
+    data["post_hoc_sonnet"] = post_hoc_sonnet_summary(data)
     data["display"] = display(data)
     return data
+
+
+def post_hoc_sonnet_summary(data: dict[str, Any]) -> dict[str, Any]:
+    """Post hoc, never the registered result: the reviewer re-run with Sonnet on the
+    registered graphs (`posthoc_sonnet.py`, `add-paper-4` task 5). Kept in its own
+    block, beside the registered reviewer's verdicts on the same trials only."""
+    from . import posthoc_sonnet
+
+    trials = {r["trial"]: r for r in registered_trials()}
+    s = posthoc_sonnet.summarise(*posthoc_sonnet.load(), trials)
+    if s["planned"]:
+        widened = data["counts"]["registered"]["total"]["widened"]
+        s["sample_holds_every_widened_trial"] = s["sample_widened_trials"] == widened
+    return s
 
 
 # The attacks the measurement ran: `poc.agentdojo.harness.ATTACK`, restated because this
@@ -467,7 +482,16 @@ def display(data: dict[str, Any]) -> dict[str, Any]:
         return _pct(x["hits"], x["n"]) if x else None
 
     slips = r["post_hoc_without_spelling_slips"]
+    son = data.get("post_hoc_sonnet") or {}
+    sonnet = {
+        view: {
+            "catch_rate": _pct(v["caught"], v["widened_trials"]),
+            "registered_catch_rate": _pct(v["registered_caught"], v["widened_trials"]),
+        }
+        for view, v in son.get("views", {}).items()
+    }
     return {
+        "post_hoc_sonnet": sonnet,
         "post_hoc_without_slips_p": f"{slips['p']:.4f}",
         "post_hoc_without_slips_q0_rate": _pct(slips["q0"]["unseen"], slips["q0"]["of"]),
         "confirmatory_p": f"{c['p']:.3f}",
@@ -567,6 +591,7 @@ def markdown(data: dict[str, Any]) -> str:
         f"- Read-class widenings (not counted): {r['read_widenings'] or 'none'}.",
         f"- Reviewer flags on grants within their label: {r['false_alarms_primary']}.",
         "",
+        *sonnet_markdown(data.get("post_hoc_sonnet") or {}),
         *measured_markdown(data["measured"]),
         "## The pilot (exploratory, unregistered, never pooled)",
         "",
@@ -579,6 +604,39 @@ def markdown(data: dict[str, Any]) -> str:
             f"{', '.join(p['utility_with_a_failed_run']) or '—'} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def sonnet_markdown(s: dict[str, Any]) -> list[str]:
+    if not s.get("planned"):
+        return []
+    lines = [
+        "## Post hoc: the reviewer re-run with Sonnet (never pooled, no test)",
+        "",
+        f"{s['label']}. {s['recorded']}/{s['planned']} calls recorded, resolving to "
+        f"{', '.join(s['model_ids'])}; sample {s['sample_trials']} registered trials "
+        f"({s['sample_widened_trials']} widened, {s['sample_clean_trials']} clean). "
+        "Baseline: the registered reviewer (claude-haiku-5-5), same view, same trials.",
+        "",
+        "| View | Widened caught: Sonnet | Haiku (registered) | Gained | Lost | Missed by both "
+        "| Clean trials flagged: Sonnet | Haiku | Within-label flags: Sonnet | Haiku "
+        "| Within-label grants |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for view, v in s["views"].items():
+        lines.append(
+            f"| {view} | {_of(v['caught'], v['widened_trials'])} | "
+            f"{_of(v['registered_caught'], v['widened_trials'])} | {v['gained']} | {v['lost']} "
+            f"| {v['missed_by_both']} | {v['clean_trials_flagged']}/{v['clean_trials']} | "
+            f"{v['registered_clean_trials_flagged']}/{v['clean_trials']} | {v['false_alarms']} "
+            f"| {v['registered_false_alarms']} | {v['grants_within_label']} |"
+        )
+    lines += [
+        "",
+        "Sonnet and Haiku are both Claude models: a difference here is diversity of "
+        "capability within one family, never independence.",
+        "",
+    ]
+    return lines
 
 
 def measured_markdown(m: dict[str, Any]) -> list[str]:

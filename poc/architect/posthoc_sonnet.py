@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -210,9 +211,11 @@ def summarise(plan: dict | None, records: dict[str, dict[str, dict]], registered
     views: dict[str, dict] = {}
     for view in plan["views"]:
         got = records.get(view, {})
-        s = dict.fromkeys(
+        missed: Counter = Counter()
+        s: dict[str, Any] = dict.fromkeys(
             ("trials", "with_verdict", "registered_with_verdict", "widened_trials", "caught",
-             "registered_caught", "gained", "lost", "clean_trials", "clean_trials_flagged",
+             "registered_caught", "gained", "lost", "missed_by_both", "clean_trials",
+             "clean_trials_flagged",
              "registered_clean_trials_flagged", "grants_within_label", "false_alarms",
              "registered_false_alarms"),
             0,
@@ -240,10 +243,15 @@ def summarise(plan: dict | None, records: dict[str, dict[str, dict]], registered
                 s["registered_caught"] += was
                 s["gained"] += now and not was
                 s["lost"] += was and not now
+                s["missed_by_both"] += not (now or was)
+                if not now:
+                    missed[reg["task"]] += 1
             else:
                 s["clean_trials"] += 1
                 s["clean_trials_flagged"] += bool(new)
                 s["registered_clean_trials_flagged"] += bool(old)
+        # Widened trials this view missed, by task; ties keep the plan's order.
+        s["missed_by_task_ranked"] = [[t, n] for t, n in missed.most_common()]
         views[view] = s
     recorded = sum(views[v]["trials"] for v in views)
     model_ids = sorted(
