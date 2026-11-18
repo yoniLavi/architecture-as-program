@@ -29,6 +29,12 @@ opam install ./src --deps-only -y
 
 # Aeneas's Makefile needs GNU make (`brew install make` provides `gmake` on macOS).
 MAKE_BIN="$(command -v gmake || command -v make)"
+"$MAKE_BIN" setup-charon || true   # its OCaml half may need the deps below first
+# Charon's OCaml library has dependencies of its own (e.g. ppx_deriving_hash).
+for opamfile in charon/charon-ml/*.opam charon/*.opam; do
+  [ -f "$opamfile" ] && opam install "$opamfile" --deps-only -y || true
+done
+opam install ppx_deriving_hash -y || true
 "$MAKE_BIN" setup-charon
 "$MAKE_BIN"
 
