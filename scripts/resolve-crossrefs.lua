@@ -117,7 +117,23 @@ function Pandoc(doc)
     while i <= #inlines do
       local el = inlines[i]
       local kind = (el.t == "Cite" and #el.citations == 1) and el.citations[1].id or nil
-      if kind
+      -- Pandoc 3.14 reads a reference to a label in the document as a Link of class
+      -- `ref` targeting `#kind:label`, with any punctuation after it a separate Str.
+      -- Pandoc 3.13 and earlier gave a Cite on `kind` followed by Str ":label", below.
+      local link_kind, link_label
+      if el.t == "Link" and el.classes:includes("ref") then
+        link_kind, link_label = el.target:match("^#([%a]+):([%w%-]+)$")
+      end
+      if link_kind and (link_kind == "sec" or KINDS[link_kind]) then
+        local full_label = link_kind .. ":" .. link_label
+        if link_kind == "sec" then
+          result:insert(pandoc.Str("§" .. (label_map[full_label] or link_label)))
+        else
+          local num = anchor_numbers[full_label]
+          result:insert(pandoc.Str(KINDS[link_kind] .. " " .. (num or link_label)))
+        end
+        i = i + 1
+      elseif kind
         and (kind == "sec" or KINDS[kind])
         and i + 1 <= #inlines
         and inlines[i + 1].t == "Str"
